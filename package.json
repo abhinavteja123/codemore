@@ -1,0 +1,247 @@
+{
+  "name": "codemore",
+  "displayName": "CodeMore",
+  "description": "Developer-Centric Code Intelligence Tool with AI-powered suggestions and project-wide analysis",
+  "version": "1.0.0",
+  "publisher": "codemore",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "code quality",
+    "ai",
+    "refactoring",
+    "code analysis",
+    "technical debt"
+  ],
+  "icon": "resources/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/codemore/codemore-vscode"
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codemore.openDashboard",
+        "title": "Open Code Quality Dashboard",
+        "category": "CodeMore"
+      },
+      {
+        "command": "codemore.analyzeWorkspace",
+        "title": "Analyze Workspace",
+        "category": "CodeMore"
+      },
+      {
+        "command": "codemore.analyzeCurrentFile",
+        "title": "Analyze Current File",
+        "category": "CodeMore"
+      },
+      {
+        "command": "codemore.applySuggestion",
+        "title": "Apply Suggestion",
+        "category": "CodeMore"
+      },
+      {
+        "command": "codemore.restartDaemon",
+        "title": "Restart Context Daemon",
+        "category": "CodeMore"
+      },
+      {
+        "command": "codemore.showLogs",
+        "title": "Show Daemon Logs",
+        "category": "CodeMore"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codemore",
+          "title": "CodeMore",
+          "icon": "resources/activity-bar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "codemore": [
+        {
+          "type": "webview",
+          "id": "codemore.dashboard",
+          "name": "Code Quality Dashboard"
+        }
+      ]
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codemore.analyzeCurrentFile",
+          "group": "codemore"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "codemore.openDashboard"
+        },
+        {
+          "command": "codemore.analyzeWorkspace"
+        },
+        {
+          "command": "codemore.restartDaemon"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "codemore.openDashboard",
+        "key": "ctrl+shift+q",
+        "mac": "cmd+shift+q"
+      },
+      {
+        "command": "codemore.analyzeCurrentFile",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a"
+      }
+    ],
+    "configuration": {
+      "title": "CodeMore",
+      "properties": {
+        "codemore.aiProvider": {
+          "type": "string",
+          "default": "openai",
+          "enum": [
+            "openai",
+            "anthropic",
+            "gemini",
+            "local"
+          ],
+          "enumDescriptions": [
+            "OpenAI GPT models",
+            "Anthropic Claude models",
+            "Google Gemini models",
+            "Local LLM server"
+          ],
+          "description": "AI provider for code analysis"
+        },
+        "codemore.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for the AI provider"
+        },
+        "codemore.autoAnalyze": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically analyze files on save"
+        },
+        "codemore.analysisDelay": {
+          "type": "number",
+          "default": 2000,
+          "description": "Delay in milliseconds before analyzing after file changes"
+        },
+        "codemore.excludePatterns": {
+          "type": "array",
+          "default": [
+            "**/node_modules/**",
+            "**/dist/**",
+            "**/build/**",
+            "**/.git/**"
+          ],
+          "description": "Glob patterns to exclude from analysis"
+        },
+        "codemore.maxFileSizeKB": {
+          "type": "number",
+          "default": 500,
+          "description": "Maximum file size in KB to analyze"
+        },
+        "codemore.enableTelemetry": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable anonymous usage telemetry"
+        },
+        "codemore.analysisTools": {
+          "type": "string",
+          "default": "both",
+          "enum": [
+            "both",
+            "external",
+            "internal"
+          ],
+          "enumDescriptions": [
+            "Use both external tools (Biome, Ruff, TFLint) and internal analyzers",
+            "Use only external tools (Biome, Ruff, TFLint)",
+            "Use only internal static analyzers"
+          ],
+          "description": "Select which analysis tools to use during code analysis"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run compile:extension && npm run compile:daemon && npm run compile:webview",
+    "compile:extension": "webpack --mode development",
+    "compile:daemon": "webpack --mode development --config webpack.daemon.config.js",
+    "compile:webview": "webpack --mode development --config webpack.webview.config.js",
+    "watch": "concurrently \"npm run watch:extension\" \"npm run watch:daemon\" \"npm run watch:webview\"",
+    "watch:extension": "webpack --mode development --watch",
+    "watch:daemon": "webpack --mode development --watch --config webpack.daemon.config.js",
+    "watch:webview": "webpack --mode development --watch --config webpack.webview.config.js",
+    "package": "webpack --mode production --devtool hidden-source-map && webpack --mode production --config webpack.daemon.config.js && webpack --mode production --config webpack.webview.config.js",
+    "download-binaries": "node scripts/download-binaries.js --current-platform",
+    "download-binaries:all": "node scripts/download-binaries.js",
+    "postinstall": "node scripts/download-binaries.js --skip-download",
+    "lint": "eslint src daemon webview --ext ts,tsx",
+    "lint:fix": "eslint src daemon webview --ext ts,tsx --fix",
+    "test": "node ./out/test/runTest.js",
+    "test:unit": "mocha --require ts-node/register 'test/**/*.test.ts'",
+    "pretest": "npm run compile",
+    "vsce:package": "npm run download-binaries:all && vsce package",
+    "vsce:publish": "npm run download-binaries:all && vsce publish"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.2",
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@types/uuid": "^10.0.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "@vscode/codicons": "^0.0.44",
+    "@vscode/test-electron": "^2.3.8",
+    "@vscode/vsce": "^2.22.0",
+    "concurrently": "^8.2.2",
+    "css-loader": "^6.8.1",
+    "eslint": "^8.56.0",
+    "glob": "^10.3.10",
+    "minimatch": "^10.1.1",
+    "mocha": "^10.2.0",
+    "style-loader": "^3.3.3",
+    "ts-loader": "^9.5.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@google/generative-ai": "^0.24.1",
+    "chokidar": "^3.5.3",
+    "diff": "^5.1.0",
+    "lucide-react": "^0.563.0",
+    "openai": "^4.24.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tree-kill": "^1.2.2",
+    "uuid": "^9.0.1"
+  }
+}
