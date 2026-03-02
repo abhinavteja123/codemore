@@ -143,7 +143,7 @@ async function extractArchive(archivePath, destDir, binaryName) {
             await execAsync(`powershell -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${destDir}' -Force"`);
         } else {
             // Use unzip command on Unix-like systems
-            await execAsync(`unzip -o "${archivePath}" -d "${destDir}"`);
+execAsync(`unzip -o "${archivePath}" -d "${destDir}"`) // FixedexecAsync(`unzip -o "${archivePath}" -d "${destDir}"`);
         }
     } else if (archivePath.endsWith('.tar.gz')) {
         // Use tar command (available on Windows 10+ and Unix-like systems)

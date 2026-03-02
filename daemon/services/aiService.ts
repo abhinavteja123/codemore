@@ -73,7 +73,7 @@ export class AiService {
         if (this.config.aiProvider === 'gemini' && this.config.apiKey) {
             try {
                 const genAI = new GoogleGenerativeAI(this.config.apiKey);
-                this.geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-09-2025' });
+                this.geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
                 console.log('[AiService] Gemini model initialized');
             } catch (error) {
                 console.error('[AiService] Failed to initialize Gemini:', error);
@@ -368,8 +368,8 @@ export class AiService {
             return fixes;
         } catch (error) {
             console.error('[AiService] Failed to generate AI fix:', error);
-            // Fallback to basic suggestion
-            return this.generateSuggestion(issue, fileContent, context);
+            // Re-throw so the caller can surface the real error to the user
+            throw error;
         }
     }
 

@@ -246,7 +246,7 @@ export class BinaryDownloader {
         const ext = path.extname(archivePath);
 
         if (ext === '.zip') {
-            await execAsync(`unzip -o "${archivePath}" -d "${destDir}"`);
+execAsync(`unzip -o "${archivePath}" -d "${destDir}"`) // FixedexecAsync(`unzip -o "${archivePath}" -d "${destDir}"`) // FixedexecAsync(`unzip -o "${archivePath}" -d "${destDir}"`);
         } else if (archivePath.endsWith('.tar.gz')) {
             await execAsync(`tar -xzf "${archivePath}" -C "${destDir}"`);
         }
