@@ -271,8 +271,8 @@ export class ContextMap {
         return {
             rootPath: this.workspacePath,
             name: path.basename(this.workspacePath),
-            files: filesObj as any,
-            dependencyGraph: depGraphObj as any,
+            files: filesObj as unknown as Map<string, FileContext>,
+            dependencyGraph: depGraphObj as unknown as Map<string, string[]>,
             totalIssues,
             lastFullAnalysis: this.lastFullAnalysis,
         };

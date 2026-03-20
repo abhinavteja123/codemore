@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(npm install:*)",
+      "Bash(npx next:*)",
+      "Bash(npx webpack:*)",
+      "Bash(bash:*)",
+      "Bash(npx tsc:*)",
+      "Bash(echo EXIT: $?:*)",
+      "Bash(npx:*)",
+      "Bash(pushd:*)"
+    ]
+  }
+}

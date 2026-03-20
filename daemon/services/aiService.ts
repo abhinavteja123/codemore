@@ -492,8 +492,12 @@ IMPORTANT:
             throw new Error('Failed to parse AI response');
         }
 
-        const suggestions = JSON.parse(jsonMatch[0]) as CodeSuggestion[];
-        return suggestions;
+        try {
+            const suggestions = JSON.parse(jsonMatch[0]) as CodeSuggestion[];
+            return suggestions;
+        } catch {
+            return [];
+        }
     }
 
     /**
@@ -535,6 +539,7 @@ IMPORTANT:
      * Call Anthropic for fix generation
      */
     private async callAnthropicForFix(prompt: string): Promise<string> {
+        if (!this.config.apiKey) throw new Error('Anthropic API key not configured');
         const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: {
@@ -672,7 +677,11 @@ IMPORTANT:
             // Parse JSON from response
             const jsonMatch = content.match(/\[[\s\S]*\]/);
             if (jsonMatch) {
-                return JSON.parse(jsonMatch[0]);
+                try {
+                    return JSON.parse(jsonMatch[0]);
+                } catch {
+                    return [];
+                }
             }
 
             return [];
@@ -686,6 +695,7 @@ IMPORTANT:
      * Call Anthropic API
      */
     private async callAnthropic(prompt: string): Promise<CodeIssue[]> {
+        if (!this.config.apiKey) throw new Error('Anthropic API key not configured');
         try {
             const response = await fetch('https://api.anthropic.com/v1/messages', {
                 method: 'POST',
@@ -720,7 +730,11 @@ IMPORTANT:
             // Parse JSON from response
             const jsonMatch = content.match(/\[[\s\S]*\]/);
             if (jsonMatch) {
-                return JSON.parse(jsonMatch[0]);
+                try {
+                    return JSON.parse(jsonMatch[0]);
+                } catch {
+                    return [];
+                }
             }
 
             return [];
@@ -820,7 +834,11 @@ Return ONLY a valid JSON array, no additional text or markdown.`;
             // Parse JSON from response
             const jsonMatch = content.match(/\[[\s\S]*\]/);
             if (jsonMatch) {
-                return JSON.parse(jsonMatch[0]);
+                try {
+                    return JSON.parse(jsonMatch[0]);
+                } catch {
+                    return [];
+                }
             }
 
             return [];

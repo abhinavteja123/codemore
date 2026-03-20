@@ -5,6 +5,7 @@
  * Prioritizes suggestions by impact and confidence.
  */
 
+import * as path from 'path';
 import { AiService } from './aiService';
 import { ContextMap } from './contextMap';
 import {

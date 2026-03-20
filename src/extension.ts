@@ -6,6 +6,7 @@
  */
 
 import * as vscode from 'vscode';
+import { minimatch } from 'minimatch';
 import { DaemonManager } from './daemon/daemonManager';
 import { RpcClient } from './rpc/rpcClient';
 import { WebviewProvider } from './providers/webviewProvider';
@@ -529,7 +530,6 @@ function getConfiguration(): DaemonConfig {
  * Check if a file should be excluded from analysis
  */
 function shouldExcludeFile(filePath: string, patterns: string[]): boolean {
-    const minimatch = require('minimatch');
     return patterns.some((pattern) => minimatch(filePath, pattern, { dot: true }));
 }
 
