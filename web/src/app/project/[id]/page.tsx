@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -44,6 +44,8 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Settings,
+  Key,
 } from "lucide-react";
 import {
   Project,
@@ -53,6 +55,8 @@ import {
   IssueCategory,
   ScanHistoryEntry,
   ProjectFile,
+  AiSettings,
+  AiProvider,
 } from "@/lib/types";
 
 type Tab = "overview" | "issues" | "files" | "history";
@@ -105,6 +109,45 @@ export default function ProjectPage() {
   const [notFound, setNotFound] = useState(false);
   const [scanHistory, setScanHistory] = useState<ScanHistoryEntry[]>([]);
   const [showBadgeModal, setShowBadgeModal] = useState(false);
+
+  // AI Settings state (matches extension pattern)
+  const [aiSettings, setAiSettings] = useState<AiSettings>({
+    aiProvider: "openai",
+    apiKey: "",
+  });
+  const [showAiSettings, setShowAiSettings] = useState(false);
+
+  // Ref for scrolling to selected issue panel
+  const selectedIssuePanelRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to selected issue panel when issue is selected
+  useEffect(() => {
+    if (selectedIssue && selectedIssuePanelRef.current) {
+      setTimeout(() => {
+        selectedIssuePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  }, [selectedIssue]);
+
+  // Load AI settings from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("codemore_ai_settings");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as AiSettings;
+        setAiSettings(parsed);
+      } catch {
+        // Invalid saved settings, use defaults
+      }
+    }
+  }, []);
+
+  // Save AI settings to localStorage
+  const saveAiSettings = () => {
+    localStorage.setItem("codemore_ai_settings", JSON.stringify(aiSettings));
+    toast.success("AI settings saved");
+    setShowAiSettings(false);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -190,12 +233,24 @@ export default function ProjectPage() {
   const selectedIssueSuggestions = selectedIssue ? suggestionsByIssue[selectedIssue.id] || [] : [];
 
   const handleGenerateFix = async (issue: CodeIssue) => {
+    // Validate AI settings before generating
+    if (!aiSettings.apiKey) {
+      toast.error("Please configure your AI API key in the AI Settings section below");
+      setShowAiSettings(true);
+      return;
+    }
+
     setGeneratingFixIssueId(issue.id);
     try {
       const res = await fetch(`/api/projects/${projectId}/suggestions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ issueId: issue.id, includeRelatedFiles: true }),
+        body: JSON.stringify({
+          issueId: issue.id,
+          includeRelatedFiles: true,
+          aiProvider: aiSettings.aiProvider,
+          apiKey: aiSettings.apiKey,
+        }),
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -983,7 +1038,10 @@ export default function ProjectPage() {
             )}
 
             {selectedIssue && (
-              <div className="mt-6 rounded-xl border border-surface-800 bg-surface-900/60 p-5">
+              <div
+                ref={selectedIssuePanelRef}
+                className="mt-6 rounded-xl border border-surface-800 bg-surface-900/60 p-5"
+              >
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-surface-500">
@@ -1015,6 +1073,99 @@ export default function ProjectPage() {
                 <p className="mb-4 text-sm text-surface-400">
                   Generate a focused fix suggestion for this issue using the same AI fix engine family used by the extension.
                 </p>
+
+                {/* AI Settings Section */}
+                <div className="mb-4 rounded-lg border border-surface-700 bg-surface-800/30">
+                  <button
+                    onClick={() => setShowAiSettings(!showAiSettings)}
+                    className="flex w-full items-center justify-between px-4 py-3 text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Settings size={16} className="text-surface-400" />
+                      <span className="text-sm font-medium text-surface-300">
+                        AI Settings
+                      </span>
+                      {aiSettings.apiKey && (
+                        <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                          Configured
+                        </span>
+                      )}
+                    </div>
+                    {showAiSettings ? (
+                      <ChevronDown size={16} className="text-surface-500" />
+                    ) : (
+                      <ChevronRight size={16} className="text-surface-500" />
+                    )}
+                  </button>
+
+                  {showAiSettings && (
+                    <div className="border-t border-surface-700 px-4 py-4">
+                      <p className="mb-3 text-xs text-surface-500">
+                        Configure your LLM provider and API key to generate AI-powered fix suggestions.
+                      </p>
+
+                      <div className="mb-3">
+                        <label className="mb-1 block text-xs font-medium text-surface-400">
+                          Provider
+                        </label>
+                        <select
+                          value={aiSettings.aiProvider}
+                          onChange={(e) =>
+                            setAiSettings({
+                              ...aiSettings,
+                              aiProvider: e.target.value as AiProvider,
+                            })
+                          }
+                          className="w-full rounded-lg border border-surface-600 bg-surface-900 px-3 py-2 text-sm text-white outline-none focus:border-brand-500"
+                        >
+                          <option value="openai">OpenAI (GPT-4)</option>
+                          <option value="anthropic">Anthropic (Claude)</option>
+                          <option value="gemini">Google Gemini</option>
+                        </select>
+                      </div>
+
+                      <div className="mb-4">
+                        <label className="mb-1 block text-xs font-medium text-surface-400">
+                          API Key
+                        </label>
+                        <div className="relative">
+                          <Key
+                            size={14}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-500"
+                          />
+                          <input
+                            type="password"
+                            value={aiSettings.apiKey}
+                            onChange={(e) =>
+                              setAiSettings({
+                                ...aiSettings,
+                                apiKey: e.target.value,
+                              })
+                            }
+                            placeholder={`Enter your ${
+                              aiSettings.aiProvider === "openai"
+                                ? "OpenAI"
+                                : aiSettings.aiProvider === "anthropic"
+                                ? "Anthropic"
+                                : "Gemini"
+                            } API key`}
+                            className="w-full rounded-lg border border-surface-600 bg-surface-900 py-2 pl-9 pr-3 text-sm text-white outline-none placeholder:text-surface-500 focus:border-brand-500"
+                          />
+                        </div>
+                        <p className="mt-1 text-[10px] text-surface-500">
+                          Your API key is stored locally in your browser and sent securely with each request.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={saveAiSettings}
+                        className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-black transition hover:bg-brand-400"
+                      >
+                        Save Settings
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 {selectedIssueSuggestions.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-surface-700 px-4 py-6 text-sm text-surface-500">

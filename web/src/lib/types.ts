@@ -120,3 +120,16 @@ export interface ScanHistoryEntry {
   techDebtMinutes: number;
   scannedAt: string;
 }
+
+// AI Settings types (matches extension pattern)
+export type AiProvider = "openai" | "anthropic" | "gemini";
+
+export interface AiSettings {
+  aiProvider: AiProvider;
+  apiKey: string;
+}
+
+export interface AiConfig {
+  aiProvider?: string;
+  apiKey?: string;
+}

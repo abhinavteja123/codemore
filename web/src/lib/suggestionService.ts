@@ -4,7 +4,7 @@ import {
   saveSuggestionsForIssue,
 } from "./database";
 import { generateFixSuggestionsForIssue } from "./fixSuggestions";
-import { CodeIssue, CodeSuggestion, Project } from "./types";
+import { AiConfig, CodeIssue, CodeSuggestion, Project } from "./types";
 
 export class SuggestionServiceError extends Error {
   constructor(
@@ -63,6 +63,7 @@ export async function resolveSuggestionsForProjectIssue(
   userEmail: string,
   issueId: string,
   includeRelatedFiles: boolean = true,
+  aiConfig?: AiConfig,
   deps: SuggestionServiceDeps = defaultDeps
 ): Promise<{ suggestions: CodeSuggestion[]; cached: boolean }> {
   if (!issueId) {
@@ -78,15 +79,20 @@ export async function resolveSuggestionsForProjectIssue(
     throw new SuggestionServiceError("Issue not found on latest scan", 404);
   }
 
-  const cachedSuggestions = await deps.getSuggestionsForIssue(issue.id);
-  if (cachedSuggestions.length > 0) {
-    return { suggestions: cachedSuggestions, cached: true };
+  // Only use cached suggestions if no custom AI config is provided
+  // This allows users to regenerate with different providers/keys
+  if (!aiConfig?.apiKey) {
+    const cachedSuggestions = await deps.getSuggestionsForIssue(issue.id);
+    if (cachedSuggestions.length > 0) {
+      return { suggestions: cachedSuggestions, cached: true };
+    }
   }
 
   const suggestions = await deps.generateFixSuggestionsForIssue(
     project.files || [],
     issue,
-    includeRelatedFiles
+    includeRelatedFiles,
+    aiConfig
   );
 
   await deps.saveSuggestionsForIssue(project.id, issue.id, suggestions);

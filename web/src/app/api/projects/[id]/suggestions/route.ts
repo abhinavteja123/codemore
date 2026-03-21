@@ -53,12 +53,18 @@ export async function POST(
   const issueId = body.issueId as string | undefined;
   const includeRelatedFiles = body.includeRelatedFiles !== false;
 
+  // Extract AI config from request body (user-provided LLM settings)
+  const aiConfig = body.aiProvider && body.apiKey
+    ? { aiProvider: body.aiProvider, apiKey: body.apiKey }
+    : undefined;
+
   try {
     const result = await resolveSuggestionsForProjectIssue(
       params.id,
       session.user.email,
       issueId || "",
-      includeRelatedFiles
+      includeRelatedFiles,
+      aiConfig
     );
     return NextResponse.json(result);
   } catch (error) {

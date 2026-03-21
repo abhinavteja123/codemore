@@ -6,14 +6,29 @@ import type {
   DaemonConfig,
   FileContext,
 } from "../../../shared/protocol";
-import { CodeIssue, CodeSuggestion, ProjectFile } from "./types";
+import { AiConfig, CodeIssue, CodeSuggestion, ProjectFile } from "./types";
 
 type FileBundle = {
   file: ProjectFile;
   context: FileContext;
 };
 
-function getAiProviderConfig(): Pick<DaemonConfig, "aiProvider" | "apiKey"> {
+/**
+ * Get AI provider config - uses user-provided config if available,
+ * otherwise falls back to server environment variables.
+ * This allows the web app to work like the extension where users
+ * configure their own LLM provider and API key.
+ */
+function getAiProviderConfig(aiConfig?: AiConfig): Pick<DaemonConfig, "aiProvider" | "apiKey"> {
+  // If user provided config, use it
+  if (aiConfig?.aiProvider && aiConfig?.apiKey) {
+    return {
+      aiProvider: aiConfig.aiProvider as DaemonConfig["aiProvider"],
+      apiKey: aiConfig.apiKey,
+    };
+  }
+
+  // Fall back to environment variables
   const provider = (process.env.CODEMORE_AI_PROVIDER ||
     (process.env.OPENAI_API_KEY
       ? "openai"
@@ -36,8 +51,8 @@ function getAiProviderConfig(): Pick<DaemonConfig, "aiProvider" | "apiKey"> {
   return { aiProvider: provider, apiKey };
 }
 
-function createAiService(): AiService {
-  const providerConfig = getAiProviderConfig();
+function createAiService(aiConfig?: AiConfig): AiService {
+  const providerConfig = getAiProviderConfig(aiConfig);
   return new AiService({
     ...providerConfig,
     autoAnalyze: false,
@@ -157,7 +172,8 @@ function gatherRelatedFiles(
 export async function generateFixSuggestionsForIssue(
   files: ProjectFile[],
   issue: CodeIssue,
-  includeRelatedFiles: boolean = true
+  includeRelatedFiles: boolean = true,
+  aiConfig?: AiConfig
 ): Promise<CodeSuggestion[]> {
   const fileBundles = await buildFileBundles(files);
   const targetPath = normalizePath(issue.location.filePath);
@@ -171,7 +187,7 @@ export async function generateFixSuggestionsForIssue(
     ? gatherRelatedFiles(targetPath, targetBundle.context, fileBundles)
     : [];
 
-  const aiService = createAiService();
+  const aiService = createAiService(aiConfig);
   const suggestions = await aiService.generateAiFixForIssue(
     issue as unknown as SharedCodeIssue,
     targetBundle.file.content,
