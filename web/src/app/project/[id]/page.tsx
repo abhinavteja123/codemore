@@ -8,6 +8,7 @@ import HealthScore from "@/components/HealthScore";
 import SeverityBadge from "@/components/SeverityBadge";
 import CategoryBadge from "@/components/CategoryBadge";
 import { toast } from "sonner";
+import { waitForScanJobCompletion } from "@/lib/scanJobClient";
 import { generateSarif } from "@/lib/sarif";
 import {
   ArrowLeft,
@@ -47,9 +48,11 @@ import {
 import {
   Project,
   CodeIssue,
+  CodeSuggestion,
   Severity,
   IssueCategory,
   ScanHistoryEntry,
+  ProjectFile,
 } from "@/lib/types";
 
 type Tab = "overview" | "issues" | "files" | "history";
@@ -83,6 +86,7 @@ const categoryIcons: Record<IssueCategory, React.ReactNode> = {
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
+  const projectId = String(params.id);
   const [project, setProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [searchQuery, setSearchQuery] = useState("");
@@ -94,35 +98,72 @@ export default function ProjectPage() {
   >(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<CodeIssue | null>(null);
+  const [suggestionsByIssue, setSuggestionsByIssue] = useState<Record<string, CodeSuggestion[]>>({});
+  const [generatingFixIssueId, setGeneratingFixIssueId] = useState<string | null>(null);
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
   const [reanalyzing, setReanalyzing] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [scanHistory, setScanHistory] = useState<ScanHistoryEntry[]>([]);
   const [showBadgeModal, setShowBadgeModal] = useState(false);
 
-  // Load project from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("codemore_projects");
-    if (saved) {
+    let cancelled = false;
+
+    async function loadProject() {
+      const saved = localStorage.getItem("codemore_projects");
+      let localProject: Project | null = null;
+
+      if (saved) {
+        try {
+          const projects: Project[] = JSON.parse(saved);
+          localProject = projects.find((p) => p.id === projectId) || null;
+        } catch {
+          localProject = null;
+        }
+      }
+
       try {
-        const projects: Project[] = JSON.parse(saved);
-        const found = projects.find((p) => p.id === params.id);
-        if (found) {
-          setProject(found);
+        const res = await fetch(`/api/projects/${projectId}`);
+        if (res.ok) {
+          const data = await res.json();
+          const apiProject = data.project as Project;
+          const mergedProject: Project = {
+            ...apiProject,
+            files: apiProject.files?.length ? apiProject.files : (localProject?.files || []),
+          };
+
+          if (!cancelled) {
+            setProject(mergedProject);
+            setNotFound(false);
+          }
+          return;
+        }
+      } catch {
+        // fall back to local cache below
+      }
+
+      if (!cancelled) {
+        if (localProject) {
+          setProject(localProject);
+          setNotFound(false);
         } else {
           setNotFound(true);
         }
-      } catch { /* ignore */ }
-    } else {
-      setNotFound(true);
+      }
     }
-  }, [params.id]);
+
+    loadProject();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   // Fetch scan history from DB
   useEffect(() => {
     async function loadHistory() {
       try {
-        const res = await fetch(`/api/projects/${params.id}/scans`);
+        const res = await fetch(`/api/projects/${projectId}/scans`);
         if (res.ok) {
           const data = await res.json();
           if (data.scans) {
@@ -141,11 +182,75 @@ export default function ProjectPage() {
         }
       } catch { /* DB not configured */ }
     }
-    if (params.id) loadHistory();
-  }, [params.id, reanalyzing]);
+    if (projectId) loadHistory();
+  }, [projectId, reanalyzing]);
 
   const metrics = project?.metrics;
   const issues = useMemo(() => project?.issues || [], [project?.issues]);
+  const selectedIssueSuggestions = selectedIssue ? suggestionsByIssue[selectedIssue.id] || [] : [];
+
+  const handleGenerateFix = async (issue: CodeIssue) => {
+    setGeneratingFixIssueId(issue.id);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/suggestions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issueId: issue.id, includeRelatedFiles: true }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || "Failed to generate fix suggestions");
+      }
+
+      setSuggestionsByIssue((prev) => ({
+        ...prev,
+        [issue.id]: Array.isArray(payload.suggestions) ? payload.suggestions : [],
+      }));
+      if ((payload.suggestions || []).length === 0) {
+        toast.info("No suggestions were generated for this issue.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to generate fix suggestions");
+    }
+    setGeneratingFixIssueId(null);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCachedSuggestions() {
+      if (!selectedIssue) {
+        return;
+      }
+      if (suggestionsByIssue[selectedIssue.id]) {
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `/api/projects/${projectId}/suggestions?issueId=${encodeURIComponent(selectedIssue.id)}`
+        );
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || cancelled) {
+          return;
+        }
+
+        if (Array.isArray(payload.suggestions) && payload.suggestions.length > 0) {
+          setSuggestionsByIssue((prev) => ({
+            ...prev,
+            [selectedIssue.id]: payload.suggestions,
+          }));
+        }
+      } catch {
+        // Ignore cache hydration failures and let manual generation continue to work.
+      }
+    }
+
+    void loadCachedSuggestions();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, selectedIssue, suggestionsByIssue]);
 
   // Filtered issues
   const filteredIssues = useMemo(() => {
@@ -195,42 +300,94 @@ export default function ProjectPage() {
 
   // Reanalyze
   const handleReanalyze = async () => {
-    if (!project?.files) return;
+    if (!project) return;
+
     setReanalyzing(true);
     try {
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ files: project.files }),
-      });
-      if (res.ok) {
-        const result = await res.json();
-        const updated = {
-          ...project,
-          metrics: result.metrics,
-          issues: result.issues,
-          analyzedAt: Date.now(),
-        };
-        setProject(updated);
+      if (project.source === "github" && project.repoFullName) {
+        const res = await fetch("/api/scan-jobs/github", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: project.name,
+            projectId: project.id,
+            repoFullName: project.repoFullName,
+          }),
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(payload.error || "Failed to re-analyze repository");
+        }
 
-        // Update in localStorage
+        let updated = payload.project as Project | null;
+        if (!updated && payload.job?.id) {
+          const completed = await waitForScanJobCompletion(payload.job.id);
+          updated = completed.project;
+        }
+        if (!updated) {
+          throw new Error("Completed scan did not return a project snapshot");
+        }
+        setProject(updated);
         const saved = localStorage.getItem("codemore_projects");
         if (saved) {
           const projects: Project[] = JSON.parse(saved);
           const idx = projects.findIndex((p) => p.id === project.id);
           if (idx !== -1) {
             projects[idx] = updated;
-            localStorage.setItem(
-              "codemore_projects",
-              JSON.stringify(projects)
-            );
+            localStorage.setItem("codemore_projects", JSON.stringify(projects));
           }
         }
+        toast.success("Re-analysis complete");
+        setReanalyzing(false);
+        return;
       }
+
+      const files: ProjectFile[] = project.files || [];
+      if (files.length === 0) {
+        throw new Error("Source files are unavailable for re-analysis");
+      }
+
+      const res = await fetch("/api/scan-jobs/files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: project.id,
+          name: project.name,
+          source: project.source,
+          repoFullName: project.repoFullName,
+          files,
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || "Re-analysis failed");
+      }
+
+      let updated = payload.project as Project | null;
+      if (!updated && payload.job?.id) {
+        const completed = await waitForScanJobCompletion(payload.job.id);
+        updated = completed.project;
+      }
+      if (!updated) {
+        throw new Error("Completed scan did not return a project snapshot");
+      }
+      setProject(updated);
+
+      const saved = localStorage.getItem("codemore_projects");
+      if (saved) {
+        const projects: Project[] = JSON.parse(saved);
+        const idx = projects.findIndex((p) => p.id === project.id);
+        if (idx !== -1) {
+          projects[idx] = updated;
+          localStorage.setItem("codemore_projects", JSON.stringify(projects));
+        }
+      }
+
       toast.success("Re-analysis complete");
     } catch (error) {
       console.error("Reanalysis failed:", error);
-      toast.error("Re-analysis failed");
+      const message = error instanceof Error ? error.message : "Re-analysis failed";
+      toast.error(message);
     }
     setReanalyzing(false);
   };
@@ -822,6 +979,82 @@ export default function ProjectPage() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+
+            {selectedIssue && (
+              <div className="mt-6 rounded-xl border border-surface-800 bg-surface-900/60 p-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-surface-500">
+                      Selected Issue
+                    </p>
+                    <h3 className="mt-1 text-lg font-semibold text-white">
+                      {selectedIssue.title}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => handleGenerateFix(selectedIssue)}
+                    disabled={generatingFixIssueId === selectedIssue.id}
+                    className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-black transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {generatingFixIssueId === selectedIssue.id ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Generating Fix
+                      </>
+                    ) : (
+                      <>
+                        <Lightbulb size={14} />
+                        Generate Fix
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <p className="mb-4 text-sm text-surface-400">
+                  Generate a focused fix suggestion for this issue using the same AI fix engine family used by the extension.
+                </p>
+
+                {selectedIssueSuggestions.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-surface-700 px-4 py-6 text-sm text-surface-500">
+                    No suggestions generated yet for this issue.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {selectedIssueSuggestions.map((suggestion) => (
+                      <div
+                        key={suggestion.id}
+                        className="rounded-lg border border-surface-800 bg-surface-950/60 p-4"
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <h4 className="font-medium text-white">{suggestion.title}</h4>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(suggestion.suggestedCode);
+                              toast.success("Suggested fix copied");
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md border border-surface-700 px-2 py-1 text-xs text-surface-300 transition hover:border-surface-500 hover:text-white"
+                          >
+                            <Copy size={12} />
+                            Copy Fix
+                          </button>
+                        </div>
+                        <p className="mb-3 text-sm text-surface-400">
+                          {suggestion.description}
+                        </p>
+                        <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-surface-500">
+                          <span>{suggestion.confidence}% confidence</span>
+                          <span>{suggestion.impact}% impact</span>
+                          <span>{suggestion.tags.join(", ")}</span>
+                        </div>
+                        <pre className="code-snippet">
+                          <code>{suggestion.suggestedCode}</code>
+                        </pre>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

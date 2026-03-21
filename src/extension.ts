@@ -23,6 +23,7 @@ let rpcClient: RpcClient | undefined;
 let webviewProvider: WebviewProvider | undefined;
 let outputChannel: vscode.OutputChannel;
 let statusBarItem: vscode.StatusBarItem;
+let daemonNotificationDisposables: vscode.Disposable[] = [];
 
 // Current state
 let currentIssues: CodeIssue[] = [];
@@ -154,6 +155,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
  */
 export async function deactivate(): Promise<void> {
     outputChannel?.appendLine('CodeMore extension deactivating...');
+
+    for (const disposable of daemonNotificationDisposables) {
+        disposable.dispose();
+    }
+    daemonNotificationDisposables = [];
 
     try {
         // Gracefully shutdown daemon
@@ -352,12 +358,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
  * Register event handlers for file changes and workspace updates
  */
 function registerEventHandlers(context: vscode.ExtensionContext): void {
-    const config = getConfiguration();
     let debounceTimer: NodeJS.Timeout | undefined;
 
     // File save handler - trigger analysis
     context.subscriptions.push(
         vscode.workspace.onDidSaveTextDocument(async (document) => {
+            const config = getConfiguration();
             if (!config.autoAnalyze || !rpcClient || !isDaemonReady) {
                 return;
             }
@@ -397,7 +403,7 @@ function registerEventHandlers(context: vscode.ExtensionContext): void {
             const filePath = event.document.uri.fsPath;
             
             // Skip non-file URIs (like output channels, extension-output, etc.)
-            if (!event.document.uri.scheme.startsWith('file')) {
+            if (event.document.uri.scheme !== 'file') {
                 return;
             }
             
@@ -461,12 +467,25 @@ function setupDaemonNotifications(): void {
         return;
     }
 
-    rpcClient.onNotification('daemon/ready', (params: { version: string }) => {
+    for (const disposable of daemonNotificationDisposables) {
+        disposable.dispose();
+    }
+    daemonNotificationDisposables = [];
+
+    daemonNotificationDisposables.push(rpcClient.onNotification('daemon/ready', (params: { version: string }) => {
         outputChannel.appendLine(`Daemon ready: v${params.version}`);
         updateStatusBar('ready');
-    });
+    }));
 
-    rpcClient.onNotification('daemon/analysisProgress', (params: { filePath: string; progress: number; total: number }) => {
+    daemonNotificationDisposables.push(rpcClient.onNotification('daemon/fileDiscovery', (params: { totalFiles: number; fileTypes: Record<string, number> }) => {
+        webviewProvider?.postMessage({
+            type: 'fileDiscovery',
+            totalFiles: params.totalFiles,
+            fileTypes: params.fileTypes,
+        });
+    }));
+
+    daemonNotificationDisposables.push(rpcClient.onNotification('daemon/analysisProgress', (params: { filePath: string; progress: number; total: number }) => {
         webviewProvider?.postMessage({
             type: 'analysisProgress',
             progress: params.progress,
@@ -474,35 +493,43 @@ function setupDaemonNotifications(): void {
             currentFile: params.filePath,
         });
         statusBarItem.text = `$(sync~spin) CodeMore (${params.progress}/${params.total})`;
-    });
+    }));
 
-    rpcClient.onNotification('daemon/analysisComplete', (params: { filePath: string; issues: CodeIssue[] }) => {
+    daemonNotificationDisposables.push(rpcClient.onNotification('daemon/analysisComplete', (params: { filePath: string; issues: CodeIssue[] }) => {
         outputChannel.appendLine(`Analysis complete: ${params.filePath}`);
-    });
+        webviewProvider?.postMessage({ type: 'analysisComplete' });
+        updateStatusBar('ready', currentIssues.length);
+    }));
 
-    rpcClient.onNotification('daemon/issuesUpdated', (params: { issues: CodeIssue[] }) => {
+    daemonNotificationDisposables.push(rpcClient.onNotification('daemon/analysisStopped', () => {
+        outputChannel.appendLine('Analysis stopped');
+        webviewProvider?.postMessage({ type: 'analysisStopped' });
+        updateStatusBar('ready', currentIssues.length);
+    }));
+
+    daemonNotificationDisposables.push(rpcClient.onNotification('daemon/issuesUpdated', (params: { issues: CodeIssue[] }) => {
         currentIssues = params.issues;
         webviewProvider?.postMessage({
             type: 'issuesUpdate',
             issues: currentIssues,
         });
         updateStatusBar('ready', currentIssues.length);
-    });
+    }));
 
-    rpcClient.onNotification('daemon/metricsUpdated', (params: { metrics: CodeHealthMetrics }) => {
+    daemonNotificationDisposables.push(rpcClient.onNotification('daemon/metricsUpdated', (params: { metrics: CodeHealthMetrics }) => {
         currentMetrics = params.metrics;
         webviewProvider?.postMessage({
             type: 'metricsUpdate',
             metrics: currentMetrics,
         });
-    });
+    }));
 
-    rpcClient.onNotification('daemon/error', (params: { message: string; details?: unknown }) => {
+    daemonNotificationDisposables.push(rpcClient.onNotification('daemon/error', (params: { message: string; details?: unknown }) => {
         outputChannel.appendLine(`Daemon error: ${params.message}`);
         if (params.details) {
             outputChannel.appendLine(`Details: ${JSON.stringify(params.details)}`);
         }
-    });
+    }));
 }
 
 /**

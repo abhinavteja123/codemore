@@ -22,6 +22,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     private isReady = false;
     private isDaemonReady = false;
     private pendingMessages: ExtensionToWebviewMessage[] = [];
+    private themeChangeSubscription?: vscode.Disposable;
 
     constructor(
         private readonly extensionUri: vscode.Uri,
@@ -72,7 +73,9 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         });
 
         // Listen for theme changes
-        vscode.window.onDidChangeActiveColorTheme((theme) => {
+        // Dispose previous subscription if exists (in case resolveWebviewView is called again)
+        this.themeChangeSubscription?.dispose();
+        this.themeChangeSubscription = vscode.window.onDidChangeActiveColorTheme((theme) => {
             this.postMessage({
                 type: 'themeChanged',
                 isDark: theme.kind === vscode.ColorThemeKind.Dark ||
@@ -181,13 +184,17 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
                     return;
                 }
                 try {
+                    // Use longer timeout for AI fix generation (90 seconds)
+                    // AI API calls can take 30-60 seconds depending on provider and context size
                     const result = await this.rpcClient.call('generateAiFix', {
                         issueId: message.issueId,
                         includeRelatedFiles: message.includeRelatedFiles ?? true,
-                    });
+                    }, 90000);
                     this.postMessage({ type: 'suggestionsUpdate', suggestions: result.suggestions });
                 } catch (error) {
-                    this.postMessage({ type: 'error', message: `Failed to generate AI fix: ${error}` });
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    this.outputChannel.appendLine(`Generate AI fix error: ${errorMessage}`);
+                    this.postMessage({ type: 'error', message: `Failed to generate AI fix: ${errorMessage}` });
                 }
                 break;
 
@@ -449,5 +456,12 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             text += possible.charAt(Math.floor(Math.random() * possible.length));
         }
         return text;
+    }
+
+    /**
+     * Dispose resources
+     */
+    dispose(): void {
+        this.themeChangeSubscription?.dispose();
     }
 }

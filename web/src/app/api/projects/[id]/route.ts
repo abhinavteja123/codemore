@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getProject, deleteProject, getLatestScan, getScanIssues } from "@/lib/database";
+import { getProjectSnapshot, deleteProject } from "@/lib/database";
 
 export async function GET(
   _req: NextRequest,
@@ -12,18 +12,12 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const project = await getProject(params.id, session.user.email);
+  const project = await getProjectSnapshot(params.id, session.user.email, true);
   if (!project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const latestScan = await getLatestScan(params.id);
-  let issues: any[] = [];
-  if (latestScan) {
-    issues = await getScanIssues(latestScan.id);
-  }
-
-  return NextResponse.json({ project, latestScan, issues });
+  return NextResponse.json({ project });
 }
 
 export async function DELETE(

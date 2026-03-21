@@ -25,7 +25,6 @@ import {
     AlertTriangle,
     StopCircle,
     X,
-    Folder,
 } from 'lucide-react';
 
 // VS Code API interface
@@ -135,6 +134,9 @@ const App: React.FC = () => {
 
     // Handle generate AI fix
     const handleGenerateAiFix = (issueId: string) => {
+        if (isGeneratingAiFix) {
+            return;
+        }
         setIsGeneratingAiFix(true);
         vscode.postMessage({ type: 'generateAiFix', issueId, includeRelatedFiles: true });
     };
@@ -252,7 +254,7 @@ const App: React.FC = () => {
                         <span className="progress-count">
                             {analysisProgress.progress} / {analysisProgress.total} files
                             <span className="progress-percent">
-                                ({Math.round((analysisProgress.progress / analysisProgress.total) * 100)}%)
+                                ({analysisProgress.total > 0 ? Math.round((analysisProgress.progress / analysisProgress.total) * 100) : 0}%)
                             </span>
                         </span>
                     </div>
@@ -260,7 +262,7 @@ const App: React.FC = () => {
                         <div
                             className="progress-fill"
                             style={{
-                                width: `${(analysisProgress.progress / analysisProgress.total) * 100}%`,
+                                width: `${analysisProgress.total > 0 ? (analysisProgress.progress / analysisProgress.total) * 100 : 0}%`,
                             }}
                         />
                     </div>

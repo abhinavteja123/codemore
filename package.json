@@ -24,6 +24,13 @@
     "type": "git",
     "url": "https://github.com/codemore/codemore-vscode"
   },
+  "files": [
+    "dist/**",
+    "daemon/dist/**",
+    "bin/**",
+    "resources/**",
+    "README.md"
+  ],
   "activationEvents": [
     "onStartupFinished"
   ],

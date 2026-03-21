@@ -15,7 +15,6 @@ import {
     Accessibility,
     Star,
     Folder,
-    FileText,
 } from 'lucide-react';
 
 interface DashboardProps {

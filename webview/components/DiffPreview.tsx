@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 import { CodeIssue, CodeSuggestion, Severity } from '../types';
-import { Lightbulb, Search, Eye, Check, Sparkles, AlertTriangle, Bug, Gauge, Shield, Wrench, Accessibility, Star, FileText, Target, Zap } from 'lucide-react';
+import { Lightbulb, Eye, Check, Sparkles, AlertTriangle, Bug, Gauge, Shield, Wrench, Accessibility, Star, FileText, Target, Zap } from 'lucide-react';
 
 interface DiffPreviewProps {
     issue: CodeIssue | null;
@@ -146,6 +146,7 @@ const DiffPreview: React.FC<DiffPreviewProps> = ({
                                 <button
                                     className="action-button primary large"
                                     onClick={() => onGenerateAiFix(issue.id)}
+                                    disabled={isGeneratingAiFix}
                                 >
                                     <Sparkles size={18} /> Generate AI Fix
                                 </button>
@@ -157,10 +158,66 @@ const DiffPreview: React.FC<DiffPreviewProps> = ({
         );
     }
 
+    // Check if suggestion has valid code content
+    const hasSuggestedCode = selectedSuggestion.suggestedCode &&
+        typeof selectedSuggestion.suggestedCode === 'string' &&
+        selectedSuggestion.suggestedCode.trim().length > 0;
+
+    const hasOriginalCode = selectedSuggestion.originalCode &&
+        typeof selectedSuggestion.originalCode === 'string' &&
+        selectedSuggestion.originalCode.trim().length > 0;
+
+    // If suggestion has no code, show regenerate option
+    if (!hasSuggestedCode) {
+        return (
+            <div className="diff-preview">
+                <div className="diff-issue-summary">
+                    <div className="issue-summary-badges">
+                        <span
+                            className="severity-badge small"
+                            style={{ backgroundColor: getSeverityColor(issue.severity) }}
+                        >
+                            {issue.severity}
+                        </span>
+                        <span className="category-badge small">
+                            {getCategoryIcon(issue.category)}
+                            <span>{issue.category.replace('-', ' ')}</span>
+                        </span>
+                    </div>
+                    <h3 className="issue-summary-title">{issue.title}</h3>
+                </div>
+
+                <div className="suggestion-info" style={{ marginBottom: '16px' }}>
+                    <h4>{selectedSuggestion.title}</h4>
+                    <p>{selectedSuggestion.description}</p>
+                </div>
+
+                <div className="empty-state" style={{ padding: '24px', textAlign: 'center', background: 'var(--vscode-inputValidation-warningBackground, rgba(255,140,0,0.1))', borderRadius: '8px' }}>
+                    <AlertTriangle size={32} style={{ marginBottom: '12px', color: 'var(--vscode-inputValidation-warningBorder, orange)' }} />
+                    <h4>Code suggestion is incomplete</h4>
+                    <p style={{ marginBottom: '16px' }}>The AI returned a truncated response. Click regenerate to try again.</p>
+                    <button
+                        className="action-button primary"
+                        onClick={() => onGenerateAiFix(issue.id)}
+                        disabled={isGeneratingAiFix}
+                    >
+                        {isGeneratingAiFix ? (
+                            <>Regenerating...</>
+                        ) : (
+                            <><Sparkles size={14} /> Regenerate Fix</>
+                        )}
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     const handleApply = () => {
+        if (!selectedSuggestion) return;
         setIsApplying(true);
         onApply(selectedSuggestion);
-        setTimeout(() => setIsApplying(false), 500);
+        // Reset applying state after a reasonable delay for the file write to complete
+        setTimeout(() => setIsApplying(false), 1500);
     };
 
     // Issue with suggestions - show diff preview

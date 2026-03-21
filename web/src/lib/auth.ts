@@ -2,6 +2,9 @@ import { NextAuthOptions } from "next-auth";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 
+const githubScope =
+  process.env.GITHUB_OAUTH_SCOPE ?? "read:user user:email public_repo";
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GitHubProvider({
@@ -9,7 +12,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
       authorization: {
         params: {
-          scope: "read:user user:email repo",
+          scope: githubScope,
         },
       },
     }),

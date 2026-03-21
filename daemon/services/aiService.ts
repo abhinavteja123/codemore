@@ -50,6 +50,238 @@ interface AnalysisResult {
     executionTimeMs: number;
 }
 
+function normalizeParsedSuggestions(payload: unknown): CodeSuggestion[] | null {
+    let suggestions: CodeSuggestion[] | null = null;
+
+    if (Array.isArray(payload)) {
+        suggestions = payload as CodeSuggestion[];
+    } else if (
+        typeof payload === 'object' &&
+        payload !== null &&
+        'suggestions' in payload &&
+        Array.isArray((payload as { suggestions: unknown }).suggestions)
+    ) {
+        suggestions = (payload as { suggestions: CodeSuggestion[] }).suggestions;
+    }
+
+    if (!suggestions) return null;
+
+    // Filter out incomplete suggestions - must have required fields with actual content
+    const validSuggestions = suggestions.filter(s =>
+        s &&
+        typeof s === 'object' &&
+        s.id &&
+        s.suggestedCode &&
+        typeof s.suggestedCode === 'string' &&
+        s.suggestedCode.trim().length > 10 // Must have meaningful code
+    );
+
+    return validSuggestions.length > 0 ? validSuggestions : null;
+}
+
+function stripMarkdownCodeFence(text: string): string {
+    const trimmed = text.trim();
+    const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    return fencedMatch ? fencedMatch[1].trim() : trimmed;
+}
+
+/**
+ * Sanitize JSON string by removing/escaping bad control characters
+ * that can break JSON.parse()
+ */
+function sanitizeJsonString(text: string): string {
+    // Replace problematic control characters inside strings
+    // JSON allows: \n, \r, \t, \b, \f but raw versions break parsing
+    let result = text;
+
+    // First, remove any BOM or zero-width characters
+    result = result.replace(/[\uFEFF\u200B-\u200D\u2060]/g, '');
+
+    // Replace raw control characters (except in escape sequences) with escaped versions
+    // This regex matches control chars (0x00-0x1F) that are NOT preceded by backslash
+    result = result.replace(/(?<!\\)([\x00-\x08\x0B\x0C\x0E-\x1F])/g, (match) => {
+        const code = match.charCodeAt(0);
+        return `\\u${code.toString(16).padStart(4, '0')}`;
+    });
+
+    return result;
+}
+
+/**
+ * Try to repair truncated JSON by closing open brackets/braces
+ */
+function tryRepairTruncatedJson(text: string): string | null {
+    let inString = false;
+    let escaped = false;
+    const stack: string[] = [];
+
+    for (const char of text) {
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+
+        if (char === '\\') {
+            escaped = true;
+            continue;
+        }
+
+        if (char === '"') {
+            inString = !inString;
+            continue;
+        }
+
+        if (inString) continue;
+
+        if (char === '[' || char === '{') {
+            stack.push(char);
+        } else if (char === ']') {
+            if (stack.length > 0 && stack[stack.length - 1] === '[') {
+                stack.pop();
+            }
+        } else if (char === '}') {
+            if (stack.length > 0 && stack[stack.length - 1] === '{') {
+                stack.pop();
+            }
+        }
+    }
+
+    // If we're in an unclosed string, close it
+    let repaired = text;
+    if (inString) {
+        repaired += '"';
+    }
+
+    // Close any open brackets/braces in reverse order
+    while (stack.length > 0) {
+        const opener = stack.pop();
+        repaired += opener === '[' ? ']' : '}';
+    }
+
+    return repaired;
+}
+
+function extractBalancedJson(text: string, opener: '[' | '{'): string | null {
+    const start = text.indexOf(opener);
+    if (start === -1) {
+        return null;
+    }
+
+    const closer = opener === '[' ? ']' : '}';
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = start; index < text.length; index++) {
+        const char = text[index];
+
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+
+        if (char === '\\') {
+            escaped = true;
+            continue;
+        }
+
+        if (char === '"') {
+            inString = !inString;
+            continue;
+        }
+
+        if (inString) {
+            continue;
+        }
+
+        if (char === opener) {
+            depth++;
+        } else if (char === closer) {
+            depth--;
+            if (depth === 0) {
+                return text.slice(start, index + 1);
+            }
+        }
+    }
+
+    return null;
+}
+
+export function parseAiFixResponseText(responseText: string): CodeSuggestion[] {
+    const candidates = new Set<string>();
+    const trimmed = responseText.trim();
+
+    // Sanitize to remove bad control characters
+    const sanitized = sanitizeJsonString(trimmed);
+    const stripped = stripMarkdownCodeFence(sanitized);
+
+    // Try various extraction methods
+    for (const candidate of [sanitized, stripped]) {
+        if (candidate) {
+            candidates.add(candidate);
+        }
+
+        const arrayCandidate = extractBalancedJson(candidate, '[');
+        if (arrayCandidate) {
+            candidates.add(arrayCandidate);
+        }
+
+        const objectCandidate = extractBalancedJson(candidate, '{');
+        if (objectCandidate) {
+            candidates.add(objectCandidate);
+        }
+    }
+
+    // First pass: try parsing candidates as-is
+    for (const candidate of candidates) {
+        try {
+            const parsed = JSON.parse(candidate) as unknown;
+            const suggestions = normalizeParsedSuggestions(parsed);
+            if (suggestions && suggestions.length > 0) {
+                console.log(`[AiService] Successfully parsed ${suggestions.length} suggestions`);
+                return suggestions;
+            }
+        } catch {
+            // Try the next candidate.
+        }
+    }
+
+    // Second pass: try repairing truncated JSON
+    console.log('[AiService] Attempting to repair truncated JSON response...');
+    for (const candidate of candidates) {
+        const repaired = tryRepairTruncatedJson(candidate);
+        if (repaired && repaired !== candidate) {
+            try {
+                const parsed = JSON.parse(repaired) as unknown;
+                const suggestions = normalizeParsedSuggestions(parsed);
+                if (suggestions && suggestions.length > 0) {
+                    console.log(`[AiService] Repaired and parsed ${suggestions.length} suggestions`);
+                    return suggestions;
+                }
+            } catch {
+                // Repair failed, continue
+            }
+        }
+    }
+
+    // Third pass: try to extract at least the first complete suggestion object
+    console.log('[AiService] Attempting to extract partial suggestions...');
+    const firstSuggestionMatch = sanitized.match(/\{\s*"id"\s*:\s*"[^"]+"\s*,[\s\S]*?"tags"\s*:\s*\[[^\]]*\]\s*\}/);
+    if (firstSuggestionMatch) {
+        try {
+            const parsed = JSON.parse(firstSuggestionMatch[0]) as CodeSuggestion;
+            if (parsed.id && parsed.suggestedCode) {
+                console.log('[AiService] Extracted 1 partial suggestion');
+                return [parsed];
+            }
+        } catch {
+            // Partial extraction failed
+        }
+    }
+
+    throw new Error('Failed to parse AI fix response - the AI returned malformed or incomplete JSON');
+}
+
 export class AiService {
     private cache = new Map<string, CacheEntry>();
     private config: DaemonConfig;
@@ -73,7 +305,7 @@ export class AiService {
         if (this.config.aiProvider === 'gemini' && this.config.apiKey) {
             try {
                 const genAI = new GoogleGenerativeAI(this.config.apiKey);
-                this.geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+                this.geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
                 console.log('[AiService] Gemini model initialized');
             } catch (error) {
                 console.error('[AiService] Failed to initialize Gemini:', error);
@@ -336,7 +568,7 @@ export class AiService {
     /**
      * Generate AI-powered fix for a specific issue with context
      * This is the targeted approach - only called when user selects an issue
-     * 
+     *
      * @param issue The issue to fix
      * @param fileContent The content of the file containing the issue
      * @param context The file context
@@ -350,26 +582,48 @@ export class AiService {
         relatedFiles: Array<{ path: string; content: string; context: FileContext }> = []
     ): Promise<CodeSuggestion[]> {
         console.log(`[AiService] Generating AI fix for issue: ${issue.id}`);
+        console.log(`[AiService] AI provider: ${this.config.aiProvider}, API key configured: ${!!this.config.apiKey}`);
 
-        // If no API key, return basic suggestion
+        // If no API key, return basic suggestion with clear message
         if (!this.config.apiKey) {
             console.log('[AiService] No API key configured, returning basic suggestion');
+            console.log('[AiService] Configure an API key in settings (codemore.apiKey) for AI-powered fixes');
             return this.generateSuggestion(issue, fileContent, context);
         }
 
         try {
             // Build targeted prompt focused on this specific issue
             const prompt = this.buildFixPrompt(issue, fileContent, context, relatedFiles);
-            
+
+            console.log(`[AiService] Calling ${this.config.aiProvider} API...`);
+            const startTime = Date.now();
+
             // Call AI API to generate fix
             const fixes = await this.callAiForFix(prompt, issue);
-            
-            console.log(`[AiService] Generated ${fixes.length} AI-powered fix suggestions`);
+
+            const duration = Date.now() - startTime;
+            console.log(`[AiService] Generated ${fixes.length} AI-powered fix suggestions in ${duration}ms`);
             return fixes;
         } catch (error) {
-            console.error('[AiService] Failed to generate AI fix:', error);
-            // Re-throw so the caller can surface the real error to the user
-            throw error;
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('[AiService] Failed to generate AI fix:', errorMessage);
+
+            // Fallback: return a basic suggestion instead of failing completely
+            console.log('[AiService] Returning fallback basic suggestion');
+            const fallbackSuggestion: CodeSuggestion = {
+                id: `fallback-${issue.id}`,
+                issueId: issue.id,
+                title: `Manual fix needed: ${issue.title}`,
+                description: `AI was unable to generate a fix automatically. ${issue.description}. Please review and fix this issue manually. Error: ${errorMessage}`,
+                originalCode: issue.codeSnippet || '',
+                suggestedCode: `// TODO: Fix ${issue.title}\n// ${issue.description}\n${issue.codeSnippet || ''}`,
+                diff: `- ${issue.codeSnippet || 'original code'}\n+ // TODO: Fix manually`,
+                location: issue.location,
+                confidence: 30,
+                impact: issue.impact || 50,
+                tags: [issue.category, issue.severity, 'fallback', 'manual-review-needed'],
+            };
+            return [fallbackSuggestion];
         }
     }
 
@@ -387,78 +641,20 @@ export class AiService {
         const lines = fileContent.split('\n');
         const issueStartLine = issue.location.range.start.line;
         const issueEndLine = issue.location.range.end.line;
-        
-        // Get 10 lines before and after for context
-        const contextStart = Math.max(0, issueStartLine - 10);
-        const contextEnd = Math.min(lines.length, issueEndLine + 10);
+
+        // Get only 3 lines before and after for minimal context
+        const contextStart = Math.max(0, issueStartLine - 3);
+        const contextEnd = Math.min(lines.length, issueEndLine + 3);
         const relevantCode = lines.slice(contextStart, contextEnd).join('\n');
-        
-        // Build related files context
-        let relatedFilesSection = '';
-        if (relatedFiles.length > 0) {
-            relatedFilesSection = '\n\nRELATED FILES FOR CONTEXT:\n';
-            for (const rf of relatedFiles) {
-                const rfLines = rf.content.split('\n');
-                const truncated = rfLines.slice(0, 50).join('\n');
-                relatedFilesSection += `\n${rf.path}:\n\`\`\`${rf.context.language}\n${truncated}${rfLines.length > 50 ? '\n... (truncated)' : ''}\n\`\`\`\n`;
-            }
-        }
 
-        return `You are an expert code refactoring assistant. Generate a secure, reliable fix for the following code issue.
+        // Very minimal prompt to prevent truncation
+        return `Fix this ${context.language} code issue: "${issue.title}"
 
-FILE: ${issue.location.filePath}
-LANGUAGE: ${context.language}
-
-ISSUE DETAILS:
-- Title: ${issue.title}
-- Description: ${issue.description}
-- Category: ${issue.category}
-- Severity: ${issue.severity}
-- Lines: ${issueStartLine}-${issueEndLine}
-
-PROBLEMATIC CODE (lines ${contextStart}-${contextEnd}):
-\`\`\`${context.language}
+CODE (lines ${issueStartLine}-${issueEndLine}):
 ${relevantCode}
-\`\`\`
 
-FILE CONTEXT:
-- Imports: ${context.imports.map(i => i.module).join(', ')}
-- Symbols: ${context.symbols.map(s => `${s.name} (${s.kind})`).join(', ')}
-- Dependencies: ${context.dependencies.join(', ')}
-${relatedFilesSection}
-
-TASK:
-Generate 1-3 concrete fix suggestions for this issue. Each fix should:
-1. Be secure and follow best practices
-2. Maintain existing functionality while fixing the issue
-3. Be minimal - only change what's necessary
-4. Include clear explanations of what changed and why
-5. Consider edge cases and potential side effects
-
-Return ONLY a valid JSON array with this structure:
-[
-  {
-    "id": "fix-${issue.id}-1",
-    "issueId": "${issue.id}",
-    "title": "Brief fix description",
-    "description": "Detailed explanation of the fix, including what was changed and why this approach is secure and reliable",
-    "originalCode": "exact code that will be replaced",
-    "suggestedCode": "the fixed code",
-    "diff": "unified diff format showing the change",
-    "location": ${JSON.stringify(issue.location)},
-    "confidence": 85,
-    "impact": 80,
-    "tags": ["${issue.category}", "${issue.severity}", "ai-generated"]
-  }
-]
-
-IMPORTANT:
-- originalCode must be an exact substring from the file that can be replaced
-- suggestedCode should be production-ready, tested code
-- diff should be in unified diff format (- for removed, + for added lines)
-- Include line numbers in the location object
-- confidence should be 70-95 (higher if you're certain the fix is correct)
-- Return ONLY the JSON array, no markdown, no explanations outside the JSON`;
+Return this exact JSON (keep suggestedCode SHORT, max 20 lines):
+{"suggestions":[{"id":"fix-1","issueId":"${issue.id}","title":"Fix title","description":"Brief fix description","originalCode":"problematic code","suggestedCode":"fixed code","diff":"- old\\n+ new","location":${JSON.stringify(issue.location)},"confidence":85,"impact":80,"tags":["fix"]}]}`;
     }
 
     /**
@@ -485,18 +681,12 @@ IMPORTANT:
                 throw new Error(`Unsupported AI provider: ${this.config.aiProvider}`);
         }
 
-        // Parse the response
-        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-        if (!jsonMatch) {
-            console.error('[AiService] No JSON array found in AI response');
-            throw new Error('Failed to parse AI response');
-        }
-
         try {
-            const suggestions = JSON.parse(jsonMatch[0]) as CodeSuggestion[];
-            return suggestions;
-        } catch {
-            return [];
+            return parseAiFixResponseText(responseText);
+        } catch (parseError) {
+            console.error('[AiService] Failed to parse AI response JSON:', parseError);
+            console.error('[AiService] Raw response:', responseText.substring(0, 500));
+            throw new Error('Failed to parse AI fix response');
         }
     }
 
@@ -515,15 +705,18 @@ IMPORTANT:
                 messages: [
                     {
                         role: 'system',
-                        content: 'You are an expert code refactoring assistant. Generate secure, reliable fixes in JSON format.',
+                        content: 'You are an expert code refactoring assistant. Return ONLY valid JSON with a top-level "suggestions" array. Keep responses complete but concise.',
                     },
                     {
                         role: 'user',
                         content: prompt,
                     },
                 ],
+                response_format: {
+                    type: 'json_object',
+                },
                 temperature: 0.3,
-                max_tokens: 3000,
+                max_tokens: 8000, // Increase to prevent truncation
             }),
         });
 
@@ -549,7 +742,8 @@ IMPORTANT:
             },
             body: JSON.stringify({
                 model: 'claude-3-5-sonnet-20241022',
-                max_tokens: 3000,
+                max_tokens: 8000, // Increase to prevent truncation
+                system: 'You are an expert code refactoring assistant. Return ONLY valid JSON with a "suggestions" array. No markdown, no explanations outside JSON.',
                 messages: [
                     {
                         role: 'user',
@@ -575,13 +769,64 @@ IMPORTANT:
             throw new Error('Gemini model not initialized');
         }
 
-        const result = await this.geminiModel.generateContent([
-            { text: 'You are an expert code refactoring assistant. Generate secure, reliable fixes in JSON format. Return ONLY valid JSON, no markdown.' },
-            { text: prompt },
-        ]);
+        // Try up to 2 times with increasingly simpler prompts
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                const promptToUse = attempt === 1 ? prompt : this.simplifyPrompt(prompt);
+                console.log(`[AiService] Gemini attempt ${attempt}/2`);
 
-        const response = await result.response;
-        return response.text();
+                const result = await this.geminiModel.generateContent({
+                    contents: [
+                        {
+                            role: 'user',
+                            parts: [
+                                { text: 'Return ONLY valid compact JSON. No markdown. Keep suggestedCode under 15 lines.' },
+                                { text: promptToUse },
+                            ],
+                        },
+                    ],
+                    generationConfig: {
+                        temperature: 0.2,
+                        maxOutputTokens: 4096,
+                        responseMimeType: 'application/json',
+                    },
+                });
+
+                const response = await result.response;
+                let text = response.text();
+
+                // Strip markdown if present
+                if (text.startsWith('```')) {
+                    const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+                    if (match) {
+                        text = match[1];
+                    }
+                }
+
+                // Quick validation - check if it looks complete
+                if (text.includes('"suggestedCode"') && text.includes('"tags"') && text.endsWith('}')) {
+                    return text;
+                }
+
+                console.log(`[AiService] Gemini attempt ${attempt} returned incomplete response, retrying...`);
+            } catch (error) {
+                console.log(`[AiService] Gemini attempt ${attempt} failed: ${error}`);
+                if (attempt === 2) throw error;
+            }
+        }
+
+        throw new Error('Gemini returned incomplete response after 2 attempts');
+    }
+
+    /**
+     * Simplify prompt for retry attempts
+     */
+    private simplifyPrompt(prompt: string): string {
+        // Extract just the issue title and request minimal fix
+        const titleMatch = prompt.match(/issue: "([^"]+)"/i) || prompt.match(/Fix this .+ code issue: "([^"]+)"/);
+        const title = titleMatch ? titleMatch[1] : 'this issue';
+
+        return `Fix: "${title}". Return minimal JSON: {"suggestions":[{"id":"fix-1","issueId":"x","title":"Fix","description":"Fixed the issue","originalCode":"old","suggestedCode":"// fixed code here","diff":"- old\\n+ new","location":{"filePath":"x","range":{"start":{"line":0,"column":0},"end":{"line":0,"column":0}}},"confidence":80,"impact":80,"tags":["fix"]}]}`;
     }
 
     /**
@@ -755,8 +1000,8 @@ IMPORTANT:
                     throw new Error('Gemini API key not configured');
                 }
                 const genAI = new GoogleGenerativeAI(this.config.apiKey);
-                this.geminiModel = genAI.getGenerativeModel({ 
-                    model: 'gemini-1.5-flash',
+                this.geminiModel = genAI.getGenerativeModel({
+                    model: 'gemini-2.5-flash',
                     generationConfig: {
                         temperature: 0.3,
                         maxOutputTokens: 4000,

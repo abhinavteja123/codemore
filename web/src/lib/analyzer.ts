@@ -45,6 +45,57 @@ function detectLanguage(filePath: string): string {
   return langMap[ext] || ext || "unknown";
 }
 
+function getFileContext(filePath: string): "production-web" | "daemon-service" | "build-script" | "general" {
+  const normalized = filePath.replace(/\\/g, "/").toLowerCase();
+
+  if (normalized.includes("/web/src/") || normalized.includes("/src/app/") || normalized.includes("/src/components/")) {
+    return "production-web";
+  }
+
+  if (normalized.includes("/daemon/") || normalized.includes("/services/")) {
+    return "daemon-service";
+  }
+
+  if (normalized.includes("/scripts/") || normalized.endsWith(".config.js") || normalized.includes("/webpack")) {
+    return "build-script";
+  }
+
+  return "general";
+}
+
+function createIssue(
+  filePath: string,
+  title: string,
+  description: string,
+  category: IssueCategory,
+  severity: Severity,
+  line: number,
+  column: number,
+  codeSnippet: string,
+  confidence: number,
+  impact: number,
+  id: string
+): CodeIssue {
+  return {
+    id,
+    title,
+    description,
+    category,
+    severity,
+    location: {
+      filePath,
+      range: {
+        start: { line, column },
+        end: { line, column: column + Math.max(codeSnippet.length, 1) },
+      },
+    },
+    codeSnippet,
+    confidence,
+    impact,
+    createdAt: Date.now(),
+  };
+}
+
 // ============================================================================
 // Static Analysis Rules
 // ============================================================================
@@ -276,6 +327,197 @@ const analysisRules: AnalysisRule[] = [
   },
 ];
 
+const CUSTOM_RULE_IDS = new Set([
+  "sec-sql-injection",
+  "perf-console-log",
+  "perf-sync-fs",
+  "smell-magic-number",
+]);
+
+function analyzeSqlInjectionRisks(file: ProjectFile, language: string): CodeIssue[] {
+  if (!["javascript", "typescript", "python"].includes(language)) {
+    return [];
+  }
+
+  const issues: CodeIssue[] = [];
+  const lines = file.content.split("\n");
+  const sqlMethodPattern =
+    /\b(?:db\.)?(?:query|execute|executequery|executeraw|rawquery|createnativequery)\s*\(\s*([`'"])/i;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!sqlMethodPattern.test(line)) {
+      continue;
+    }
+    if (!/(select|insert|update|delete|from|where)\b/i.test(line)) {
+      continue;
+    }
+    if (!/(\$\{|["'`]\s*\+|\+\s*["'`])/.test(line)) {
+      continue;
+    }
+
+    issues.push(
+      createIssue(
+        file.path,
+        "Potential SQL injection",
+        "String interpolation in SQL queries can lead to SQL injection. Use parameterized queries instead.",
+        "security",
+        "CRITICAL",
+        i,
+        0,
+        line.trim(),
+        80,
+        95,
+        `sec-sql-injection-${i}`
+      )
+    );
+  }
+
+  return issues;
+}
+
+function analyzeConsoleStatements(file: ProjectFile, language: string): CodeIssue[] {
+  if (!["javascript", "typescript"].includes(language)) {
+    return [];
+  }
+
+  const issues: CodeIssue[] = [];
+  const lines = file.content.split("\n");
+  const context = getFileContext(file.path);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(/\bconsole\.(log|debug|info|warn|error)\s*\(/);
+    if (!match) {
+      continue;
+    }
+
+    if (match[1] === "error" && context !== "production-web") {
+      continue;
+    }
+
+    const severity: Severity = context === "production-web" ? "MINOR" : "INFO";
+    issues.push(
+      createIssue(
+        file.path,
+        "Console.log in production code",
+        context === "production-web"
+          ? "Console statements should be removed from production code. Use a proper logging library with log levels."
+          : "Console statements are acceptable in tooling code, but a structured logger is usually preferable.",
+        "performance",
+        severity,
+        i,
+        0,
+        line.trim(),
+        context === "production-web" ? 90 : 70,
+        context === "production-web" ? 30 : 10,
+        `perf-console-log-${i}`
+      )
+    );
+  }
+
+  return issues;
+}
+
+function analyzeSyncFsUsage(file: ProjectFile, language: string): CodeIssue[] {
+  if (!["javascript", "typescript"].includes(language)) {
+    return [];
+  }
+
+  const context = getFileContext(file.path);
+  if (context === "daemon-service" || context === "build-script") {
+    return [];
+  }
+
+  const issues: CodeIssue[] = [];
+  const lines = file.content.split("\n");
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(/\bfs\.(readFileSync|writeFileSync|statSync|readdirSync|existsSync)\b/);
+    if (!match) {
+      continue;
+    }
+
+    issues.push(
+      createIssue(
+        file.path,
+        "Synchronous file system operation",
+        "Synchronous fs operations block the event loop. Prefer async alternatives in request/response or UI-facing code.",
+        "performance",
+        "INFO",
+        i,
+        0,
+        line.trim(),
+        75,
+        35,
+        `perf-sync-fs-${i}`
+      )
+    );
+  }
+
+  return issues;
+}
+
+function analyzeMagicNumbers(file: ProjectFile, language: string): CodeIssue[] {
+  if (!["javascript", "typescript", "python", "java", "csharp", "go"].includes(language)) {
+    return [];
+  }
+
+  const issues: CodeIssue[] = [];
+  const lines = file.content.split("\n");
+  const occurrenceMap = new Map<string, number>();
+  const lineValues = new Map<number, string[]>();
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^\s*(const|let|var|enum|interface|type)\b/.test(line)) {
+      continue;
+    }
+    if (/(timeout|max|min|limit|threshold|port|size|width|height|delay|interval|confidence|impact)/i.test(line)) {
+      continue;
+    }
+
+    const matches = Array.from(line.matchAll(/(?<![\w.])(-?\d{3,}|\d+\.\d+)(?![\w.])/g))
+      .map((match) => match[1])
+      .filter((value) => !["-1", "0", "1", "2", "100"].includes(value));
+
+    if (matches.length === 0) {
+      continue;
+    }
+
+    lineValues.set(i, matches);
+    for (const value of matches) {
+      occurrenceMap.set(value, (occurrenceMap.get(value) || 0) + 1);
+    }
+  }
+
+  for (const [line, values] of Array.from(lineValues)) {
+    const repeatedValue = values.find((value) => (occurrenceMap.get(value) || 0) >= 2);
+    if (!repeatedValue) {
+      continue;
+    }
+
+    issues.push(
+      createIssue(
+        file.path,
+        "Magic number in code",
+        "Repeated numeric literals can make logic harder to understand. Consider extracting the value to a named constant.",
+        "code-smell",
+        "INFO",
+        line,
+        0,
+        lines[line].trim(),
+        55,
+        20,
+        `smell-magic-number-${line}`
+      )
+    );
+  }
+
+  return issues;
+}
+
 // ============================================================================
 // Function Length Analysis
 // ============================================================================
@@ -375,6 +617,7 @@ export function analyzeFile(file: ProjectFile): CodeIssue[] {
 
   // Apply pattern-based rules
   for (const rule of analysisRules) {
+    if (CUSTOM_RULE_IDS.has(rule.id)) continue;
     // Skip rules not applicable to this language
     if (rule.languages && !rule.languages.includes(language)) continue;
 
@@ -414,6 +657,11 @@ export function analyzeFile(file: ProjectFile): CodeIssue[] {
       });
     }
   }
+
+  issues.push(...analyzeSqlInjectionRisks(file, language));
+  issues.push(...analyzeConsoleStatements(file, language));
+  issues.push(...analyzeSyncFsUsage(file, language));
+  issues.push(...analyzeMagicNumbers(file, language));
 
   // Analyze function lengths
   issues.push(...analyzeFunctionLengths(file.content, file.path, language));

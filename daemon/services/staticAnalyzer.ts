@@ -256,8 +256,10 @@ export class StaticAnalyzer {
                     }
                     if (/;/.test(this.lines[j])) break; // Statement ended
                 }
-                
-                if (!hasWhere && /\bUPDATE\b/i.test(upperLine)) {
+
+                // Check for UPDATE without WHERE - but exclude ON UPDATE CASCADE/SET NULL (foreign key constraints)
+                const isUpdateStatement = /\bUPDATE\b/i.test(upperLine) && !/\bON\s+UPDATE\s+(CASCADE|SET\s+NULL|SET\s+DEFAULT|RESTRICT|NO\s+ACTION)\b/i.test(upperLine);
+                if (!hasWhere && isUpdateStatement) {
                     issues.push(this.createIssue({
                         id: `sql-update-no-where-${this.issueCounter++}`,
                         title: 'UPDATE without WHERE clause',
@@ -272,8 +274,10 @@ export class StaticAnalyzer {
                         confidence: 85,
                     }));
                 }
-                
-                if (!hasWhere && /\bDELETE\b/i.test(upperLine)) {
+
+                // Check for DELETE without WHERE - but exclude ON DELETE CASCADE/SET NULL (foreign key constraints)
+                const isDeleteStatement = /\bDELETE\b/i.test(upperLine) && !/\bON\s+DELETE\s+(CASCADE|SET\s+NULL|SET\s+DEFAULT|RESTRICT|NO\s+ACTION)\b/i.test(upperLine);
+                if (!hasWhere && isDeleteStatement) {
                     issues.push(this.createIssue({
                         id: `sql-delete-no-where-${this.issueCounter++}`,
                         title: 'DELETE without WHERE clause',
@@ -657,7 +661,7 @@ export class StaticAnalyzer {
             const line = this.lines[i];
 
             // Check for broken links
-            const linkMatches = line.matchAll(/\[([^\]]*)\]\(([^)]*)\)/g);
+            const linkMatches = Array.from(line.matchAll(/\[([^\]]*)\]\(([^)]*)\)/g));
             for (const match of linkMatches) {
                 const url = match[2];
                 if (url.startsWith('#') && !this.content.toLowerCase().includes(`# ${url.slice(1).toLowerCase()}`)) {
@@ -843,54 +847,50 @@ export class StaticAnalyzer {
         return complexity;
     }
 
+    /**
+     * Get the cognitive complexity contribution for a single node
+     */
+    private getNodeCognitiveContribution(node: ts.Node, nesting: number): { delta: number; addsNesting: boolean } {
+        switch (node.kind) {
+            case ts.SyntaxKind.IfStatement:
+            case ts.SyntaxKind.ForStatement:
+            case ts.SyntaxKind.ForInStatement:
+            case ts.SyntaxKind.ForOfStatement:
+            case ts.SyntaxKind.WhileStatement:
+            case ts.SyntaxKind.DoStatement:
+            case ts.SyntaxKind.CatchClause:
+            case ts.SyntaxKind.SwitchStatement:
+                return { delta: 1 + nesting, addsNesting: true };
+
+            case ts.SyntaxKind.ConditionalExpression:
+                return { delta: 1 + nesting, addsNesting: false };
+
+            case ts.SyntaxKind.BinaryExpression:
+                const binaryExpr = node as ts.BinaryExpression;
+                if (binaryExpr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+                    binaryExpr.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
+                    return { delta: 1, addsNesting: false };
+                }
+                break;
+
+            case ts.SyntaxKind.BreakStatement:
+            case ts.SyntaxKind.ContinueStatement:
+                const stmt = node as ts.BreakOrContinueStatement;
+                if (stmt.label) {
+                    return { delta: 1, addsNesting: false };
+                }
+                break;
+        }
+        return { delta: 0, addsNesting: false };
+    }
+
     private calculateCognitiveComplexity(node: ts.Node): number {
         let complexity = 0;
-        let nestingLevel = 0;
 
         const countComplexity = (n: ts.Node, nesting: number): void => {
-            let addedNesting = false;
-
-            switch (n.kind) {
-                case ts.SyntaxKind.IfStatement:
-                    complexity += 1 + nesting;
-                    addedNesting = true;
-                    break;
-                case ts.SyntaxKind.ForStatement:
-                case ts.SyntaxKind.ForInStatement:
-                case ts.SyntaxKind.ForOfStatement:
-                case ts.SyntaxKind.WhileStatement:
-                case ts.SyntaxKind.DoStatement:
-                    complexity += 1 + nesting;
-                    addedNesting = true;
-                    break;
-                case ts.SyntaxKind.CatchClause:
-                    complexity += 1 + nesting;
-                    addedNesting = true;
-                    break;
-                case ts.SyntaxKind.SwitchStatement:
-                    complexity += 1 + nesting;
-                    addedNesting = true;
-                    break;
-                case ts.SyntaxKind.ConditionalExpression:
-                    complexity += 1 + nesting;
-                    break;
-                case ts.SyntaxKind.BinaryExpression:
-                    const binaryExpr = n as ts.BinaryExpression;
-                    if (binaryExpr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
-                        binaryExpr.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
-                        complexity += 1;
-                    }
-                    break;
-                case ts.SyntaxKind.BreakStatement:
-                case ts.SyntaxKind.ContinueStatement:
-                    const stmt = n as ts.BreakOrContinueStatement;
-                    if (stmt.label) {
-                        complexity += 1; // Labeled break/continue adds complexity
-                    }
-                    break;
-            }
-
-            ts.forEachChild(n, (child) => countComplexity(child, addedNesting ? nesting + 1 : nesting));
+            const { delta, addsNesting } = this.getNodeCognitiveContribution(n, nesting);
+            complexity += delta;
+            ts.forEachChild(n, (child) => countComplexity(child, addsNesting ? nesting + 1 : nesting));
         };
 
         ts.forEachChild(node, (child) => countComplexity(child, 0));
@@ -985,7 +985,7 @@ export class StaticAnalyzer {
         });
 
         // Find unused declarations
-        for (const [name, info] of declared) {
+        for (const [name, info] of Array.from(declared.entries())) {
             if (!used.has(name)) {
                 const { line, column } = this.getPosition(info.node.getStart());
                 issues.push(this.createIssue({
@@ -1077,7 +1077,7 @@ export class StaticAnalyzer {
         });
 
         // Find unused imports
-        for (const name of importedNames) {
+        for (const name of Array.from(importedNames)) {
             if (!usedInCode.has(name)) {
                 // Find the import statement for this name
                 this.visitNodes(this.sourceFile, (node) => {
@@ -1210,15 +1210,26 @@ export class StaticAnalyzer {
             if (ts.isCallExpression(node)) {
                 const expr = node.expression;
                 let methodName = '';
-                
+
                 if (ts.isPropertyAccessExpression(expr)) {
                     methodName = expr.name.text;
                 } else if (ts.isIdentifier(expr)) {
                     methodName = expr.text;
                 }
 
-                const sqlMethods = ['query', 'execute', 'exec', 'raw', 'sql'];
-                if (sqlMethods.some(m => methodName.toLowerCase().includes(m))) {
+                // True SQL methods (exact matches only)
+                const sqlMethods = ['query', 'execute', 'raw', 'sql'];
+
+                // Shell/process execution methods (exclude from SQL injection)
+                const shellMethods = ['exec', 'execSync', 'execAsync', 'execFile', 'execFileSync', 'spawn', 'spawnSync', 'fork'];
+
+                // Check if it's a shell command (skip SQL injection check)
+                const isShellCommand = shellMethods.some(m => methodName.toLowerCase().includes(m));
+
+                // Only flag actual SQL methods
+                const isSqlMethod = sqlMethods.some(m => methodName.toLowerCase() === m || methodName.toLowerCase().endsWith(`.${m}`));
+
+                if (isSqlMethod && !isShellCommand) {
                     const arg = node.arguments[0];
                     if (arg && ts.isTemplateExpression(arg)) {
                         const { line, column } = this.getPosition(node.getStart());
@@ -1495,36 +1506,40 @@ export class StaticAnalyzer {
         });
 
         // Detect synchronous file operations in async context
-        const syncMethods = ['readFileSync', 'writeFileSync', 'existsSync', 'statSync', 'readdirSync'];
-        this.visitNodes(this.sourceFile, (node) => {
-            if (ts.isCallExpression(node)) {
-                const expr = node.expression;
-                let methodName = '';
-                
-                if (ts.isPropertyAccessExpression(expr)) {
-                    methodName = expr.name.text;
-                } else if (ts.isIdentifier(expr)) {
-                    methodName = expr.text;
-                }
+        // Skip for daemon/build scripts where sync operations are acceptable
+        const fileContext = this.getFileContext(this.filePath);
+        if (fileContext !==  'daemon-service' && fileContext !== 'build-script') {
+            const syncMethods = ['readFileSync', 'writeFileSync', 'existsSync', 'statSync', 'readdirSync'];
+            this.visitNodes(this.sourceFile, (node) => {
+                if (ts.isCallExpression(node)) {
+                    const expr = node.expression;
+                    let methodName = '';
 
-                if (syncMethods.includes(methodName)) {
-                    const { line, column } = this.getPosition(node.getStart());
-                    issues.push(this.createIssue({
-                        id: `perf-sync-${this.issueCounter++}`,
-                        title: `Synchronous operation: ${methodName}`,
-                        description: 'Synchronous file operations block the event loop. Consider using the async version for better performance in production.',
-                        category: 'performance',
-                        severity: 'INFO',
-                        line,
-                        column,
-                        endLine: line,
-                        endColumn: column + node.getText().length,
-                        codeSnippet: node.getText().slice(0, 40),
-                        confidence: 75,
-                    }));
+                    if (ts.isPropertyAccessExpression(expr)) {
+                        methodName = expr.name.text;
+                    } else if (ts.isIdentifier(expr)) {
+                        methodName = expr.text;
+                    }
+
+                    if (syncMethods.includes(methodName)) {
+                        const { line, column } = this.getPosition(node.getStart());
+                        issues.push(this.createIssue({
+                            id: `perf-sync-${this.issueCounter++}`,
+                            title: `Synchronous operation: ${methodName}`,
+                            description: 'Synchronous file operations block the event loop. Consider using the async version for better performance in production.',
+                            category: 'performance',
+                            severity: 'INFO',
+                            line,
+                            column,
+                            endLine: line,
+                            endColumn: column + node.getText().length,
+                            codeSnippet: node.getText().slice(0, 40),
+                            confidence: 75,
+                        }));
+                    }
                 }
-            }
-        });
+            });
+        }
 
         // Detect async/await anti-patterns
         issues.push(...this.analyzeAsyncPatterns());
@@ -1569,28 +1584,54 @@ export class StaticAnalyzer {
         this.visitNodes(this.sourceFile, (node) => {
             if (ts.isCallExpression(node)) {
                 const parent = node.parent;
-                
+
                 // Check if the call looks async but isn't awaited
                 const expr = node.expression;
                 let methodName = '';
-                
+
                 if (ts.isPropertyAccessExpression(expr)) {
                     methodName = expr.name.text;
                 } else if (ts.isIdentifier(expr)) {
                     methodName = expr.text;
                 }
 
-                // Common async method patterns
-                const asyncPatterns = ['fetch', 'axios', 'request', 'query', 'findOne', 'findAll', 'save', 'delete', 'update'];
-                const isLikelyAsync = asyncPatterns.some(p => methodName.toLowerCase().includes(p.toLowerCase()));
+                // High-confidence async patterns (API/network calls that almost always return Promises)
+                const highConfidenceAsync = ['fetch', 'axios', 'request'];
+                // Medium-confidence patterns (DB operations that usually return Promises)
+                const mediumConfidenceAsync = ['findOne', 'findAll', 'findById', 'findMany', 'createOne', 'createMany'];
+
+                // Exclude common sync patterns that LOOK async but aren't
+                const syncExclusions = [
+                    'updateState', 'updateConfig', 'updateFile', 'updateUI', 'updateView',
+                    'updateCache', 'updateLocal', 'updateCounter', 'updateIndex',
+                    'saveLocal', 'saveToCache', 'saveState',
+                    'deleteLocal', 'deleteFromCache', 'deleteState',
+                    'querySelector', 'querySelectorAll', 'requestAnimationFrame'
+                ];
+
+                const lowerName = methodName.toLowerCase();
+
+                // Skip if matches sync exclusion patterns
+                if (syncExclusions.some(ex => lowerName === ex.toLowerCase())) {
+                    return;
+                }
+
+                const isHighConfidence = highConfidenceAsync.some(p => lowerName.includes(p.toLowerCase()));
+                const isMediumConfidence = mediumConfidenceAsync.some(p => lowerName.includes(p.toLowerCase()));
+                const isLikelyAsync = isHighConfidence || isMediumConfidence;
 
                 if (isLikelyAsync && parent && !ts.isAwaitExpression(parent) && !ts.isReturnStatement(parent)) {
+                    // Also skip if result is being assigned (user might handle it later)
+                    if (ts.isVariableDeclaration(parent) || ts.isBinaryExpression(parent)) {
+                        return;
+                    }
+
                     // Check if we're in an async context
                     let current: ts.Node | undefined = node;
                     let inAsyncContext = false;
                     while (current) {
-                        if (ts.isFunctionDeclaration(current) || 
-                            ts.isFunctionExpression(current) || 
+                        if (ts.isFunctionDeclaration(current) ||
+                            ts.isFunctionExpression(current) ||
                             ts.isArrowFunction(current) ||
                             ts.isMethodDeclaration(current)) {
                             const modifiers = ts.canHaveModifiers(current) ? ts.getModifiers(current) : undefined;
@@ -1602,6 +1643,7 @@ export class StaticAnalyzer {
 
                     if (inAsyncContext) {
                         const { line, column } = this.getPosition(node.getStart());
+                        const confidence = isHighConfidence ? 85 : 65;
                         issues.push(this.createIssue({
                             id: `async-missing-await-${this.issueCounter++}`,
                             title: `Possibly missing await on '${methodName}'`,
@@ -1613,7 +1655,7 @@ export class StaticAnalyzer {
                             endLine: line,
                             endColumn: column + node.getText().length,
                             codeSnippet: node.getText().slice(0, 50),
-                            confidence: 60,
+                            confidence,
                         }));
                     }
                 }
@@ -1703,7 +1745,7 @@ export class StaticAnalyzer {
                             return;
                         }
                     }
-                    
+
                     // Check if the expression is likely a promise that's being ignored
                     let methodName = '';
                     if (ts.isPropertyAccessExpression(callExpr)) {
@@ -1712,8 +1754,15 @@ export class StaticAnalyzer {
                         methodName = callExpr.text;
                     }
 
-                    const asyncPatterns = ['save', 'update', 'delete', 'insert', 'remove', 'send', 'emit'];
-                    if (asyncPatterns.some(p => methodName.toLowerCase().includes(p))) {
+                    // Only flag high-confidence async DB/API methods, not generic sync methods
+                    const highConfidenceAsync = ['saveToDb', 'saveAsync', 'deleteAsync', 'insertAsync', 'removeAsync', 'sendAsync', 'emitAsync'];
+                    const mediumConfidenceAsync = ['sendMessage', 'sendEmail', 'sendNotification'];
+
+                    const lowerName = methodName.toLowerCase();
+                    const isHighConfidence = highConfidenceAsync.some(p => lowerName === p.toLowerCase());
+                    const isMediumConfidence = mediumConfidenceAsync.some(p => lowerName === p.toLowerCase());
+
+                    if (isHighConfidence || isMediumConfidence) {
                         const { line, column } = this.getPosition(node.getStart());
                         issues.push(this.createIssue({
                             id: `async-floating-promise-${this.issueCounter++}`,
@@ -1726,7 +1775,7 @@ export class StaticAnalyzer {
                             endLine: line,
                             endColumn: column + node.getText().length,
                             codeSnippet: node.getText().slice(0, 50),
-                            confidence: 55,
+                            confidence: isHighConfidence ? 80 : 60,
                         }));
                     }
                 }
@@ -1877,7 +1926,7 @@ export class StaticAnalyzer {
             }
         });
 
-        // Detect inline function definitions in JSX props (performance concern)
+        // Detect inline function definitions in JSX props (minor performance concern in modern React)
         this.visitNodes(this.sourceFile, (node) => {
             if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name)) {
                 const propName = node.name.text;
@@ -1890,7 +1939,7 @@ export class StaticAnalyzer {
                             issues.push(this.createIssue({
                                 id: `react-inline-handler-${this.issueCounter++}`,
                                 title: 'Inline function in JSX prop',
-                                description: `Inline function in "${propName}" creates a new function on each render. Consider using useCallback or defining the function outside the render.`,
+                                description: `Inline function in "${propName}" creates a new function on each render. With modern React and proper memoization, this is often acceptable. Consider useCallback only if performance issues are observed.`,
                                 category: 'performance',
                                 severity: 'INFO',
                                 line,
@@ -1898,7 +1947,7 @@ export class StaticAnalyzer {
                                 endLine: line,
                                 endColumn: column + node.getText().length,
                                 codeSnippet: `${propName}={() => ...}`,
-                                confidence: 65,
+                                confidence: 50, // Reduced from 65
                             }));
                         }
                     }
@@ -1952,8 +2001,20 @@ export class StaticAnalyzer {
             const line = this.lines[i];
             const lineNumber = i;
 
-            // Long lines
+            // Long lines (with exclusions for imports/exports and URLs)
             if (line.length > this.config.maxLineLength) {
+                const trimmed = line.trim();
+
+                // Skip import/export statements
+                if (trimmed.startsWith('import ') || trimmed.startsWith('export ') || trimmed.startsWith('import{') || trimmed.startsWith('export{')) {
+                    continue;
+                }
+
+                // Skip URLs
+                if (/(https?:\/\/|www\.)/.test(line)) {
+                    continue;
+                }
+
                 issues.push(this.createIssue({
                     id: `style-long-line-${this.issueCounter++}`,
                     title: 'Line exceeds maximum length',
@@ -1965,7 +2026,7 @@ export class StaticAnalyzer {
                     endLine: lineNumber,
                     endColumn: line.length,
                     codeSnippet: `${line.slice(0, 50)}...`,
-                    confidence: 100,
+                    confidence: 60, // Reduced from 100
                 }));
             }
 
@@ -1989,38 +2050,72 @@ export class StaticAnalyzer {
                 }));
             }
 
-            // Console statements
+            // Console statements (context-aware)
             if (/console\.(log|debug|info|warn|error|trace)\s*\(/.test(line)) {
+                const fileContext = this.getFileContext(this.filePath);
+                const isError = /console\.error/.test(line);
+
+                // Determine severity based on context
+                let severity: Severity = 'MAJOR';
+                let confidence = 95;
+
+                if (fileContext === 'daemon-service' || fileContext === 'build-script') {
+                    // Console statements are acceptable in daemon/scripts
+                    severity = 'INFO';
+                    confidence = 70;
+                }
+
+                // console.error is more acceptable than console.log
+                if (isError && fileContext !== 'production-web') {
+                    continue; // Skip console.error in non-production code
+                }
+
                 issues.push(this.createIssue({
                     id: `style-console-${this.issueCounter++}`,
                     title: 'Console statement',
-                    description: 'Console statements should be removed before production. Consider using a proper logging library.',
+                    description: fileContext === 'production-web'
+                        ? 'Console statements should be removed before production. Consider using a proper logging library.'
+                        : 'Consider using a structured logging library instead of console statements.',
                     category: 'best-practice',
-                    severity: 'MAJOR',
+                    severity,
                     line: lineNumber,
                     column: 0,
                     endLine: lineNumber,
                     endColumn: line.length,
                     codeSnippet: line.trim(),
-                    confidence: 95,
+                    confidence,
                 }));
             }
 
-            // Debugger statements
+            // Debugger statements (but not in strings or comments)
             if (/\bdebugger\b/.test(line)) {
-                issues.push(this.createIssue({
-                    id: `style-debugger-${this.issueCounter++}`,
-                    title: 'Debugger statement',
-                    description: 'Remove debugger statements before committing code.',
-                    category: 'best-practice',
-                    severity: 'CRITICAL',
-                    line: lineNumber,
-                    column: 0,
-                    endLine: lineNumber,
-                    endColumn: line.length,
-                    codeSnippet: line.trim(),
-                    confidence: 100,
-                }));
+                const trimmed = line.trim();
+
+                // Skip if it's a comment
+                if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+                    continue;
+                }
+
+                // Skip if inside a string literal (check for quotes before and after)
+                // This regex finds strings and checks if debugger is inside them
+                const strings = line.match(/(['"`])(?:(?=(\\?))\2.)*?\1/g) || [];
+                const isInString = strings.some(s => s.includes('debugger'));
+
+                if (!isInString) {
+                    issues.push(this.createIssue({
+                        id: `style-debugger-${this.issueCounter++}`,
+                        title: 'Debugger statement',
+                        description: 'Remove debugger statements before committing code.',
+                        category: 'best-practice',
+                        severity: 'CRITICAL',
+                        line: lineNumber,
+                        column: 0,
+                        endLine: lineNumber,
+                        endColumn: line.length,
+                        codeSnippet: line.trim(),
+                        confidence: 100,
+                    }));
+                }
             }
 
             // == instead of ===
@@ -2085,15 +2180,33 @@ export class StaticAnalyzer {
                 }
             });
 
-            // Magic numbers (context-aware)
+            // Magic numbers (context-aware with smarter exclusions)
+            const fileContext = this.getFileContext(this.filePath);
             this.visitNodes(this.sourceFile, (node) => {
                 if (ts.isNumericLiteral(node)) {
                     const value = parseFloat(node.text);
-                    // Skip common acceptable values
+
+                    // Skip common acceptable values (expanded list)
                     if ([0, 1, -1, 2, 10, 100, 1000].includes(value)) {
                         return;
                     }
-                    
+
+                    // Skip time-related values
+                    if ([24, 60, 365, 3600, 86400].includes(value)) return; // hours, minutes, days, seconds
+
+                    // Skip round hundreds and thousands
+                    if (value >= 100 && value < 1000 && value % 100 === 0) return;
+                    if (value >= 1000 && value < 10000 && value % 1000 === 0) return;
+
+                    // Skip HTTP status codes
+                    if ([200, 201, 204, 301, 302, 304, 400, 401, 403, 404, 500, 502, 503].includes(value)) return;
+
+                    // Skip common ports
+                    if ([80, 443, 3000, 5000, 8000, 8080, 8443, 9000].includes(value)) return;
+
+                    // Skip percentages (0-100)
+                    if (value >= 0 && value <= 100 && Number.isInteger(value)) return;
+
                     // Skip if it's in a const declaration
                     let parent: ts.Node | undefined = node.parent;
                     while (parent) {
@@ -2112,8 +2225,18 @@ export class StaticAnalyzer {
                         parent = parent.parent;
                     }
 
-                    // Skip if in array index or simple arithmetic
-                    if (value > 10) {
+                    // Skip if in config context (object literals)
+                    if (this.isConfigContext(node)) {
+                        return;
+                    }
+
+                    // Skip in test files
+                    if (fileContext === 'test') {
+                        return;
+                    }
+
+                    // Only flag larger numbers (> 50 instead of > 10) with lower confidence
+                    if (value > 50) {
                         const { line, column } = this.getPosition(node.getStart());
                         issues.push(this.createIssue({
                             id: `style-magic-number-${this.issueCounter++}`,
@@ -2126,7 +2249,7 @@ export class StaticAnalyzer {
                             endLine: line,
                             endColumn: column + node.text.length,
                             codeSnippet: node.text,
-                            confidence: 70,
+                            confidence: 50, // Reduced from 70
                         }));
                     }
                 }
@@ -2163,6 +2286,32 @@ export class StaticAnalyzer {
     // ========================================================================
     // Helper Methods
     // ========================================================================
+
+    /**
+     * Determine file context for context-aware rule application
+     */
+    private getFileContext(filePath: string): 'production-web' | 'daemon-service' | 'build-script' | 'test' {
+        const normalized = filePath.toLowerCase().replace(/\\/g, '/');
+
+        if (normalized.includes('/daemon/')) return 'daemon-service';
+        if (normalized.includes('/scripts/') || normalized.includes('/bin/')) return 'build-script';
+        if (normalized.includes('.test.') || normalized.includes('.spec.') || normalized.includes('/__tests__/')) return 'test';
+
+        return 'production-web';
+    }
+
+    /**
+     * Check if a node is in a configuration context (object literal)
+     */
+    private isConfigContext(node: ts.Node): boolean {
+        let parent: ts.Node | undefined = node.parent;
+        while (parent) {
+            if (ts.isObjectLiteralExpression(parent)) return true;
+            if (ts.isCallExpression(parent)) return false; // In function call, not config
+            parent = parent.parent;
+        }
+        return false;
+    }
 
     private parseFile(filePath: string, content: string): ts.SourceFile | null {
         try {

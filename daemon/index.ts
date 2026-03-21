@@ -29,7 +29,6 @@ import { ContextMap } from './services/contextMap';
 import { AnalysisQueue } from './services/analysisQueue';
 import { AiService } from './services/aiService';
 import { SuggestionEngine } from './services/suggestionEngine';
-import * as path from 'path';
 
 // ============================================================================
 // Daemon State
@@ -116,7 +115,11 @@ const handlers: Record<string, RequestHandler> = {
 
             // Initialize services
             astParser = new AstParser();
-            contextMap = new ContextMap(workspacePath);
+            contextMap = new ContextMap(
+                workspacePath,
+                state.config.excludePatterns,
+                state.config.maxFileSizeKB
+            );
             aiService = new AiService(state.config);
             suggestionEngine = new SuggestionEngine(aiService, contextMap);
 
@@ -148,7 +151,7 @@ const handlers: Record<string, RequestHandler> = {
                 if (contextMap) {
                     const metrics = contextMap.getHealthMetrics();
                     notify('daemon/metricsUpdated', { metrics });
-                    notify('daemon/analysisComplete', { filePath: '' });
+                    notify('daemon/analysisComplete', { filePath: '', issues: [] });
                     log('Analysis complete');
                 }
             });
@@ -157,7 +160,8 @@ const handlers: Record<string, RequestHandler> = {
             fileWatcher = new FileWatcher(
                 workspacePath,
                 state.config.excludePatterns,
-                state.config.analysisDelay
+                state.config.analysisDelay,
+                state.config.maxFileSizeKB
             );
 
             fileWatcher.onFileChange(async (filePath, content) => {
@@ -426,7 +430,22 @@ const handlers: Record<string, RequestHandler> = {
         }
 
         if (fileWatcher && config.excludePatterns) {
-            fileWatcher.updateExcludePatterns(config.excludePatterns);
+            fileWatcher.updateConfig(
+                state.config.excludePatterns,
+                state.config.maxFileSizeKB
+            );
+        } else if (fileWatcher && typeof config.maxFileSizeKB === 'number') {
+            fileWatcher.updateConfig(
+                state.config.excludePatterns,
+                state.config.maxFileSizeKB
+            );
+        }
+
+        if (contextMap && (config.excludePatterns || typeof config.maxFileSizeKB === 'number')) {
+            contextMap.updateConfig(
+                state.config.excludePatterns,
+                state.config.maxFileSizeKB
+            );
         }
 
         return { success: true };

@@ -7,6 +7,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { minimatch } from 'minimatch';
 import {
     FileContext,
     ProjectContext,
@@ -21,8 +22,13 @@ export class ContextMap {
     private dependencyGraph = new Map<string, string[]>();
     private reverseDependencyGraph = new Map<string, string[]>();
     private lastFullAnalysis = 0;
+    private totalWorkspaceFiles = 0;
 
-    constructor(private readonly workspacePath: string) { }
+    constructor(
+        private readonly workspacePath: string,
+        private excludePatterns: string[] = [],
+        private maxFileSizeKB: number = 500
+    ) { }
 
     /**
      * Scan workspace for all files
@@ -34,6 +40,7 @@ export class ContextMap {
         console.log(`[ContextMap] Found ${result.totalFiles} files across ${Object.keys(result.fileTypes).length} file types`);
 
         this.lastFullAnalysis = Date.now();
+        this.totalWorkspaceFiles = result.totalFiles;
         return result;
     }
 
@@ -41,7 +48,14 @@ export class ContextMap {
      * Get all files in the workspace
      */
     async getAllFiles(): Promise<string[]> {
-        return await this.findFiles(this.workspacePath);
+        const files = await this.findFiles(this.workspacePath);
+        this.totalWorkspaceFiles = files.length;
+        return files;
+    }
+
+    updateConfig(excludePatterns: string[], maxFileSizeKB: number): void {
+        this.excludePatterns = excludePatterns;
+        this.maxFileSizeKB = maxFileSizeKB;
     }
 
     /**
@@ -157,13 +171,28 @@ export class ContextMap {
                 const fullPath = path.join(dir, entry.name);
 
                 if (entry.isDirectory()) {
-                    if (!excludeDirs.includes(entry.name) && !entry.name.startsWith('.')) {
+                    if (
+                        !excludeDirs.includes(entry.name) &&
+                        !entry.name.startsWith('.') &&
+                        !this.excludePatterns.some((pattern) => minimatch(fullPath, pattern, { dot: true }))
+                    ) {
                         files.push(...await this.findFiles(fullPath));
                     }
                 } else if (entry.isFile()) {
                     const ext = path.extname(entry.name).toLowerCase();
                     const fileName = entry.name.toLowerCase();
-                    if (supportedExtensions.includes(ext) || specialFiles.includes(fileName)) {
+                    const isSupported = supportedExtensions.includes(ext) || specialFiles.includes(fileName);
+                    if (!isSupported) {
+                        continue;
+                    }
+                    if (this.excludePatterns.some((pattern) => minimatch(fullPath, pattern, { dot: true }))) {
+                        continue;
+                    }
+                    const stats = await fs.promises.stat(fullPath);
+                    if (stats.size > this.maxFileSizeKB * 1024) {
+                        continue;
+                    }
+                    if (isSupported) {
                         files.push(fullPath);
                     }
                 }
@@ -350,7 +379,7 @@ export class ContextMap {
             issuesByCategory,
             issuesBySeverity,
             filesAnalyzed,
-            totalFiles: filesAnalyzed, // In full scan, these would differ
+            totalFiles: Math.max(this.totalWorkspaceFiles, filesAnalyzed),
             linesOfCode: totalLinesOfCode,
             averageComplexity,
             technicalDebtMinutes,

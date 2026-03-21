@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "sonner";
-import JSZip from "jszip";
+import { waitForScanJobCompletion } from "@/lib/scanJobClient";
 import {
   Upload,
   Github,
@@ -75,13 +75,15 @@ export default function DashboardPage() {
               id: p.id,
               name: p.name,
               source: p.source,
-              repoFullName: p.repo_full_name || p.repoFullName,
-              files: [],
-              analyzedAt: p.updated_at
-                ? new Date(p.updated_at).getTime()
-                : p.created_at
-                  ? new Date(p.created_at).getTime()
-                  : Date.now(),
+              repoFullName: p.repoFullName || p.repo_full_name,
+              files: Array.isArray(p.files) ? p.files : [],
+              analyzedAt: typeof p.analyzedAt === "number"
+                ? p.analyzedAt
+                : p.updated_at
+                  ? new Date(p.updated_at).getTime()
+                  : p.created_at
+                    ? new Date(p.created_at).getTime()
+                    : Date.now(),
               metrics: p.metrics || p.latest_metrics,
               issues: p.issues || [],
             }));
@@ -139,81 +141,39 @@ export default function DashboardPage() {
     }
   }, [session, isGitHub, fetchRepos]);
 
-  // ── Create project in DB ──
-  const createDbProject = async (
-    name: string,
-    source: "upload" | "github",
-    repoFullName?: string
-  ): Promise<string | null> => {
-    try {
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, source, repoFullName }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        return data.id || null;
-      }
-    } catch {
-      /* DB not configured, continue without */
-    }
-    return null;
-  };
-
   // ── Analyze GitHub repo ──
   const analyzeRepo = async (repo: GitHubRepo) => {
     setAnalyzing(repo.full_name);
     try {
-      const filesRes = await fetch("/api/github/repos", {
+      const scanRes = await fetch("/api/scan-jobs/github", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          name: repo.name,
           repoFullName: repo.full_name,
           branch: repo.default_branch,
         }),
       });
-      if (!filesRes.ok) throw new Error("Failed to fetch files");
-      const { files } = await filesRes.json();
-      if (!files?.length) {
-        toast.error("No analyzable source files found in this repository.");
-        setAnalyzing(null);
-        return;
+      const payload = await scanRes.json().catch(() => ({}));
+      if (!scanRes.ok) {
+        throw new Error(payload.error || "Repository scan failed");
       }
 
-      // Create project in DB first
-      const dbProjectId = await createDbProject(
-        repo.name,
-        "github",
-        repo.full_name
-      );
+      let project = payload.project as Project | null;
+      if (!project && payload.job?.id) {
+        setUploadProgress("Queued scan. Waiting for analysis to finish...");
+        const completed = await waitForScanJobCompletion(payload.job.id);
+        project = completed.project;
+      }
+      if (!project) {
+        throw new Error("Completed scan did not return a project snapshot");
+      }
 
-      const analysisRes = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          files,
-          ...(dbProjectId ? { projectId: dbProjectId } : {}),
-        }),
-      });
-      if (!analysisRes.ok) throw new Error("Analysis failed");
-      const result = await analysisRes.json();
-
-      const project: Project = {
-        id: dbProjectId || `github-${repo.id}`,
-        name: repo.name,
-        source: "github",
-        repoFullName: repo.full_name,
-        files,
-        analyzedAt: Date.now(),
-        metrics: result.metrics,
-        issues: result.issues,
-      };
       saveProjects([project, ...projects.filter((p) => p.id !== project.id)]);
       toast.success(`Scan complete for ${repo.name}`);
       router.push(`/project/${project.id}`);
-    } catch {
-      toast.error("Analysis failed. Please try again.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Analysis failed. Please try again.");
     }
     setAnalyzing(null);
   };
@@ -221,93 +181,43 @@ export default function DashboardPage() {
   // ── Handle ZIP upload ──
   const handleZipUpload = async (file: File) => {
     setAnalyzing("upload");
-    setUploadProgress("Extracting ZIP...");
+    setUploadProgress("Uploading ZIP to server...");
 
     try {
-      const zip = new JSZip();
-      const contents = await zip.loadAsync(file);
-      const projectFiles: ProjectFile[] = [];
-
-      const entries: { path: string; entry: JSZip.JSZipObject }[] = [];
-      contents.forEach((relativePath, zipEntry) => {
-        if (!zipEntry.dir) {
-          entries.push({ path: relativePath, entry: zipEntry });
-        }
-      });
-
-      setUploadProgress(`Found ${entries.length} files, filtering...`);
-
-      for (const { path, entry } of entries) {
-        const ext = path.split(".").pop()?.toLowerCase() || "";
-        if (!SUPPORTED_EXTENSIONS.has(ext)) continue;
-
-        // Skip large files and common non-source directories
-        if (
-          path.includes("node_modules/") ||
-          path.includes(".git/") ||
-          path.includes("vendor/") ||
-          path.includes("dist/") ||
-          path.includes("build/") ||
-          path.includes("__pycache__/")
-        ) {
-          continue;
-        }
-
-        try {
-          const content = await entry.async("string");
-          if (content.length > 500000) continue; // skip files > 500KB
-          projectFiles.push({
-            path,
-            content,
-            language: ext,
-            size: content.length,
-          });
-        } catch {
-          /* skip unreadable entries */
-        }
-      }
-
-      if (projectFiles.length === 0) {
-        toast.error("No supported source files found in the ZIP archive.");
-        setAnalyzing(null);
-        setUploadProgress(null);
-        return;
-      }
-
-      setUploadProgress(`Analyzing ${projectFiles.length} files...`);
-
       const projectName =
         file.name.replace(/\.zip$/i, "") || "Uploaded Project";
 
-      // Create project in DB
-      const dbProjectId = await createDbProject(projectName, "upload");
+      setUploadProgress("Server is extracting and scanning the archive...");
 
-      const res = await fetch("/api/analyze", {
+      const formData = new FormData();
+      formData.append("archive", file);
+      formData.append("name", projectName);
+
+      const res = await fetch("/api/scan-jobs/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          files: projectFiles,
-          ...(dbProjectId ? { projectId: dbProjectId } : {}),
-        }),
+        body: formData,
       });
-      if (!res.ok) throw new Error("Analysis failed");
-      const result = await res.json();
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || "Failed to process ZIP file");
+      }
 
-      const project: Project = {
-        id: dbProjectId || `upload-${Date.now()}`,
-        name: projectName,
-        source: "upload",
-        files: projectFiles,
-        analyzedAt: Date.now(),
-        metrics: result.metrics,
-        issues: result.issues,
-      };
+      let project = payload.project as Project | null;
+      if (!project && payload.job?.id) {
+        setUploadProgress("Queued scan. Waiting for analysis to finish...");
+        const completed = await waitForScanJobCompletion(payload.job.id);
+        project = completed.project;
+      }
+      if (!project) {
+        throw new Error("Completed scan did not return a project snapshot");
+      }
+
       saveProjects([project, ...projects]);
-      toast.success(`Scan complete: ${projectFiles.length} files analyzed`);
+      toast.success(`Scan complete: ${project.metrics?.filesAnalyzed || project.files.length} files analyzed`);
       router.push(`/project/${project.id}`);
     } catch (err) {
       console.error("ZIP upload error:", err);
-      toast.error("Failed to process ZIP file. Please try again.");
+      toast.error(err instanceof Error ? err.message : "Failed to process ZIP file. Please try again.");
     }
     setAnalyzing(null);
     setUploadProgress(null);
@@ -332,6 +242,7 @@ export default function DashboardPage() {
       try {
         const content = await file.text();
         const ext = file.name.split(".").pop()?.toLowerCase() || "";
+        if (!SUPPORTED_EXTENSIONS.has(ext)) continue;
         files.push({
           path: (file as any).webkitRelativePath || file.name,
           content,
@@ -353,35 +264,35 @@ export default function DashboardPage() {
     setUploadProgress(`Analyzing ${files.length} files...`);
     try {
       const projectName = files[0].path.split("/")[0] || "Uploaded Project";
-
-      // Create project in DB
-      const dbProjectId = await createDbProject(projectName, "upload");
-
-      const res = await fetch("/api/analyze", {
+      const res = await fetch("/api/scan-jobs/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          name: projectName,
+          source: "upload",
           files,
-          ...(dbProjectId ? { projectId: dbProjectId } : {}),
         }),
       });
-      if (!res.ok) throw new Error("Analysis failed");
-      const result = await res.json();
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || "Analysis failed");
+      }
 
-      const project: Project = {
-        id: dbProjectId || `upload-${Date.now()}`,
-        name: projectName,
-        source: "upload",
-        files,
-        analyzedAt: Date.now(),
-        metrics: result.metrics,
-        issues: result.issues,
-      };
+      let project = payload.project as Project | null;
+      if (!project && payload.job?.id) {
+        setUploadProgress("Queued scan. Waiting for analysis to finish...");
+        const completed = await waitForScanJobCompletion(payload.job.id);
+        project = completed.project;
+      }
+      if (!project) {
+        throw new Error("Completed scan did not return a project snapshot");
+      }
+
       saveProjects([project, ...projects]);
-      toast.success(`Scan complete: ${files.length} files analyzed`);
+      toast.success(`Scan complete: ${project.metrics?.filesAnalyzed || files.length} files analyzed`);
       router.push(`/project/${project.id}`);
-    } catch {
-      toast.error("Analysis failed. Please try again.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Analysis failed. Please try again.");
     }
     setAnalyzing(null);
     setUploadProgress(null);

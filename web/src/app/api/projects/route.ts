@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getUserProjects, createProject, getUserStats } from "@/lib/database";
+import { getUserProjectSnapshots, createProject, getUserStats } from "@/lib/database";
 
 export async function GET(_req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -10,7 +10,7 @@ export async function GET(_req: NextRequest) {
   }
 
   const [projects, stats] = await Promise.all([
-    getUserProjects(session.user.email),
+    getUserProjectSnapshots(session.user.email),
     getUserStats(session.user.email),
   ]);
 

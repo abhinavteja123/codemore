@@ -62,6 +62,23 @@ export interface CodeHealthMetrics {
   technicalDebtMinutes: number;
 }
 
+export type ScanJobStatus = "queued" | "running" | "completed" | "failed";
+
+export interface ScanJob {
+  id: string;
+  projectId: string;
+  status: ScanJobStatus;
+  source: "upload" | "github";
+  sourceLabel: string;
+  filesDiscovered: number;
+  filesAnalyzed: number;
+  issueCount: number;
+  errorMessage?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
 export interface ProjectFile {
   path: string;
   content: string;

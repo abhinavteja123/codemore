@@ -389,10 +389,10 @@ export class DaemonManager implements vscode.Disposable {
     /**
      * Cleanup resources
      */
-    dispose(): void {
+    async dispose(): Promise<void> {
         this.clearHealthChecks();
         this.clearRestartTimeout();
-        this.stop();
+        await this.stop();
         this.outputEmitter.dispose();
         this.stateChangeEmitter.dispose();
     }

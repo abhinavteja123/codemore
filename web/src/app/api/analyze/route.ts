@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { analyzeProject } from "@/lib/analyzer";
+import { analyzeProjectWithProductionCore } from "@/lib/productionAnalyzer";
 import { ProjectFile } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
@@ -31,15 +31,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Run analysis
-    const result = analyzeProject(files);
+    const result = await analyzeProjectWithProductionCore(files);
 
     // Save to database if projectId provided
     let scanId = null;
     if (body.projectId) {
-      const { saveScan, getProject } = await import("@/lib/database");
+      const { saveScan, saveProjectFiles, getProject } = await import("@/lib/database");
       // Verify user owns this project
       const project = await getProject(body.projectId, session.user?.email || "");
       if (project) {
+        await saveProjectFiles(body.projectId, files);
         const scan = await saveScan(body.projectId, result.metrics, result.issues);
         if (scan) scanId = scan.id;
       }

@@ -52,6 +52,7 @@ export class RpcClient implements vscode.Disposable {
     ): Promise<DaemonMethods[M]['result']> {
         const id = this.getNextId();
         const request = createRequest(id, method, params);
+        const effectiveTimeout = timeout || this.defaultTimeout;
 
         return new Promise((resolve, reject) => {
             // Set timeout
@@ -59,9 +60,10 @@ export class RpcClient implements vscode.Disposable {
                 const pending = this.pendingRequests.get(id);
                 if (pending) {
                     this.pendingRequests.delete(id);
-                    reject(new Error(`RPC call '${method}' timed out after ${timeout || this.defaultTimeout}ms`));
+                    this.outputChannel.appendLine(`RPC timeout: ${method} (${effectiveTimeout}ms) - id: ${id}`);
+                    reject(new Error(`RPC call '${method}' timed out after ${effectiveTimeout}ms. The AI provider may be slow or unavailable.`));
                 }
-            }, timeout || this.defaultTimeout);
+            }, effectiveTimeout);
 
             // Store pending request
             this.pendingRequests.set(id, {
@@ -140,7 +142,8 @@ export class RpcClient implements vscode.Disposable {
     private handleResponse(response: JsonRpcResponse): void {
         const pending = this.pendingRequests.get(response.id);
         if (!pending) {
-            this.outputChannel.appendLine(`No pending request for id: ${response.id}`);
+            this.outputChannel.appendLine(`No pending request for id: ${response.id} (may have timed out)`);
+            this.outputChannel.appendLine(`Current pending requests: ${Array.from(this.pendingRequests.keys()).join(', ') || 'none'}`);
             return;
         }
 
@@ -149,9 +152,11 @@ export class RpcClient implements vscode.Disposable {
         this.pendingRequests.delete(response.id);
 
         if (response.error) {
+            this.outputChannel.appendLine(`RPC error for ${pending.method}: ${response.error.message}`);
             const error = this.createError(response.error);
             pending.reject(error);
         } else {
+            this.outputChannel.appendLine(`RPC <- ${pending.method} (success)`);
             pending.resolve(response.result);
         }
     }

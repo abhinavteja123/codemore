@@ -8,7 +8,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as chokidar from 'chokidar';
-import { EventEmitter } from 'events';
+import { minimatch } from 'minimatch';
 
 type FileChangeHandler = (filePath: string, content: string) => void;
 
@@ -18,14 +18,17 @@ export class FileWatcher {
     private changeHandlers: FileChangeHandler[] = [];
     private excludePatterns: string[];
     private debounceDelay: number;
+    private maxFileSizeKB: number;
 
     constructor(
         private readonly workspacePath: string,
         excludePatterns: string[] = [],
-        debounceDelay: number = 2000
+        debounceDelay: number = 2000,
+        maxFileSizeKB: number = 500
     ) {
         this.excludePatterns = excludePatterns;
         this.debounceDelay = debounceDelay;
+        this.maxFileSizeKB = maxFileSizeKB;
         this.start();
     }
 
@@ -91,8 +94,9 @@ export class FileWatcher {
     /**
      * Update exclude patterns
      */
-    updateExcludePatterns(patterns: string[]): void {
+    updateConfig(patterns: string[], maxFileSizeKB: number): void {
         this.excludePatterns = patterns;
+        this.maxFileSizeKB = maxFileSizeKB;
         // Restart watcher with new patterns
         this.stop();
         this.start();
@@ -138,6 +142,10 @@ export class FileWatcher {
     private shouldAnalyze(filePath: string): boolean {
         const ext = path.extname(filePath).toLowerCase();
         const fileName = path.basename(filePath).toLowerCase();
+
+        if (this.excludePatterns.some((pattern) => minimatch(filePath, pattern, { dot: true }))) {
+            return false;
+        }
 
         // Supported file extensions
         const supportedExtensions = [
@@ -187,28 +195,7 @@ export class FileWatcher {
             return false;
         }
 
-        // Check exclude patterns
-        for (const pattern of this.excludePatterns) {
-            if (this.matchPattern(filePath, pattern)) {
-                return false;
-            }
-        }
-
         return true;
-    }
-
-    /**
-     * Simple glob pattern matching
-     */
-    private matchPattern(filePath: string, pattern: string): boolean {
-        // Convert glob pattern to regex
-        const regexPattern = pattern
-            .replace(/\*\*/g, '.*')
-            .replace(/\*/g, '[^/]*')
-            .replace(/\?/g, '.');
-
-        const regex = new RegExp(regexPattern);
-        return regex.test(filePath);
     }
 
     /**
@@ -218,8 +205,8 @@ export class FileWatcher {
         try {
             const stats = await fs.promises.stat(filePath);
 
-            // Skip large files (default 500KB)
-            if (stats.size > 500 * 1024) {
+            // Skip large files based on configured limit
+            if (stats.size > this.maxFileSizeKB * 1024) {
                 console.log(`[FileWatcher] Skipping large file: ${filePath} (${stats.size} bytes)`);
                 return null;
             }
