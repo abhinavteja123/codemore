@@ -1,13 +1,16 @@
 /**
  * Severity Remapper Service
- * 
+ *
  * Re-maps raw static-analysis findings into developer-meaningful severities
  * that reduce noise, increase trust, and surface real engineering risk.
- * 
+ *
  * Based on improvements.md specification.
  */
 
 import { CodeIssue, Severity, OldSeverity } from '../../shared/protocol';
+import { createLogger } from '../lib/logger';
+
+const logger = createLogger('severityRemapper');
 
 // Mapping from canonical Severity to VS Code OldSeverity (for backward compatibility)
 const SEVERITY_TO_OLD: Record<Severity, OldSeverity> = {
@@ -16,14 +19,6 @@ const SEVERITY_TO_OLD: Record<Severity, OldSeverity> = {
     'MAJOR': 'warning',
     'MINOR': 'info',
     'INFO': 'hint',
-};
-
-// Mapping from OldSeverity to canonical Severity (for migrating old issues)
-const OLD_TO_SEVERITY: Record<OldSeverity, Severity> = {
-    'error': 'CRITICAL',
-    'warning': 'MAJOR',
-    'info': 'MINOR',
-    'hint': 'INFO',
 };
 
 interface RemappingRule {
@@ -150,8 +145,13 @@ export class SeverityRemapper {
         const remapped = issues.map(issue => this.remapIssue(issue));
 
         // Log stats
-        console.log(`[SeverityRemapper] Processed ${this.remappingStats.total} issues: ${this.remappingStats.remapped} remapped (${this.remappingStats.upgraded} upgraded, ${this.remappingStats.downgraded} downgraded)`);
-        
+        logger.info({
+            total: this.remappingStats.total,
+            remapped: this.remappingStats.remapped,
+            upgraded: this.remappingStats.upgraded,
+            downgraded: this.remappingStats.downgraded
+        }, 'Severity remapping complete');
+
         return remapped;
     }
 

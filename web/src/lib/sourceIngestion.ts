@@ -26,7 +26,15 @@ const EXCLUDED_PATH_SEGMENTS = [
 ];
 
 function normalizePath(filePath: string): string {
-  return filePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  // Normalize and strip leading slashes
+  let normalized = filePath.replace(/\\/g, "/").replace(/^\/+/, "");
+
+  // Check for path traversal attempts
+  if (normalized.includes("../") || normalized.includes("..\\") || normalized === "..") {
+    throw new Error(`Path traversal detected: ${filePath}`);
+  }
+
+  return normalized;
 }
 
 function getExtension(filePath: string): string {

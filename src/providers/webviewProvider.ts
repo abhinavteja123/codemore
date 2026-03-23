@@ -6,6 +6,7 @@
  */
 
 import * as vscode from 'vscode';
+import { randomBytes } from 'crypto';
 import { RpcClient } from '../rpc/rpcClient';
 import {
     WebviewToExtensionMessage,
@@ -75,11 +76,13 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         // Listen for theme changes
         // Dispose previous subscription if exists (in case resolveWebviewView is called again)
         this.themeChangeSubscription?.dispose();
+        // ColorThemeKind.HighContrastDark = 4 (added in VS Code 1.74)
+        const HighContrastDark = 4;
         this.themeChangeSubscription = vscode.window.onDidChangeActiveColorTheme((theme) => {
             this.postMessage({
                 type: 'themeChanged',
                 isDark: theme.kind === vscode.ColorThemeKind.Dark ||
-                    theme.kind === (vscode.ColorThemeKind as any).HighContrastDark ||
+                    theme.kind === HighContrastDark ||
                     theme.kind === vscode.ColorThemeKind.HighContrast,
             });
         });
@@ -450,12 +453,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
      * Generate a random nonce for CSP
      */
     private getNonce(): string {
-        let text = '';
-        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        for (let i = 0; i < 32; i++) {
-            text += possible.charAt(Math.floor(Math.random() * possible.length));
-        }
-        return text;
+        return randomBytes(16).toString('hex');
     }
 
     /**

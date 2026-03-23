@@ -1,6 +1,6 @@
 /**
  * Binary Downloader Service
- * 
+ *
  * Automatically downloads and installs external analysis tool binaries
  * on first run to provide a zero-install experience.
  */
@@ -12,6 +12,9 @@ import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { createLogger, sanitizeError } from '../lib/logger';
+
+const logger = createLogger('binaryDownloader');
 
 const execAsync = promisify(exec);
 
@@ -121,18 +124,18 @@ export class BinaryDownloader {
         const missing = checks.filter(c => !c.installed);
 
         if (missing.length === 0) {
-            console.log('[BinaryDownloader] All binaries already installed');
+            logger.info('All binaries already installed');
             return;
         }
 
-        console.log(`[BinaryDownloader] Installing ${missing.length} missing binaries: ${missing.map(m => m.tool).join(', ')}`);
+        logger.info({ missingCount: missing.length, tools: missing.map(m => m.tool) }, 'Installing missing binaries');
 
         // Download missing binaries in parallel
         await Promise.all(
             missing.map(({ tool }) => this.downloadTool(tool, platform))
         );
 
-        console.log('[BinaryDownloader] All binaries installed successfully');
+        logger.info('All binaries installed successfully');
     }
 
     /**
@@ -178,11 +181,11 @@ export class BinaryDownloader {
             }
 
             this.notifyProgress({ tool, status: 'complete' });
-            console.log(`[BinaryDownloader] ${tool}: installed successfully`);
+            logger.info({ tool }, 'Binary installed successfully');
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.notifyProgress({ tool, status: 'failed', error: errorMessage });
-            console.error(`[BinaryDownloader] ${tool}: download failed:`, error);
+            logger.error({ err: sanitizeError(error), tool }, 'Binary download failed');
             throw error;
         }
     }

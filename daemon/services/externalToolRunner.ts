@@ -1,10 +1,10 @@
 /**
  * External Tool Runner Service
- * 
+ *
  * Integrates industry-standard static analysis tools for performant,
  * language-specific analysis. These tools provide instant feedback
  * without requiring AI API calls.
- * 
+ *
  * Bundled Tools:
  * - Semgrep: Security scanning (SAST) for 30+ languages
  * - Biome: Ultra-fast JS/TS linting (100x faster than ESLint)
@@ -12,7 +12,7 @@
  * - TFLint/Checkov: Infrastructure-as-Code analysis
  */
 
-import { exec, ExecOptions } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -23,8 +23,11 @@ import {
     IssueCategory,
     Severity,
 } from '../../shared/protocol';
+import { createLogger, sanitizeError } from '../lib/logger';
 
-const execAsync = promisify(exec);
+const logger = createLogger('externalToolRunner');
+
+const execFileAsync = promisify(execFile);
 
 // ============================================================================
 // Types
@@ -172,7 +175,7 @@ export class ExternalToolRunner {
                 status = 'not found';
             }
             
-            console.log(`[ExternalToolRunner] ${tool}: ${status}`);
+            logger.info({ tool, status }, 'External tool status');
         }
     }
 
@@ -184,19 +187,17 @@ export class ExternalToolRunner {
         if (!toolConfig.enabled) return false;
 
         const binaryPath = toolConfig.path || this.getDefaultBinaryPath(tool);
-        
+
         try {
-            // Try to run --version to check availability
-            const command = this.getVersionCommand(tool, binaryPath);
-            await execAsync(command, { timeout: 5000 });
+            // Try to run --version to check availability using execFileAsync (safe, no shell)
+            await execFileAsync(binaryPath, ['--version'], { timeout: 5000 });
             return true;
         } catch {
             // Tool not available, try bundled binary
             const bundledPath = this.getBundledBinaryPath(tool);
             if (bundledPath && fs.existsSync(bundledPath)) {
                 try {
-                    const command = this.getVersionCommand(tool, bundledPath);
-                    await execAsync(command, { timeout: 5000 });
+                    await execFileAsync(bundledPath, ['--version'], { timeout: 5000 });
                     // Update config to use bundled binary
                     this.config[tool].path = bundledPath;
                     return true;
@@ -257,28 +258,8 @@ export class ExternalToolRunner {
         if (fs.existsSync(bundledPath)) {
             return bundledPath;
         }
-        
-        return null;
-    }
 
-    /**
-     * Get version command for a tool
-     */
-    private getVersionCommand(tool: ExternalTool, binaryPath: string): string {
-        switch (tool) {
-            case 'semgrep':
-                return `${binaryPath} --version`;
-            case 'biome':
-                return `${binaryPath} --version`;
-            case 'ruff':
-                return `${binaryPath} --version`;
-            case 'tflint':
-                return `${binaryPath} --version`;
-            case 'checkov':
-                return `${binaryPath} --version`;
-            default:
-                return `${binaryPath} --version`;
-        }
+        return null;
     }
 
     /**
@@ -307,7 +288,7 @@ export class ExternalToolRunner {
             return [];
         }
 
-        console.log(`[ExternalToolRunner] Running tools for ${filePath}: ${applicableTools.join(', ')}`);
+        logger.debug({ filePath, tools: applicableTools }, 'Running external tools');
 
         // Run tools in parallel for better performance
         const results = await Promise.all(
@@ -318,10 +299,10 @@ export class ExternalToolRunner {
         const allIssues: CodeIssue[] = [];
         for (const result of results) {
             if (result.success) {
-                console.log(`[ExternalToolRunner] ${result.tool} found ${result.issues.length} issues (${result.executionTimeMs}ms)`);
+                logger.debug({ tool: result.tool, issueCount: result.issues.length, executionTimeMs: result.executionTimeMs }, 'Tool completed');
                 allIssues.push(...result.issues);
             } else if (result.error) {
-                console.warn(`[ExternalToolRunner] ${result.tool} failed: ${result.error}`);
+                logger.warn({ tool: result.tool, error: result.error }, 'Tool failed');
             }
         }
 
@@ -391,8 +372,13 @@ export class ExternalToolRunner {
         
         try {
             // Run semgrep with auto config (uses community rules)
-            const command = `${binaryPath} scan --config auto --json --quiet "${tempFile}"`;
-            const { stdout } = await execAsync(command, { 
+            const { stdout } = await execFileAsync(binaryPath, [
+                'scan',
+                '--config', 'auto',
+                '--json',
+                '--quiet',
+                tempFile
+            ], {
                 timeout,
                 maxBuffer: 10 * 1024 * 1024, // 10MB buffer
             });
@@ -433,7 +419,7 @@ export class ExternalToolRunner {
                 });
             }
         } catch (error) {
-            console.error('[ExternalToolRunner] Failed to parse Semgrep output:', error);
+            logger.error({ err: sanitizeError(error) }, 'Failed to parse Semgrep output');
         }
 
         return issues;
@@ -480,8 +466,11 @@ export class ExternalToolRunner {
         
         try {
             // Run biome lint with JSON output
-            const command = `${binaryPath} lint --reporter=json "${tempFile}"`;
-            const { stdout } = await execAsync(command, { 
+            const { stdout } = await execFileAsync(binaryPath, [
+                'lint',
+                '--reporter=json',
+                tempFile
+            ], {
                 timeout,
                 maxBuffer: 5 * 1024 * 1024,
             });
@@ -529,7 +518,7 @@ export class ExternalToolRunner {
                 });
             }
         } catch (error) {
-            console.error('[ExternalToolRunner] Failed to parse Biome output:', error);
+            logger.error({ err: sanitizeError(error) }, 'Failed to parse Biome output');
         }
 
         return issues;
@@ -568,8 +557,11 @@ export class ExternalToolRunner {
         
         try {
             // Run ruff check with JSON output
-            const command = `${binaryPath} check --output-format=json "${tempFile}"`;
-            const { stdout } = await execAsync(command, { 
+            const { stdout } = await execFileAsync(binaryPath, [
+                'check',
+                '--output-format=json',
+                tempFile
+            ], {
                 timeout,
                 maxBuffer: 5 * 1024 * 1024,
             });
@@ -615,7 +607,7 @@ export class ExternalToolRunner {
                 });
             }
         } catch (error) {
-            console.error('[ExternalToolRunner] Failed to parse Ruff output:', error);
+            logger.error({ err: sanitizeError(error) }, 'Failed to parse Ruff output');
         }
 
         return issues;
@@ -676,8 +668,10 @@ export class ExternalToolRunner {
         
         try {
             // Run tflint with JSON output
-            const command = `${binaryPath} --format=json "${tempFile}"`;
-            const { stdout } = await execAsync(command, { 
+            const { stdout } = await execFileAsync(binaryPath, [
+                '--format=json',
+                tempFile
+            ], {
                 timeout,
                 cwd: tempDir,
                 maxBuffer: 5 * 1024 * 1024,
@@ -724,7 +718,7 @@ export class ExternalToolRunner {
                 });
             }
         } catch (error) {
-            console.error('[ExternalToolRunner] Failed to parse TFLint output:', error);
+            logger.error({ err: sanitizeError(error) }, 'Failed to parse TFLint output');
         }
 
         return issues;
@@ -751,8 +745,11 @@ export class ExternalToolRunner {
         
         try {
             // Run checkov with JSON output
-            const command = `${binaryPath} -f "${tempFile}" --output json --quiet`;
-            const { stdout } = await execAsync(command, { 
+            const { stdout } = await execFileAsync(binaryPath, [
+                '-f', tempFile,
+                '--output', 'json',
+                '--quiet'
+            ], {
                 timeout,
                 maxBuffer: 10 * 1024 * 1024,
             });
@@ -799,7 +796,7 @@ export class ExternalToolRunner {
                 });
             }
         } catch (error) {
-            console.error('[ExternalToolRunner] Failed to parse Checkov output:', error);
+            logger.error({ err: sanitizeError(error) }, 'Failed to parse Checkov output');
         }
 
         return issues;
@@ -843,6 +840,11 @@ export class ExternalToolRunner {
             // Ignore cleanup errors
         }
     }
+
+    // Note: Tool execution uses execFileAsync with timeout option, which handles
+    // process termination on timeout. A custom executeWithAbort with AbortController
+    // was considered for cleaner cleanup (SIGTERM then SIGKILL) but the standard
+    // execFileAsync timeout is sufficient for our use case.
 
     /**
      * Deduplicate issues from multiple tools

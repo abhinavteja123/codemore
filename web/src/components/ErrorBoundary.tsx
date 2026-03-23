@@ -2,6 +2,7 @@
 
 import React from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { logger, sanitizeError } from "@/lib/logger";
 
 interface Props {
   children: React.ReactNode;
@@ -24,7 +25,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error("ErrorBoundary caught:", error, info);
+    logger.error({
+      err: sanitizeError(error),
+      componentName: info.componentStack?.split('\n')[1]?.trim() ?? 'unknown'
+    }, 'React error boundary caught unhandled error');
   }
 
   render() {

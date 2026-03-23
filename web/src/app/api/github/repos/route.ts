@@ -2,15 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { fetchGitHubRepoFiles } from "@/lib/sourceIngestion";
+import { getUserToken } from "@/lib/tokenStore";
+import { validateCsrf } from "@/lib/csrf";
+import { logger, sanitizeError } from '@/lib/logger';
 
 export async function GET(_req: NextRequest) {
   const session = await getServerSession(authOptions);
 
-  if (!session || !(session as any).accessToken) {
+  if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const accessToken = (session as any).accessToken;
+  // Fetch GitHub token from database (not from session)
+  const accessToken = await getUserToken(session.user.email, "github");
+  if (!accessToken) {
+    return NextResponse.json({ error: "GitHub not connected. Please re-authenticate with GitHub." }, { status: 401 });
+  }
 
   try {
     const response = await fetch(
@@ -26,7 +33,7 @@ export async function GET(_req: NextRequest) {
     // Check rate limit
     const remaining = parseInt(response.headers.get("x-ratelimit-remaining") || "100");
     if (remaining < 5) {
-      console.warn(`GitHub rate limit low: ${remaining} remaining`);
+      logger.warn({ remaining }, "GitHub rate limit low");
     }
 
     if (response.status === 403 || response.status === 429) {
@@ -44,7 +51,7 @@ export async function GET(_req: NextRequest) {
     const repos = await response.json();
     return NextResponse.json(repos);
   } catch (error) {
-    console.error("GitHub repos error:", error);
+    logger.error({ err: sanitizeError(error) }, "GitHub repos error");
     return NextResponse.json(
       { error: "Failed to fetch repositories" },
       { status: 500 }
@@ -54,13 +61,22 @@ export async function GET(_req: NextRequest) {
 
 // Fetch repo files for analysis
 export async function POST(req: NextRequest) {
+  // CSRF protection for state-changing requests
+  const csrfError = validateCsrf(req);
+  if (csrfError) return csrfError;
+
   const session = await getServerSession(authOptions);
 
-  if (!session || !(session as any).accessToken) {
+  if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const accessToken = (session as any).accessToken;
+  // Fetch GitHub token from database (not from session)
+  const accessToken = await getUserToken(session.user.email, "github");
+  if (!accessToken) {
+    return NextResponse.json({ error: "GitHub not connected. Please re-authenticate with GitHub." }, { status: 401 });
+  }
+
   const { repoFullName, branch } = await req.json();
 
   if (!repoFullName || !/^[\w.-]+\/[\w.-]+$/.test(repoFullName)) {
@@ -75,7 +91,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ files });
   } catch (error) {
-    console.error("GitHub fetch files error:", error);
+    logger.error({ err: sanitizeError(error) }, "GitHub fetch files error");
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch repository files" },
       { status: 500 }

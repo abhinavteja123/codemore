@@ -4,6 +4,17 @@
  */
 
 // ============================================================================
+// Protocol Version
+// ============================================================================
+
+/**
+ * Protocol version for IPC communication.
+ * Bump this when making breaking changes to the protocol.
+ * Extension will warn if daemon version doesn't match.
+ */
+export const PROTOCOL_VERSION = 1;
+
+// ============================================================================
 // Core Types
 // ============================================================================
 
@@ -198,7 +209,7 @@ export const RpcErrorCodes = {
 
 // Daemon -> Extension Host notifications
 export interface DaemonNotifications {
-    'daemon/ready': { version: string };
+    'daemon/ready': { version: string; protocolVersion: number };
     'daemon/fileDiscovery': { totalFiles: number; fileTypes: Record<string, number> };
     'daemon/analysisProgress': { filePath: string; progress: number; total: number };
     'daemon/analysisComplete': { filePath: string; issues: CodeIssue[] };

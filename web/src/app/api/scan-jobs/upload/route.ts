@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { validateCsrf } from "@/lib/csrf";
 import { enqueueZipScanJob, kickScanQueue } from "@/lib/scanJobRunner";
 import { createProject, createScanJob, mapDbScanJob } from "@/lib/database";
 import { isDbEnabled } from "@/lib/supabase";
 import { saveZipArtifact } from "@/lib/scanArtifacts";
 import { Project } from "@/lib/types";
+import { logger, sanitizeError } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrf(req);
+  if (csrfError) return csrfError;
+
   const session = await getServerSession(authOptions);
 
   if (!session || !session.user?.email) {
@@ -68,7 +73,7 @@ export async function POST(req: NextRequest) {
       queued: result.queued,
     });
   } catch (error) {
-    console.error("ZIP scan job failed:", error);
+    logger.error({ err: sanitizeError(error) }, "ZIP scan job failed");
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "ZIP scan failed" },
       { status: 500 }

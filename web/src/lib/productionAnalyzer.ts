@@ -1,6 +1,7 @@
 import { AstParser } from "../../../daemon/services/astParser";
 import { StaticAnalyzer } from "../../../daemon/services/staticAnalyzer";
 import type { FileContext as SharedFileContext } from "../../../shared/protocol";
+import { calculateHealthScoreFromTotals, calculateTechnicalDebt } from "../../../shared/scoring";
 import {
   CodeHealthMetrics,
   CodeIssue,
@@ -9,6 +10,7 @@ import {
   Severity,
 } from "./types";
 import { analyzeFile as analyzeFallbackFile } from "./analyzer";
+import { logger, sanitizeError } from './logger';
 
 const STATIC_PRIMARY_EXTENSIONS = new Set([
   ".ts",
@@ -102,22 +104,12 @@ function buildMetrics(
     issuesBySeverity[issue.severity] += 1;
   }
 
-  let overallScore = files.length > 0 ? 100 : 0;
-  if (files.length > 0) {
-    overallScore -= issuesBySeverity.BLOCKER * 15;
-    overallScore -= issuesBySeverity.CRITICAL * 10;
-    overallScore -= issuesBySeverity.MAJOR * 5;
-    overallScore -= issuesBySeverity.MINOR * 2;
-    overallScore -= issuesBySeverity.INFO * 1;
-    overallScore = Math.max(0, Math.min(100, overallScore));
-  }
+  // Calculate overall score using shared health scoring formula
+  // Using the legacy function for backward compatibility (total counts instead of per-file)
+  const overallScore = calculateHealthScoreFromTotals(issuesBySeverity, files.length);
 
-  const technicalDebtMinutes =
-    issuesBySeverity.BLOCKER * 120 +
-    issuesBySeverity.CRITICAL * 60 +
-    issuesBySeverity.MAJOR * 30 +
-    issuesBySeverity.MINOR * 10 +
-    issuesBySeverity.INFO * 5;
+  // Calculate technical debt using shared formula
+  const technicalDebtMinutes = calculateTechnicalDebt(issuesBySeverity);
 
   const linesOfCode = files.reduce(
     (total, file) => total + countMeaningfulLines(file.content),
@@ -167,7 +159,7 @@ export async function analyzeProjectWithProductionCore(files: ProjectFile[]): Pr
         ast.sourceFile ?? undefined
       ) as unknown as CodeIssue[];
     } catch (error) {
-      console.error("[productionAnalyzer] Static analysis failed:", error);
+      logger.error({ err: sanitizeError(error) }, '[productionAnalyzer] Static analysis failed');
     }
 
     if (usesStaticAnalyzerAsPrimary(file.path)) {

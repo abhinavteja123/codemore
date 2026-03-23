@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { validateCsrf } from "@/lib/csrf";
 import {
   getCachedSuggestionsForProjectIssue,
   resolveSuggestionsForProjectIssue,
   SuggestionServiceError,
 } from "@/lib/suggestionService";
+import { logger, sanitizeError } from "@/lib/logger";
 
 export async function GET(
   req: NextRequest,
@@ -31,7 +33,7 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
-    console.error("Failed to load suggestions:", error);
+    logger.error({ err: sanitizeError(error) }, "Failed to load suggestions");
     return NextResponse.json(
       { error: "Failed to load suggestions" },
       { status: 500 }
@@ -43,6 +45,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const csrfError = validateCsrf(req);
+  if (csrfError) return csrfError;
+
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email) {
@@ -72,7 +77,7 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
-    console.error("Suggestion generation failed:", error);
+    logger.error({ err: sanitizeError(error) }, "Suggestion generation failed");
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to generate suggestions" },
       { status: 500 }

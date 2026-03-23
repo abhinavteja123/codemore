@@ -6,22 +6,40 @@ import { createProject, createScanJob, mapDbScanJob } from "@/lib/database";
 import { isDbEnabled } from "@/lib/supabase";
 import { saveGitHubArtifact } from "@/lib/scanArtifacts";
 import { Project } from "@/lib/types";
+import { createGitHubScanSchema, validateBody, formatZodError } from "@/lib/validation";
+import { validateCsrf } from "@/lib/csrf";
+import { getUserToken } from "@/lib/tokenStore";
+import { logger, sanitizeError } from '@/lib/logger';
 
 export async function POST(req: NextRequest) {
+  // CSRF protection for state-changing requests
+  const csrfError = validateCsrf(req);
+  if (csrfError) return csrfError;
+
   const session = await getServerSession(authOptions);
 
-  if (!session || !(session as any).accessToken || !session.user?.email) {
+  if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const repoFullName = body.repoFullName as string | undefined;
-  const branch = body.branch as string | undefined;
-  const projectName = (body.name as string | undefined) || repoFullName?.split("/")[1] || "GitHub Project";
-
-  if (!repoFullName || !/^[\w.-]+\/[\w.-]+$/.test(repoFullName)) {
-    return NextResponse.json({ error: "Invalid repository name" }, { status: 400 });
+  // Fetch GitHub token from database (not from session)
+  const accessToken = await getUserToken(session.user.email, "github");
+  if (!accessToken) {
+    return NextResponse.json({ error: "GitHub not connected. Please re-authenticate with GitHub." }, { status: 401 });
   }
+
+  const body = await req.json();
+  const validation = validateBody(createGitHubScanSchema, body);
+
+  if (!validation.success) {
+    return NextResponse.json(
+      { error: formatZodError(validation.error) },
+      { status: 400 }
+    );
+  }
+
+  const { repoFullName, branch, name, projectId } = validation.data;
+  const projectName = name || repoFullName.split("/")[1] || "GitHub Project";
 
   try {
     if (isDbEnabled()) {
@@ -43,7 +61,7 @@ export async function POST(req: NextRequest) {
       await saveGitHubArtifact(dbJob.id, {
         repoFullName,
         branch,
-        accessToken: (session as any).accessToken,
+        accessToken,
       });
       kickScanQueue();
 
@@ -57,10 +75,10 @@ export async function POST(req: NextRequest) {
 
     const result = await enqueueGitHubScanJob({
       userEmail: session.user.email,
-      projectId: body.projectId as string | undefined,
+      projectId,
       name: projectName,
       repoFullName,
-      accessToken: (session as any).accessToken,
+      accessToken,
       branch,
     });
 
@@ -71,7 +89,7 @@ export async function POST(req: NextRequest) {
       queued: result.queued,
     });
   } catch (error) {
-    console.error("GitHub scan job failed:", error);
+    logger.error({ err: sanitizeError(error) }, "GitHub scan job failed");
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "GitHub scan failed" },
       { status: 500 }

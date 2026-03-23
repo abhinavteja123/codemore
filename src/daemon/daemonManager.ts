@@ -1,6 +1,6 @@
 /**
  * CodeMore Daemon Manager
- * 
+ *
  * Manages the lifecycle of the background Context Daemon process.
  * Handles spawning, health checks, graceful shutdown, and automatic restart.
  */
@@ -10,20 +10,28 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { ChildProcess, fork } from 'child_process';
 import * as treeKill from 'tree-kill';
+import { PROTOCOL_VERSION } from '../../shared/protocol';
 
 interface DaemonState {
-    status: 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed';
+    status: 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed' | 'disabled';
     pid?: number;
     startTime?: number;
     restartCount: number;
     lastError?: string;
 }
 
+// Workspace state keys for persistence
+const RESTART_COUNT_KEY = 'codemore.daemonRestartCount';
+const LAST_RESTART_TIMESTAMP_KEY = 'codemore.lastRestartTimestamp';
+const RESTART_WINDOW_MS = 5 * 60 * 1000; // 5 minutes - resets restart count if this much time passes
+
 export class DaemonManager implements vscode.Disposable {
     private process: ChildProcess | null = null;
     private state: DaemonState = { status: 'stopped', restartCount: 0 };
     private healthCheckInterval: NodeJS.Timeout | null = null;
     private restartTimeout: NodeJS.Timeout | null = null;
+    private isStarting = false; // Guard against concurrent start() calls
+    private restartTimer: NodeJS.Timeout | null = null; // Track pending restarts
 
     // Configuration
     private readonly maxRestartAttempts = 5;
@@ -37,26 +45,94 @@ export class DaemonManager implements vscode.Disposable {
     private readonly stateChangeEmitter = new vscode.EventEmitter<DaemonState>();
     readonly onStateChange = this.stateChangeEmitter.event;
 
+    // Named handler functions for clean removal
+    private handleStdout = (data: Buffer): void => {
+        const text = data.toString().trim();
+        if (text) {
+            this.outputChannel.appendLine(`[Daemon] ${text}`);
+        }
+    };
+
+    private handleStderr = (data: Buffer): void => {
+        const text = data.toString().trim();
+        if (text) {
+            this.outputChannel.appendLine(`[Daemon Error] ${text}`);
+        }
+    };
+
     constructor(
         private readonly context: vscode.ExtensionContext,
         private readonly outputChannel: vscode.OutputChannel
-    ) { }
+    ) {
+        // Restore persisted restart count
+        this.restoreRestartCount();
+    }
+
+    /**
+     * Restore restart count from workspace state
+     * Resets if the last restart was more than RESTART_WINDOW_MS ago
+     */
+    private restoreRestartCount(): void {
+        const savedCount = this.context.workspaceState.get<number>(RESTART_COUNT_KEY, 0);
+        const lastTimestamp = this.context.workspaceState.get<number>(LAST_RESTART_TIMESTAMP_KEY, 0);
+        const timeSinceLastRestart = Date.now() - lastTimestamp;
+
+        if (timeSinceLastRestart > RESTART_WINDOW_MS) {
+            // Reset count if it's been a while since last restart
+            this.state.restartCount = 0;
+        } else {
+            this.state.restartCount = savedCount;
+
+            // Check if we were in a crash loop
+            if (savedCount >= this.maxRestartAttempts) {
+                this.state.status = 'disabled';
+                this.outputChannel.appendLine(
+                    `Daemon was disabled due to repeated crashes. Use "CodeMore: Restart Context Daemon" to re-enable.`
+                );
+            }
+        }
+    }
+
+    /**
+     * Persist restart count to workspace state
+     */
+    private async persistRestartCount(): Promise<void> {
+        await this.context.workspaceState.update(RESTART_COUNT_KEY, this.state.restartCount);
+        await this.context.workspaceState.update(LAST_RESTART_TIMESTAMP_KEY, Date.now());
+    }
+
+    /**
+     * Reset persisted restart count (called on successful start or manual restart)
+     */
+    private async resetPersistedRestartCount(): Promise<void> {
+        this.state.restartCount = 0;
+        await this.context.workspaceState.update(RESTART_COUNT_KEY, 0);
+        await this.context.workspaceState.update(LAST_RESTART_TIMESTAMP_KEY, Date.now());
+    }
 
     /**
      * Start the daemon process
      */
     async start(): Promise<void> {
+        // Guard against concurrent start() calls
+        if (this.isStarting) {
+            this.outputChannel.appendLine('Daemon start() called while already starting — skipping');
+            return;
+        }
+
         if (this.state.status === 'running' || this.state.status === 'starting') {
             this.outputChannel.appendLine('Daemon is already running or starting');
             return;
         }
 
-        this.setState({ status: 'starting' });
-        this.outputChannel.appendLine('=================================');
-        this.outputChannel.appendLine('Starting Context Daemon...');
-        this.outputChannel.appendLine(`Extension path: ${this.context.extensionPath}`);
+        this.isStarting = true;
 
         try {
+            this.setState({ status: 'starting' });
+            this.outputChannel.appendLine('=================================');
+            this.outputChannel.appendLine('Starting Context Daemon...');
+            this.outputChannel.appendLine(`Extension path: ${this.context.extensionPath}`);
+
             // Get path to daemon entry point
             const daemonPath = this.getDaemonPath();
             this.outputChannel.appendLine(`Daemon path: ${daemonPath}`);
@@ -90,6 +166,9 @@ export class DaemonManager implements vscode.Disposable {
                 restartCount: 0,
             });
 
+            // Reset persisted restart count on successful start
+            await this.resetPersistedRestartCount();
+
             // Start health checks
             this.startHealthChecks();
 
@@ -107,6 +186,8 @@ export class DaemonManager implements vscode.Disposable {
 
             // Attempt restart with backoff
             this.scheduleRestart();
+        } finally {
+            this.isStarting = false;
         }
     }
 
@@ -164,7 +245,8 @@ export class DaemonManager implements vscode.Disposable {
     async restart(): Promise<void> {
         this.outputChannel.appendLine('Restarting Context Daemon...');
         await this.stop();
-        this.state.restartCount = 0; // Reset restart count for manual restart
+        await this.resetPersistedRestartCount(); // Reset persisted count for manual restart
+        this.state.status = 'stopped'; // Clear any 'disabled' status
         await this.start();
     }
 
@@ -205,27 +287,14 @@ export class DaemonManager implements vscode.Disposable {
             return;
         }
 
+        // Remove any existing listeners to prevent memory leaks on restart
+        this.attachProcessListeners();
+
         // Handle IPC messages from daemon
         this.process.on('message', (message: unknown) => {
             // Convert to string if it's an object
             const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
             this.outputEmitter.fire(messageStr);
-        });
-
-        // Handle stdout (for debugging)
-        this.process.stdout?.on('data', (data: Buffer) => {
-            const text = data.toString().trim();
-            if (text) {
-                this.outputChannel.appendLine(`[Daemon] ${text}`);
-            }
-        });
-
-        // Handle stderr
-        this.process.stderr?.on('data', (data: Buffer) => {
-            const text = data.toString().trim();
-            if (text) {
-                this.outputChannel.appendLine(`[Daemon Error] ${text}`);
-            }
         });
 
         // Handle process exit
@@ -253,6 +322,23 @@ export class DaemonManager implements vscode.Disposable {
     }
 
     /**
+     * Attach stdout/stderr listeners, removing old ones first to prevent memory leaks
+     */
+    private attachProcessListeners(): void {
+        if (!this.process) {
+            return;
+        }
+
+        // Remove old listeners
+        this.process.stdout?.removeAllListeners('data');
+        this.process.stderr?.removeAllListeners('data');
+
+        // Attach new named function handlers
+        this.process.stdout?.on('data', this.handleStdout);
+        this.process.stderr?.on('data', this.handleStderr);
+    }
+
+    /**
      * Wait for the daemon to signal it's ready
      */
     private waitForReady(): Promise<void> {
@@ -273,6 +359,22 @@ export class DaemonManager implements vscode.Disposable {
                     ) {
                         clearTimeout(timeout);
                         this.process?.off('message', handler);
+
+                        // Check protocol version compatibility
+                        const readyMsg = msg as { type: string; protocolVersion?: number; version?: string };
+                        if (readyMsg.protocolVersion !== undefined && readyMsg.protocolVersion !== PROTOCOL_VERSION) {
+                            this.outputChannel.appendLine(
+                                `Protocol version mismatch: expected ${PROTOCOL_VERSION}, got ${readyMsg.protocolVersion}`
+                            );
+                            vscode.window.showWarningMessage(
+                                'CodeMore: daemon version mismatch. Please reload VS Code.'
+                            );
+                        }
+
+                        if (readyMsg.version) {
+                            this.outputChannel.appendLine(`Daemon version: ${readyMsg.version}`);
+                        }
+
                         resolve();
                     }
                 } catch (error) {
@@ -290,13 +392,18 @@ export class DaemonManager implements vscode.Disposable {
     private scheduleRestart(): void {
         if (this.state.restartCount >= this.maxRestartAttempts) {
             this.outputChannel.appendLine(
-                `Max restart attempts (${this.maxRestartAttempts}) reached. Manual restart required.`
+                `Max restart attempts (${this.maxRestartAttempts}) reached. Daemon disabled.`
             );
+            this.setState({ status: 'disabled' });
+            this.persistRestartCount(); // Persist the disabled state
             vscode.window.showErrorMessage(
-                'CodeMore daemon failed to start. Use "CodeMore: Restart Context Daemon" to try again.',
+                'CodeMore daemon failed to start after multiple attempts. Check the output channel for details.',
+                'Open Output',
                 'Restart'
             ).then((selection) => {
-                if (selection === 'Restart') {
+                if (selection === 'Open Output') {
+                    this.outputChannel.show();
+                } else if (selection === 'Restart') {
                     vscode.commands.executeCommand('codemore.restartDaemon');
                 }
             });
@@ -308,8 +415,9 @@ export class DaemonManager implements vscode.Disposable {
             `Scheduling restart in ${delay}ms (attempt ${this.state.restartCount + 1}/${this.maxRestartAttempts})`
         );
 
-        this.restartTimeout = setTimeout(async () => {
+        this.restartTimer = setTimeout(async () => {
             this.state.restartCount++;
+            await this.persistRestartCount(); // Persist before attempting restart
             await this.start();
         }, delay);
     }
@@ -359,6 +467,10 @@ export class DaemonManager implements vscode.Disposable {
         if (this.restartTimeout) {
             clearTimeout(this.restartTimeout);
             this.restartTimeout = null;
+        }
+        if (this.restartTimer) {
+            clearTimeout(this.restartTimer);
+            this.restartTimer = null;
         }
     }
 

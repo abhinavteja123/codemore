@@ -336,8 +336,9 @@ export default function ProjectPage() {
     const map = new Map<string, CodeIssue[]>();
     for (const issue of issues) {
       const file = issue.location.filePath;
-      if (!map.has(file)) map.set(file, []);
-      map.get(file)!.push(issue);
+      const fileIssues = map.get(file) ?? [];
+      fileIssues.push(issue);
+      map.set(file, fileIssues);
     }
     return map;
   }, [issues]);

@@ -25,6 +25,10 @@ let outputChannel: vscode.OutputChannel;
 let statusBarItem: vscode.StatusBarItem;
 let daemonNotificationDisposables: vscode.Disposable[] = [];
 
+// Debounce timers (module-level for cleanup in deactivate)
+let debounceTimer: NodeJS.Timeout | undefined;
+let invalidateDebounceMap = new Map<string, NodeJS.Timeout>();
+
 // Current state
 let currentIssues: CodeIssue[] = [];
 let currentMetrics: CodeHealthMetrics | undefined;
@@ -155,6 +159,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
  */
 export async function deactivate(): Promise<void> {
     outputChannel?.appendLine('CodeMore extension deactivating...');
+
+    // Clear debounce timers to prevent memory leaks
+    if (debounceTimer) {
+        clearTimeout(debounceTimer);
+        debounceTimer = undefined;
+    }
+    invalidateDebounceMap.forEach(timer => clearTimeout(timer));
+    invalidateDebounceMap.clear();
 
     for (const disposable of daemonNotificationDisposables) {
         disposable.dispose();
@@ -358,8 +370,6 @@ function registerCommands(context: vscode.ExtensionContext): void {
  * Register event handlers for file changes and workspace updates
  */
 function registerEventHandlers(context: vscode.ExtensionContext): void {
-    let debounceTimer: NodeJS.Timeout | undefined;
-
     // File save handler - trigger analysis
     context.subscriptions.push(
         vscode.workspace.onDidSaveTextDocument(async (document) => {
@@ -379,9 +389,9 @@ function registerEventHandlers(context: vscode.ExtensionContext): void {
             }
 
             debounceTimer = setTimeout(async () => {
-                if (!isDaemonReady) return;
+                if (!isDaemonReady || !rpcClient) return;
                 try {
-                    await rpcClient!.call('analyzeFile', {
+                    await rpcClient.call('analyzeFile', {
                         filePath: document.uri.fsPath,
                         content: document.getText(),
                     });
@@ -393,7 +403,6 @@ function registerEventHandlers(context: vscode.ExtensionContext): void {
     );
 
     // File change handler - invalidate cache with debouncing
-    const invalidateDebounceMap = new Map<string, NodeJS.Timeout>();
     context.subscriptions.push(
         vscode.workspace.onDidChangeTextDocument((event) => {
             if (!rpcClient || !isDaemonReady) {
@@ -401,23 +410,25 @@ function registerEventHandlers(context: vscode.ExtensionContext): void {
             }
 
             const filePath = event.document.uri.fsPath;
-            
+
             // Skip non-file URIs (like output channels, extension-output, etc.)
             if (event.document.uri.scheme !== 'file') {
                 return;
             }
-            
+
             // Debounce invalidation per file to reduce log spam
             const existingTimer = invalidateDebounceMap.get(filePath);
             if (existingTimer) {
                 clearTimeout(existingTimer);
             }
-            
+
             const timer = setTimeout(() => {
                 invalidateDebounceMap.delete(filePath);
-                rpcClient!.notify('invalidateFile', { filePath });
+                if (rpcClient) {
+                    rpcClient.notify('invalidateFile', { filePath });
+                }
             }, 500);
-            
+
             invalidateDebounceMap.set(filePath, timer);
         })
     );

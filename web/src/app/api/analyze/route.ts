@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { validateCsrf } from "@/lib/csrf";
 import { analyzeProjectWithProductionCore } from "@/lib/productionAnalyzer";
 import { ProjectFile } from "@/lib/types";
+import { logger, sanitizeError } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrf(req);
+  if (csrfError) return csrfError;
+
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -48,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ...result, scanId });
   } catch (error) {
-    console.error("Analysis error:", error);
+    logger.error({ err: sanitizeError(error) }, "Analysis error");
     return NextResponse.json(
       { error: "Analysis failed" },
       { status: 500 }

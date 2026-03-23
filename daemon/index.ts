@@ -1,9 +1,17 @@
 /**
  * CodeMore Context Daemon - Entry Point
- * 
+ *
  * Background service for code analysis, AST parsing, and AI suggestions.
  * Communicates with the extension host via IPC using JSON-RPC protocol.
  */
+
+import { initSentry, captureError } from './lib/sentry';
+import { createLogger, sanitizeError } from './lib/logger';
+
+// Initialize Sentry FIRST (before any other setup)
+initSentry();
+
+const logger = createLogger('daemon');
 
 import {
     JsonRpcRequest,
@@ -21,6 +29,7 @@ import {
     createNotification,
     RpcErrorCodes,
     isJsonRpcRequest,
+    PROTOCOL_VERSION,
 } from '../shared/protocol';
 
 import { FileWatcher } from './services/fileWatcher';
@@ -83,12 +92,12 @@ function notify(method: string, params?: unknown): void {
  * Log to console (redirected to extension output)
  */
 function log(message: string): void {
-    console.log(`[Daemon] ${message}`);
+    logger.info(message);
 }
 
 function logError(message: string, error?: unknown): void {
-    console.error(`[Daemon Error] ${message}`, error);
-    notify('daemon/error', { message, details: error });
+    logger.error({ err: sanitizeError(error) }, message);
+    notify('daemon/error', { message, details: error instanceof Error ? error.message : String(error) });
 }
 
 // ============================================================================
@@ -492,13 +501,12 @@ const handlers: Record<string, RequestHandler> = {
  * Check if message is a JSON-RPC notification (request without id)
  */
 function isJsonRpcNotification(msg: unknown): boolean {
+    if (typeof msg !== 'object' || msg === null) return false;
+    const obj = msg as Record<string, unknown>;
     return (
-        typeof msg === 'object' &&
-        msg !== null &&
-        'jsonrpc' in msg &&
-        (msg as any).jsonrpc === '2.0' &&
-        'method' in msg &&
-        !('id' in msg)
+        obj.jsonrpc === '2.0' &&
+        typeof obj.method === 'string' &&
+        !('id' in obj)
     );
 }
 
@@ -568,20 +576,37 @@ async function handleMessage(data: unknown): Promise<void> {
 // Process Setup
 // ============================================================================
 
-// Handle IPC messages
-process.on('message', handleMessage);
-
-// Handle shutdown signal
-process.on('message', (message: unknown) => {
-    if (
+/**
+ * Type guard for shutdown messages
+ */
+function isShutdownMessage(message: unknown): boolean {
+    return (
         typeof message === 'object' &&
         message !== null &&
         'type' in message &&
         (message as { type: string }).type === 'shutdown'
-    ) {
-        log('Received shutdown signal');
-        cleanup();
-        process.exit(0);
+    );
+}
+
+/**
+ * Unified IPC message handler
+ * Handles both JSON-RPC messages and shutdown signals
+ */
+process.on('message', (message: unknown) => {
+    try {
+        // Check for shutdown signal first (highest priority)
+        if (isShutdownMessage(message)) {
+            log('Received shutdown signal');
+            cleanup();
+            process.exit(0);
+            return;
+        }
+
+        // Otherwise handle as JSON-RPC message
+        handleMessage(message);
+    } catch (error) {
+        // Ensure errors in message handling don't prevent shutdown
+        logError('Error in message handler', error);
     }
 });
 
@@ -599,14 +624,17 @@ process.on('SIGINT', () => {
 });
 
 // Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-    logError('Uncaught exception', error);
+process.on('uncaughtException', (error: Error) => {
+    captureError(error, { type: 'uncaughtException' });
+    logger.fatal({ err: sanitizeError(error) }, 'Uncaught exception — daemon shutting down');
     cleanup();
     process.exit(1);
 });
 
-process.on('unhandledRejection', (reason) => {
-    logError('Unhandled rejection', reason);
+process.on('unhandledRejection', (reason: unknown) => {
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+    captureError(error, { type: 'unhandledRejection' });
+    logger.error({ err: sanitizeError(error) }, 'Unhandled promise rejection in daemon');
 });
 
 /**
@@ -626,9 +654,13 @@ log('Context Daemon starting...');
 
 // Small delay to ensure all handlers are set up
 setTimeout(() => {
-    // Signal ready to extension host
+    // Signal ready to extension host with version info
     if (process.send) {
-        process.send(JSON.stringify({ type: 'ready' }));
+        process.send(JSON.stringify({
+            type: 'ready',
+            version: state.version,
+            protocolVersion: PROTOCOL_VERSION,
+        }));
     }
     log('Context Daemon ready');
 }, 100);

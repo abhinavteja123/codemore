@@ -5,6 +5,7 @@ import {
   getProjectFiles,
   getProjectSnapshot,
   mapDbScanJob,
+  recordHealthSnapshot,
   resetStaleRunningScanJobs,
   saveProjectFiles,
   saveScan,
@@ -16,6 +17,7 @@ import { extractProjectFilesFromZipBuffer, fetchGitHubRepoFiles, filterProjectFi
 import { Project, ProjectFile, ScanJob } from "./types";
 import { isDbEnabled } from "./supabase";
 import { deleteArtifact, loadArtifact } from "./scanArtifacts";
+import { logger, sanitizeError } from './logger';
 
 type JobSource = "upload" | "github";
 
@@ -90,7 +92,7 @@ async function processQueueLoop(): Promise<void> {
       try {
         await executePersistedJob(job.id, job.project_id);
       } catch (error) {
-        console.error("[scanJobRunner] Job failed:", error);
+        logger.error({ err: sanitizeError(error) }, "[scanJobRunner] Job failed");
         await updateScanJob(job.id, {
           status: "failed",
           error_message: error instanceof Error ? error.message : "Scan failed",
@@ -136,7 +138,18 @@ async function executePersistedJob(jobId: string, projectId: string): Promise<vo
   }
 
   const result = await analyzeProjectWithProductionCore(files);
-  await saveScan(project.id, result.metrics, result.issues);
+  const scan = await saveScan(project.id, result.metrics, result.issues);
+
+  // Record health snapshot for trend tracking and regression detection
+  if (scan) {
+    await recordHealthSnapshot(
+      project.id,
+      scan.id,
+      result.issues,
+      result.metrics.filesAnalyzed,
+      result.metrics.overallScore
+    );
+  }
 
   await updateScanJob(jobId, {
     status: "completed",

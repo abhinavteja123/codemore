@@ -1,11 +1,12 @@
 /**
  * Suggestion Engine
- * 
+ *
  * Generates actionable refactoring suggestions with diffs.
  * Prioritizes suggestions by impact and confidence.
  */
 
 import * as path from 'path';
+import { LRUCache } from 'lru-cache';
 import { AiService } from './aiService';
 import { ContextMap } from './contextMap';
 import {
@@ -13,16 +14,37 @@ import {
     CodeSuggestion,
     FileContext,
 } from '../../shared/protocol';
+import { createLogger } from '../lib/logger';
+
+const logger = createLogger('suggestionEngine');
+
+// Cache configuration
+const CACHE_MAX_SIZE = 1000;
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 export class SuggestionEngine {
-    private issueCache = new Map<string, CodeIssue>();
-    private suggestionCache = new Map<string, CodeSuggestion[]>();
-    private suggestionById = new Map<string, CodeSuggestion>();
+    private issueCache: LRUCache<string, CodeIssue>;
+    private suggestionCache: LRUCache<string, CodeSuggestion[]>;
+    private suggestionById: LRUCache<string, CodeSuggestion>;
 
     constructor(
         private readonly aiService: AiService,
         private readonly contextMap: ContextMap
-    ) { }
+    ) {
+        // Initialize LRU caches with size limits to prevent unbounded memory growth
+        this.issueCache = new LRUCache<string, CodeIssue>({
+            max: CACHE_MAX_SIZE,
+            ttl: CACHE_TTL_MS,
+        });
+        this.suggestionCache = new LRUCache<string, CodeSuggestion[]>({
+            max: Math.floor(CACHE_MAX_SIZE / 2),
+            ttl: CACHE_TTL_MS,
+        });
+        this.suggestionById = new LRUCache<string, CodeSuggestion>({
+            max: CACHE_MAX_SIZE * 2,
+            ttl: CACHE_TTL_MS,
+        });
+    }
 
     /**
      * Analyze a file and return issues
@@ -32,7 +54,7 @@ export class SuggestionEngine {
         content: string,
         context: FileContext
     ): Promise<CodeIssue[]> {
-        console.log(`[SuggestionEngine] Analyzing: ${filePath}`);
+        logger.debug({ filePath }, 'Analyzing file');
 
         const issues = await this.aiService.analyzeCode(filePath, content, context);
 
@@ -60,12 +82,12 @@ export class SuggestionEngine {
         // Check cache only - no generation
         const cached = this.suggestionCache.get(issueId);
         if (cached) {
-            console.log(`[SuggestionEngine] Returning ${cached.length} cached suggestions for: ${issueId}`);
+            logger.debug({ issueId, count: cached.length }, 'Returning cached suggestions');
             return cached;
         }
 
         // No suggestions available - user must click "Generate Fix" button
-        console.log(`[SuggestionEngine] No cached suggestions for: ${issueId}. User must generate fix explicitly.`);
+        logger.debug({ issueId }, 'No cached suggestions — user must generate fix explicitly');
         return [];
     }
 
@@ -78,19 +100,19 @@ export class SuggestionEngine {
      * @returns Array of AI-generated fix suggestions
      */
     async generateAiFixForIssue(issueId: string, includeRelatedFiles: boolean = true): Promise<CodeSuggestion[]> {
-        console.log(`[SuggestionEngine] Generating AI fix for issue: ${issueId}`);
+        logger.info({ issueId }, 'Generating AI fix for issue');
 
         // Get the issue
         const issue = this.issueCache.get(issueId);
         if (!issue) {
-            console.log(`[SuggestionEngine] Issue not found: ${issueId}`);
+            logger.debug({ issueId }, 'Issue not found');
             return [];
         }
 
         // Get file context
         const fileContext = this.contextMap.getFileContext(issue.location.filePath);
         if (!fileContext) {
-            console.log(`[SuggestionEngine] File context not found: ${issue.location.filePath}`);
+            logger.debug({ filePath: issue.location.filePath }, 'File context not found');
             return [];
         }
 
@@ -99,11 +121,11 @@ export class SuggestionEngine {
 
         // Optionally gather related files for better context
         const relatedFiles: Array<{ path: string; content: string; context: FileContext }> = [];
-        
+
         if (includeRelatedFiles) {
             const relatedPaths = await this.gatherRelatedFiles(issue.location.filePath, fileContext);
-            console.log(`[SuggestionEngine] Found ${relatedPaths.length} related files`);
-            
+            logger.debug({ filePath: issue.location.filePath, relatedCount: relatedPaths.length }, 'Found related files');
+
             for (const relatedPath of relatedPaths) {
                 const relatedContext = this.contextMap.getFileContext(relatedPath);
                 if (relatedContext) {
@@ -131,7 +153,7 @@ export class SuggestionEngine {
             this.suggestionById.set(suggestion.id, suggestion);
         }
 
-        console.log(`[SuggestionEngine] Generated ${suggestions.length} AI-powered suggestions`);
+        logger.info({ issueId, count: suggestions.length }, 'Generated AI-powered suggestions');
         return suggestions;
     }
 

@@ -1,6 +1,6 @@
 /**
  * File Watcher Service
- * 
+ *
  * Watches for file system changes with efficient debouncing.
  * Triggers analysis when files are modified.
  */
@@ -9,6 +9,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as chokidar from 'chokidar';
 import { minimatch } from 'minimatch';
+import { createLogger, sanitizeError } from '../lib/logger';
+
+const logger = createLogger('fileWatcher');
 
 type FileChangeHandler = (filePath: string, content: string) => void;
 
@@ -47,7 +50,7 @@ export class FileWatcher {
             return;
         }
 
-        console.log(`[FileWatcher] Starting watch on: ${this.workspacePath}`);
+        logger.info({ workspacePath: this.workspacePath }, 'Starting file watcher');
 
         this.watcher = chokidar.watch(this.workspacePath, {
             ignored: [
@@ -71,7 +74,7 @@ export class FileWatcher {
         this.watcher.on('change', (filePath) => this.handleChange(filePath));
         this.watcher.on('add', (filePath) => this.handleChange(filePath));
         this.watcher.on('error', (error) => {
-            console.error('[FileWatcher] Error:', error);
+            logger.error({ err: sanitizeError(error) }, 'File watcher error');
         });
     }
 
@@ -129,7 +132,7 @@ export class FileWatcher {
                     }
                 }
             } catch (error) {
-                console.error(`[FileWatcher] Error reading file ${filePath}:`, error);
+                logger.error({ err: sanitizeError(error), filePath }, 'Error reading file during change');
             }
         }, this.debounceDelay);
 
@@ -207,13 +210,13 @@ export class FileWatcher {
 
             // Skip large files based on configured limit
             if (stats.size > this.maxFileSizeKB * 1024) {
-                console.log(`[FileWatcher] Skipping large file: ${filePath} (${stats.size} bytes)`);
+                logger.debug({ filePath, sizeBytes: stats.size }, 'Skipping large file');
                 return null;
             }
 
             return await fs.promises.readFile(filePath, 'utf-8');
         } catch (error) {
-            console.error(`[FileWatcher] Error reading ${filePath}:`, error);
+            logger.error({ err: sanitizeError(error), filePath }, 'Error reading file');
             return null;
         }
     }

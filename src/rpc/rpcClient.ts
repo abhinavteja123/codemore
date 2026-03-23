@@ -30,6 +30,21 @@ interface PendingRequest {
 
 type NotificationHandler<T> = (params: T) => void;
 
+/**
+ * Custom error class for RPC errors with code and data properties
+ */
+export class RpcError extends Error {
+    readonly code: number;
+    readonly data?: unknown;
+
+    constructor(message: string, code: number, data?: unknown) {
+        super(message);
+        this.name = 'RpcError';
+        this.code = code;
+        this.data = data;
+    }
+}
+
 export class RpcClient implements vscode.Disposable {
     private pendingRequests = new Map<string | number, PendingRequest>();
     private notificationHandlers = new Map<string, Set<NotificationHandler<unknown>>>();
@@ -201,11 +216,8 @@ export class RpcClient implements vscode.Disposable {
     /**
      * Create an Error from a JSON-RPC error
      */
-    private createError(rpcError: JsonRpcError): Error {
-        const error = new Error(rpcError.message);
-        (error as any).code = rpcError.code;
-        (error as any).data = rpcError.data;
-        return error;
+    private createError(rpcError: JsonRpcError): RpcError {
+        return new RpcError(rpcError.message, rpcError.code, rpcError.data);
     }
 
     /**

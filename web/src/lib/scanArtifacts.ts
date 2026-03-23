@@ -20,11 +20,37 @@ type ScanArtifactPayload = GitHubArtifactPayload | ZipArtifactPayload;
 
 const ARTIFACT_DIR = path.join(process.cwd(), ".scan-artifacts");
 
+/**
+ * Validate jobId to prevent path traversal attacks.
+ * Only allows alphanumeric characters, hyphens, and underscores.
+ */
+function validateJobId(jobId: string): void {
+  if (!/^[a-zA-Z0-9_-]+$/.test(jobId)) {
+    throw new Error(`Invalid jobId format: ${jobId}`);
+  }
+}
+
+/**
+ * Sanitize a path to ensure it stays within the base directory.
+ * Prevents path traversal attacks using ../ sequences.
+ */
+function sanitizePath(inputPath: string, baseDir: string): string {
+  const normalized = path.normalize(path.join(baseDir, inputPath));
+  if (!normalized.startsWith(path.resolve(baseDir))) {
+    throw new Error(`Path traversal detected: ${inputPath}`);
+  }
+  return normalized;
+}
+
 function getEncryptionKey(): Buffer {
-  const secret =
-    process.env.CODEMORE_JOB_ENCRYPTION_KEY ||
-    process.env.NEXTAUTH_SECRET ||
-    "codemore-dev-secret";
+  const secret = process.env.CODEMORE_JOB_ENCRYPTION_KEY || process.env.NEXTAUTH_SECRET;
+
+  if (!secret) {
+    throw new Error(
+      "CODEMORE_JOB_ENCRYPTION_KEY environment variable is required. " +
+      "Generate one with: openssl rand -base64 32"
+    );
+  }
 
   return crypto.createHash("sha256").update(secret).digest();
 }
@@ -34,11 +60,13 @@ async function ensureArtifactDir(): Promise<void> {
 }
 
 function getMetadataPath(jobId: string): string {
-  return path.join(ARTIFACT_DIR, `${jobId}.json`);
+  validateJobId(jobId);
+  return sanitizePath(`${jobId}.json`, ARTIFACT_DIR);
 }
 
 function getArchivePath(jobId: string): string {
-  return path.join(ARTIFACT_DIR, `${jobId}.zip`);
+  validateJobId(jobId);
+  return sanitizePath(`${jobId}.zip`, ARTIFACT_DIR);
 }
 
 function encryptText(value: string): { ciphertext: string; iv: string; authTag: string } {

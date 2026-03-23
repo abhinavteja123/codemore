@@ -1,6 +1,6 @@
 /**
  * Context Map Service
- * 
+ *
  * Maintains a project-wide context map with dependency graphs.
  * Provides incremental updates on file changes.
  */
@@ -16,6 +16,10 @@ import {
     Severity,
     IssueCategory,
 } from '../../shared/protocol';
+import { calculateHealthScoreFromTotals, calculateTechnicalDebt } from '../../shared/scoring';
+import { createLogger, sanitizeError } from '../lib/logger';
+
+const logger = createLogger('contextMap');
 
 export class ContextMap {
     private files = new Map<string, FileContext>();
@@ -34,10 +38,10 @@ export class ContextMap {
      * Scan workspace for all files
      */
     async scanWorkspace(): Promise<{ totalFiles: number; fileTypes: Record<string, number> }> {
-        console.log(`[ContextMap] Scanning workspace: ${this.workspacePath}`);
+        logger.info({ workspacePath: this.workspacePath }, 'Scanning workspace');
 
         const result = await this.findFilesWithStats(this.workspacePath);
-        console.log(`[ContextMap] Found ${result.totalFiles} files across ${Object.keys(result.fileTypes).length} file types`);
+        logger.info({ totalFiles: result.totalFiles, fileTypeCount: Object.keys(result.fileTypes).length }, 'Workspace scan complete');
 
         this.lastFullAnalysis = Date.now();
         this.totalWorkspaceFiles = result.totalFiles;
@@ -198,7 +202,7 @@ export class ContextMap {
                 }
             }
         } catch (error) {
-            console.error(`[ContextMap] Error scanning ${dir}:`, error);
+            logger.error({ err: sanitizeError(error), dir }, 'Error scanning directory');
         }
 
         return files;
@@ -211,7 +215,7 @@ export class ContextMap {
         try {
             return await fs.promises.readFile(filePath, 'utf-8');
         } catch (error) {
-            console.error(`[ContextMap] Error reading file ${filePath}:`, error);
+            logger.error({ err: sanitizeError(error), filePath }, 'Error reading file');
             return '';
         }
     }
@@ -238,10 +242,9 @@ export class ContextMap {
         // Add new dependencies
         this.dependencyGraph.set(filePath, context.dependencies);
         for (const dep of context.dependencies) {
-            if (!this.reverseDependencyGraph.has(dep)) {
-                this.reverseDependencyGraph.set(dep, []);
-            }
-            this.reverseDependencyGraph.get(dep)!.push(filePath);
+            const dependents = this.reverseDependencyGraph.get(dep) ?? [];
+            dependents.push(filePath);
+            this.reverseDependencyGraph.set(dep, dependents);
         }
 
         // Store context
@@ -352,27 +355,12 @@ export class ContextMap {
         const filesAnalyzed = this.files.size;
         const averageComplexity = filesAnalyzed > 0 ? totalComplexity / filesAnalyzed : 0;
 
-        // Calculate overall score (0-100)
-        // Higher is better
-        // If no files analyzed, return 0 so UI can show N/A
-        let overallScore = filesAnalyzed > 0 ? 100 : 0;
-        if (filesAnalyzed > 0) {
-            // Deduct points based on canonical severity
-            overallScore -= issuesBySeverity.BLOCKER * 15;
-            overallScore -= issuesBySeverity.CRITICAL * 10;
-            overallScore -= issuesBySeverity.MAJOR * 5;
-            overallScore -= issuesBySeverity.MINOR * 2;
-            overallScore -= issuesBySeverity.INFO * 1;
-            overallScore = Math.max(0, Math.min(100, overallScore));
-        }
+        // Calculate overall score using shared health scoring formula
+        // Using the legacy function for backward compatibility (total counts instead of per-file)
+        const overallScore = calculateHealthScoreFromTotals(issuesBySeverity, filesAnalyzed);
 
-        // Estimate technical debt in minutes based on canonical severity
-        const technicalDebtMinutes =
-            issuesBySeverity.BLOCKER * 120 +
-            issuesBySeverity.CRITICAL * 60 +
-            issuesBySeverity.MAJOR * 30 +
-            issuesBySeverity.MINOR * 10 +
-            issuesBySeverity.INFO * 5;
+        // Estimate technical debt using shared formula
+        const technicalDebtMinutes = calculateTechnicalDebt(issuesBySeverity);
 
         return {
             overallScore,

@@ -1,0 +1,40 @@
+{
+  "version": "1",
+  "maxLineLength": 120,
+  "maxFunctionLength": 80,
+  "maxComplexity": 15,
+  "maxParameters": 6,
+  "rules": {
+    "style-no-docs": "off",
+    "react-inline-handler": "info",
+    "ts-non-null": "minor",
+    "perf-array-in-loop": "info"
+  },
+  "ignore": [
+    "node_modules",
+    "dist",
+    "build",
+    ".next",
+    "coverage",
+    "*.d.ts",
+    "scripts/**",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "CODEBASE_DEEP_DIVE.md",
+    "CODEMORE_AUDIT.md"
+  ],
+  "overrides": [
+    {
+      "files": ["daemon/services/**"],
+      "maxFunctionLength": 100,
+      "maxComplexity": 20
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.spec.ts"],
+      "rules": {
+        "ts-any": "off",
+        "ts-as-any": "off"
+      }
+    }
+  ]
+}

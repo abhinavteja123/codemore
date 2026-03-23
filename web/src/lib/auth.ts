@@ -1,6 +1,8 @@
 import { NextAuthOptions } from "next-auth";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
+import { storeUserToken } from "./tokenStore";
+import { logger, sanitizeError } from "./logger";
 
 const githubScope =
   process.env.GITHUB_OAUTH_SCOPE ?? "read:user user:email public_repo";
@@ -28,15 +30,21 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, account }) {
-      if (account) {
-        token.accessToken = account.access_token;
+      if (account?.access_token && token.email) {
+        // Store token in database, NOT in JWT cookie
+        try {
+          await storeUserToken(token.email, account.provider, account.access_token);
+        } catch (error) {
+          logger.error({ err: sanitizeError(error) }, "Failed to store token");
+        }
+        // Only store provider info, not the actual token
         token.provider = account.provider;
       }
       return token;
     },
     async session({ session, token }) {
-      (session as any).accessToken = token.accessToken;
-      (session as any).provider = token.provider;
+      // Do NOT expose accessToken in session - fetch from DB when needed
+      session.provider = token.provider as string | undefined;
       return session;
     },
   },

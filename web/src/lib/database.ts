@@ -1,5 +1,6 @@
-import { supabase, isDbEnabled } from "./supabase";
+import { supabase, supabaseAdmin, isDbEnabled } from "./supabase";
 import { CodeIssue, CodeHealthMetrics, Project, Severity, IssueCategory, ProjectFile, ScanJob, CodeSuggestion } from "./types";
+import { logger, sanitizeError } from "./logger";
 
 // ============================================================================
 // Types
@@ -265,7 +266,7 @@ export async function createProject(
     .single();
 
   if (error) {
-    console.error("Failed to create project:", error);
+    logger.error({ err: sanitizeError(error) }, "Failed to create project");
     return null;
   }
   return data as DbProject;
@@ -281,15 +282,67 @@ export async function getUserProjects(userEmail: string): Promise<DbProject[]> {
     .order("updated_at", { ascending: false });
 
   if (error) {
-    console.error("Failed to fetch projects:", error);
+    logger.error({ err: sanitizeError(error) }, "Failed to fetch projects");
     return [];
   }
   return (data || []) as DbProject[];
 }
 
 export async function getUserProjectSnapshots(userEmail: string): Promise<Project[]> {
-  const projects = await getUserProjects(userEmail);
-  return Promise.all(projects.map((project) => buildProjectSnapshot(project)));
+  if (!isDbEnabled()) return [];
+
+  // Single query with nested select to avoid N+1
+  const { data: projects, error } = await supabase!
+    .from("projects")
+    .select(`
+      *,
+      scans (
+        id,
+        overall_score,
+        files_analyzed,
+        total_files,
+        lines_of_code,
+        avg_complexity,
+        tech_debt_minutes,
+        issues_by_severity,
+        issues_by_category,
+        issue_count,
+        scanned_at
+      )
+    `)
+    .eq("user_email", userEmail)
+    .order("updated_at", { ascending: false });
+
+  if (error || !projects) {
+    logger.error({ err: sanitizeError(error) }, "Failed to fetch project snapshots");
+    return [];
+  }
+
+  return projects.map((project: DbProject & { scans?: DbScan[] }) => {
+    const latestScan = project.scans?.[0];
+    return {
+      id: project.id,
+      name: project.name,
+      source: project.source,
+      repoFullName: project.repo_full_name || undefined,
+      files: [],
+      analyzedAt: latestScan
+        ? Date.parse(latestScan.scanned_at)
+        : Date.parse(project.updated_at),
+      metrics: latestScan ? {
+        overallScore: latestScan.overall_score,
+        filesAnalyzed: latestScan.files_analyzed,
+        totalFiles: latestScan.total_files,
+        linesOfCode: latestScan.lines_of_code,
+        avgComplexity: latestScan.avg_complexity,
+        techDebtMinutes: latestScan.tech_debt_minutes,
+        issuesBySeverity: latestScan.issues_by_severity as Record<string, number>,
+        issuesByCategory: latestScan.issues_by_category as Record<string, number>,
+        issueCount: latestScan.issue_count,
+      } : undefined,
+      issues: [],
+    };
+  });
 }
 
 export async function getProject(
@@ -377,7 +430,7 @@ export async function saveScan(
     .single();
 
   if (scanError || !scan) {
-    console.error("Failed to save scan:", scanError);
+    logger.error({ err: sanitizeError(scanError) }, "Failed to save scan");
     return null;
   }
 
@@ -403,7 +456,7 @@ export async function saveScan(
     for (let i = 0; i < issueRows.length; i += 100) {
       const batch = issueRows.slice(i, i + 100);
       const { error } = await supabase!.from("issues").insert(batch);
-      if (error) console.error("Failed to save issues batch:", error);
+      if (error) logger.error({ err: sanitizeError(error) }, "Failed to save issues batch");
     }
   }
 
@@ -428,7 +481,7 @@ export async function saveProjectFiles(
     .eq("project_id", projectId);
 
   if (deleteError) {
-    console.error("Failed to clear existing project files:", deleteError);
+    logger.error({ err: sanitizeError(deleteError) }, "Failed to clear existing project files");
     return false;
   }
 
@@ -448,7 +501,7 @@ export async function saveProjectFiles(
     const batch = rows.slice(i, i + 100);
     const { error } = await supabase!.from("project_files").insert(batch);
     if (error) {
-      console.error("Failed to save project files batch:", error);
+      logger.error({ err: sanitizeError(error) }, "Failed to save project files batch");
       return false;
     }
   }
@@ -466,7 +519,7 @@ export async function getProjectFiles(projectId: string): Promise<ProjectFile[]>
     .order("path", { ascending: true });
 
   if (error) {
-    console.error("Failed to fetch project files:", error);
+    logger.error({ err: sanitizeError(error) }, "Failed to fetch project files");
     return [];
   }
 
@@ -489,7 +542,7 @@ export async function getProjectScans(projectId: string): Promise<DbScan[]> {
     .limit(20);
 
   if (error) {
-    console.error("Failed to fetch scans:", error);
+    logger.error({ err: sanitizeError(error) }, "Failed to fetch scans");
     return [];
   }
   return (data || []) as DbScan[];
@@ -529,7 +582,7 @@ export async function createScanJob(
     .single();
 
   if (error) {
-    console.error("Failed to create scan job:", error);
+    logger.error({ err: sanitizeError(error) }, "Failed to create scan job");
     return null;
   }
 
@@ -550,7 +603,7 @@ export async function updateScanJob(
     .single();
 
   if (error) {
-    console.error("Failed to update scan job:", error);
+    logger.error({ err: sanitizeError(error) }, "Failed to update scan job");
     return null;
   }
 
@@ -606,7 +659,7 @@ export async function resetStaleRunningScanJobs(staleBeforeIso: string): Promise
     .lt("started_at", staleBeforeIso);
 
   if (error) {
-    console.error("Failed to reset stale running scan jobs:", error);
+    logger.error({ err: sanitizeError(error) }, "Failed to reset stale running scan jobs");
   }
 }
 
@@ -627,20 +680,53 @@ export async function getScanJob(jobId: string, userEmail: string): Promise<DbSc
   return data as unknown as DbScanJob;
 }
 
-export async function getScanIssues(scanId: string): Promise<DbIssue[]> {
+export async function getScanIssues(
+  scanId: string,
+  options: {
+    offset?: number;
+    limit?: number;
+    severity?: "BLOCKER" | "CRITICAL" | "MAJOR" | "MINOR" | "INFO";
+    filePath?: string;
+  } = {}
+): Promise<DbIssue[]> {
   if (!isDbEnabled()) return [];
 
-  const { data, error } = await supabase!
+  const { offset = 0, limit = 200, severity, filePath } = options;
+
+  let query = supabase!
     .from("issues")
     .select("*")
     .eq("scan_id", scanId)
-    .order("severity", { ascending: true });
+    .order("severity", { ascending: true })
+    .order("created_at", { ascending: true })
+    .range(offset, offset + limit - 1);
+
+  if (severity) query = query.eq("severity", severity);
+  if (filePath) query = query.eq("file_path", filePath);
+
+  const { data, error } = await query;
 
   if (error) {
-    console.error("Failed to fetch issues:", error);
+    logger.error({ err: sanitizeError(error) }, "Failed to fetch issues");
     return [];
   }
   return (data || []) as DbIssue[];
+}
+
+export async function getScanIssueCount(scanId: string): Promise<number> {
+  if (!isDbEnabled()) return 0;
+
+  const { count, error } = await supabase!
+    .from("issues")
+    .select("*", { count: "exact", head: true })
+    .eq("scan_id", scanId);
+
+  if (error) {
+    logger.error({ err: sanitizeError(error) }, "Failed to fetch issue count");
+    return 0;
+  }
+
+  return count ?? 0;
 }
 
 export async function getSuggestionsForIssue(issueId: string): Promise<CodeSuggestion[]> {
@@ -653,7 +739,7 @@ export async function getSuggestionsForIssue(issueId: string): Promise<CodeSugge
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("Failed to fetch suggestions:", error);
+    logger.error({ err: sanitizeError(error) }, "Failed to fetch suggestions");
     return [];
   }
 
@@ -673,7 +759,7 @@ export async function saveSuggestionsForIssue(
     .eq("issue_id", issueId);
 
   if (deleteError) {
-    console.error("Failed to clear existing suggestions:", deleteError);
+    logger.error({ err: sanitizeError(deleteError) }, "Failed to clear existing suggestions");
     return false;
   }
 
@@ -697,7 +783,7 @@ export async function saveSuggestionsForIssue(
 
   const { error } = await supabase!.from("suggestions").insert(rows);
   if (error) {
-    console.error("Failed to save suggestions:", error);
+    logger.error({ err: sanitizeError(error) }, "Failed to save suggestions");
     return false;
   }
 
@@ -733,9 +819,9 @@ export async function getUserStats(userEmail: string): Promise<{
     .in("project_id", projectIds);
 
   const totalScans = scans?.length || 0;
-  const totalIssuesFound = scans?.reduce((acc, s) => acc + (s.issue_count || 0), 0) || 0;
+  const totalIssuesFound = (scans ?? []).reduce((acc, s) => acc + (s.issue_count ?? 0), 0);
   const avgScore = totalScans > 0
-    ? scans!.reduce((acc, s) => acc + (s.overall_score || 0), 0) / totalScans
+    ? (scans ?? []).reduce((acc, s) => acc + (s.overall_score ?? 0), 0) / totalScans
     : 0;
 
   return {
@@ -744,4 +830,221 @@ export async function getUserStats(userEmail: string): Promise<{
     totalIssuesFound,
     avgScore: Math.round(avgScore),
   };
+}
+
+// ============================================================================
+// AI Cost Tracking (FIX 6)
+// ============================================================================
+
+// Cost per 1K tokens by model — update as pricing changes
+const COST_PER_1K: Record<string, { prompt: number; completion: number }> = {
+  'gpt-4o':              { prompt: 0.005,    completion: 0.015 },
+  'gpt-4o-mini':         { prompt: 0.000150, completion: 0.000600 },
+  'gpt-4-turbo':         { prompt: 0.01,     completion: 0.03 },
+  'gpt-4':               { prompt: 0.03,     completion: 0.06 },
+  'claude-3-5-sonnet':   { prompt: 0.003,    completion: 0.015 },
+  'claude-3-haiku':      { prompt: 0.00025,  completion: 0.00125 },
+  'claude-3-opus':       { prompt: 0.015,    completion: 0.075 },
+  'gemini-1.5-pro':      { prompt: 0.00125,  completion: 0.005 },
+  'gemini-1.5-flash':    { prompt: 0.000075, completion: 0.0003 },
+};
+
+export function calculateAICost(
+  model: string,
+  promptTokens: number,
+  completionTokens: number
+): number {
+  const rates = COST_PER_1K[model] ?? { prompt: 0.01, completion: 0.03 };
+  return (
+    (promptTokens / 1000) * rates.prompt +
+    (completionTokens / 1000) * rates.completion
+  );
+}
+
+export async function recordAIUsage(params: {
+  userEmail: string;
+  projectId?: string;
+  scanId?: string;
+  provider: string;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+}): Promise<void> {
+  if (!isDbEnabled()) return;
+  const totalTokens = params.promptTokens + params.completionTokens;
+  const estimatedCost = calculateAICost(params.model, params.promptTokens, params.completionTokens);
+
+  const { error } = await supabaseAdmin!
+    .from('ai_usage')
+    .insert({
+      user_email: params.userEmail,
+      project_id: params.projectId ?? null,
+      scan_id: params.scanId ?? null,
+      provider: params.provider,
+      model: params.model,
+      prompt_tokens: params.promptTokens,
+      completion_tokens: params.completionTokens,
+      total_tokens: totalTokens,
+      estimated_cost_usd: estimatedCost,
+    });
+
+  if (error) {
+    logger.error({ err: sanitizeError(error) }, 'Failed to record AI usage');
+  }
+}
+
+export async function getDailyAICost(
+  userEmail: string,
+  date: Date
+): Promise<{ totalTokens: number; totalCostUsd: number; apiCalls: number }> {
+  if (!isDbEnabled()) return { totalTokens: 0, totalCostUsd: 0, apiCalls: 0 };
+  const dateStr = date.toISOString().split('T')[0];
+
+  const { data, error } = await supabaseAdmin!
+    .from('ai_daily_costs')
+    .select('total_tokens, total_cost_usd, api_calls')
+    .eq('user_email', userEmail)
+    .eq('date', dateStr);
+
+  if (error || !data) return { totalTokens: 0, totalCostUsd: 0, apiCalls: 0 };
+
+  return data.reduce(
+    (acc, row) => ({
+      totalTokens: acc.totalTokens + (row.total_tokens ?? 0),
+      totalCostUsd: acc.totalCostUsd + Number(row.total_cost_usd ?? 0),
+      apiCalls: acc.apiCalls + (row.api_calls ?? 0),
+    }),
+    { totalTokens: 0, totalCostUsd: 0, apiCalls: 0 }
+  );
+}
+
+export async function getMonthlyAICost(
+  userEmail: string,
+  year: number,
+  month: number
+): Promise<{ totalTokens: number; totalCostUsd: number; apiCalls: number }> {
+  if (!isDbEnabled()) return { totalTokens: 0, totalCostUsd: 0, apiCalls: 0 };
+
+  const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+  const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+
+  const { data, error } = await supabaseAdmin!
+    .from('ai_usage')
+    .select('total_tokens, estimated_cost_usd')
+    .eq('user_email', userEmail)
+    .gte('created_at', startDate)
+    .lte('created_at', endDate + 'T23:59:59Z');
+
+  if (error || !data) return { totalTokens: 0, totalCostUsd: 0, apiCalls: 0 };
+
+  return {
+    totalTokens: data.reduce((sum, r) => sum + (r.total_tokens ?? 0), 0),
+    totalCostUsd: data.reduce((sum, r) => sum + Number(r.estimated_cost_usd ?? 0), 0),
+    apiCalls: data.length,
+  };
+}
+
+// ============================================================================
+// Health History (FIX 7)
+// ============================================================================
+
+export interface HealthSnapshot {
+  id: string;
+  projectId: string;
+  scanId: string;
+  healthScore: number;
+  blockerCount: number;
+  criticalCount: number;
+  majorCount: number;
+  minorCount: number;
+  infoCount: number;
+  totalIssues: number;
+  filesAnalyzed: number;
+  scannedAt: string;
+  // Computed:
+  trend?: 'improving' | 'worsening' | 'stable';
+}
+
+export async function recordHealthSnapshot(
+  projectId: string,
+  scanId: string,
+  issues: Array<{ severity: string }>,
+  filesAnalyzed: number,
+  healthScore: number
+): Promise<void> {
+  if (!isDbEnabled()) return;
+
+  const counts = issues.reduce(
+    (acc, issue) => {
+      const sev = issue.severity.toLowerCase();
+      if (sev === 'blocker') acc.blocker++;
+      else if (sev === 'critical') acc.critical++;
+      else if (sev === 'major') acc.major++;
+      else if (sev === 'minor') acc.minor++;
+      else acc.info++;
+      return acc;
+    },
+    { blocker: 0, critical: 0, major: 0, minor: 0, info: 0 }
+  );
+
+  const { error } = await supabaseAdmin!
+    .from('health_history')
+    .upsert({
+      project_id: projectId,
+      scan_id: scanId,
+      health_score: healthScore,
+      blocker_count: counts.blocker,
+      critical_count: counts.critical,
+      major_count: counts.major,
+      minor_count: counts.minor,
+      info_count: counts.info,
+      total_issues: issues.length,
+      files_analyzed: filesAnalyzed,
+    }, { onConflict: 'scan_id' });
+
+  if (error) {
+    logger.error({ err: sanitizeError(error), projectId }, 'Failed to record health snapshot');
+  }
+}
+
+export async function getHealthHistory(
+  projectId: string,
+  limit: number = 30
+): Promise<HealthSnapshot[]> {
+  if (!isDbEnabled()) return [];
+
+  const { data, error } = await supabaseAdmin!
+    .from('health_history')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('scanned_at', { ascending: false })
+    .limit(limit);
+
+  if (error || !data) return [];
+
+  const snapshots = data.map(row => ({
+    id: row.id,
+    projectId: row.project_id,
+    scanId: row.scan_id,
+    healthScore: row.health_score,
+    blockerCount: row.blocker_count,
+    criticalCount: row.critical_count,
+    majorCount: row.major_count,
+    minorCount: row.minor_count,
+    infoCount: row.info_count,
+    totalIssues: row.total_issues,
+    filesAnalyzed: row.files_analyzed,
+    scannedAt: row.scanned_at,
+  })) as HealthSnapshot[];
+
+  // Calculate trend based on last 5 entries
+  for (let i = 0; i < snapshots.length; i++) {
+    const current = snapshots[i];
+    const previous = snapshots[i + 1];
+    if (!previous) { current.trend = 'stable'; continue; }
+    const diff = current.healthScore - previous.healthScore;
+    current.trend = diff > 2 ? 'improving' : diff < -2 ? 'worsening' : 'stable';
+  }
+
+  return snapshots;
 }

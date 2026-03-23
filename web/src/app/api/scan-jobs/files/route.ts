@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { filterProjectFiles } from "@/lib/sourceIngestion";
 import { ProjectFile } from "@/lib/types";
 import { enqueueFileScanJob } from "@/lib/scanJobRunner";
+import { logger, sanitizeError } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
       queued: result.queued,
     });
   } catch (error) {
-    console.error("File scan job failed:", error);
+    logger.error({ err: sanitizeError(error) }, "File scan job failed");
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "File scan failed" },
       { status: 500 }

@@ -55,7 +55,7 @@ export default function DashboardPage() {
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
 
-  const isGitHub = (session as any)?.provider === "github";
+  const isGitHub = session?.provider === "github";
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -243,8 +243,10 @@ export default function DashboardPage() {
         const content = await file.text();
         const ext = file.name.split(".").pop()?.toLowerCase() || "";
         if (!SUPPORTED_EXTENSIONS.has(ext)) continue;
+        // webkitRelativePath is non-standard but supported in most browsers
+        const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
         files.push({
-          path: (file as any).webkitRelativePath || file.name,
+          path: relativePath,
           content,
           language: ext,
           size: file.size,
@@ -671,7 +673,7 @@ export default function DashboardPage() {
               <p className="mx-auto mt-2 max-w-md text-sm text-surface-500">
                 Connect your GitHub account to browse and analyze your
                 repositories directly. Your current session is via{" "}
-                {(session as any)?.provider || "email"}.
+                {session?.provider || "email"}.
               </p>
               <button
                 onClick={() => signIn("github")}

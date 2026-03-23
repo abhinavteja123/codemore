@@ -1,14 +1,38 @@
 /**
  * Analysis Queue Service
- * 
+ *
  * Manages a queue of files for background analysis.
  * Supports priority-based processing and concurrency control.
  */
 
+import { createHash } from 'crypto';
+import { LRUCache } from 'lru-cache';
 import { AstParser } from './astParser';
 import { ContextMap } from './contextMap';
 import { SuggestionEngine } from './suggestionEngine';
 import { CodeIssue, FileContext } from '../../shared/protocol';
+import { createLogger, sanitizeError } from '../lib/logger';
+
+const logger = createLogger('analysisQueue');
+
+// Bump this when analysis rules change to invalidate all cached results
+const RULES_VERSION = '1.0.0';
+
+interface AnalysisCacheEntry {
+    contentHash: string;
+    issues: CodeIssue[];
+    analyzedAt: number;
+    rulesVersion: string;
+}
+
+const analysisCache = new LRUCache<string, AnalysisCacheEntry>({
+    max: 500,
+    ttl: 1000 * 60 * 60, // 1 hour TTL
+});
+
+function getContentHash(content: string): string {
+    return createHash('sha256').update(content).digest('hex').slice(0, 16);
+}
 
 interface QueueItem {
     filePath: string;
@@ -25,6 +49,7 @@ export class AnalysisQueue {
     private queue: QueueItem[] = [];
     private processing = new Set<string>();
     private isRunning = false;
+    private isProcessing = false; // Mutex flag to prevent concurrent processing
     private progressHandlers: ProgressHandler[] = [];
     private issuesHandlers: IssuesHandler[] = [];
     private completeHandlers: CompleteHandler[] = [];
@@ -100,34 +125,44 @@ export class AnalysisQueue {
      * Start processing the queue
      */
     private async startProcessing(): Promise<void> {
-        this.isRunning = true;
-
-        while (this.queue.length > 0 && this.isRunning) {
-            // Process up to maxConcurrent items
-            const batch: QueueItem[] = [];
-            while (batch.length < this.maxConcurrent && this.queue.length > 0) {
-                const item = this.queue.shift()!;
-                if (!this.processing.has(item.filePath)) {
-                    batch.push(item);
-                    this.processing.add(item.filePath);
-                }
-            }
-
-            if (batch.length === 0) {
-                break;
-            }
-
-            // Process batch concurrently
-            await Promise.all(batch.map((item) => this.processItem(item)));
+        // Return immediately if already processing to prevent concurrent processing
+        if (this.isProcessing) {
+            return;
         }
 
-        this.isRunning = false;
-        
-        // Signal completion if we processed everything
-        if (this.queue.length === 0 && this.processing.size === 0 && this.totalCount > 0) {
-            for (const handler of this.completeHandlers) {
-                handler();
+        this.isRunning = true;
+        this.isProcessing = true;
+
+        try {
+            while (this.queue.length > 0 && this.isRunning) {
+                // Process up to maxConcurrent items
+                const batch: QueueItem[] = [];
+                while (batch.length < this.maxConcurrent && this.queue.length > 0) {
+                    const item = this.queue.shift()!;
+                    if (!this.processing.has(item.filePath)) {
+                        batch.push(item);
+                        this.processing.add(item.filePath);
+                    }
+                }
+
+                if (batch.length === 0) {
+                    break;
+                }
+
+                // Process batch concurrently
+                await Promise.all(batch.map((item) => this.processItem(item)));
             }
+
+            this.isRunning = false;
+
+            // Signal completion if we processed everything
+            if (this.queue.length === 0 && this.processing.size === 0 && this.totalCount > 0) {
+                for (const handler of this.completeHandlers) {
+                    handler();
+                }
+            }
+        } finally {
+            this.isProcessing = false;
         }
     }
 
@@ -136,12 +171,41 @@ export class AnalysisQueue {
      */
     private async processItem(item: QueueItem): Promise<void> {
         try {
-            console.log(`[AnalysisQueue] Processing: ${item.filePath}`);
+            logger.debug({ filePath: item.filePath }, 'Processing file');
 
             // Get content if not provided
             const content = item.content || await this.contextMap.getFileContent(item.filePath);
             if (!content) {
-                console.log(`[AnalysisQueue] Empty content for: ${item.filePath}`);
+                logger.debug({ filePath: item.filePath }, 'Empty content for file');
+                return;
+            }
+
+            // Check cache before analysis
+            const contentHash = getContentHash(content);
+            const cacheKey = `${item.filePath}:${contentHash}:${RULES_VERSION}`;
+            const cached = analysisCache.get(cacheKey);
+
+            if (cached) {
+                logger.debug({ filePath: item.filePath, cacheKey }, 'Analysis cache hit — skipping');
+                // Use cached issues
+                const fileContext = this.astParser.extractContext(
+                    item.filePath,
+                    await this.astParser.parse(item.filePath, content),
+                    content
+                );
+                fileContext.issues = cached.issues;
+                this.contextMap.updateFile(item.filePath, fileContext);
+
+                this.processedCount++;
+                for (const handler of this.progressHandlers) {
+                    handler(this.processedCount, this.totalCount, item.filePath);
+                }
+
+                if (cached.issues.length > 0) {
+                    for (const handler of this.issuesHandlers) {
+                        handler(cached.issues);
+                    }
+                }
                 return;
             }
 
@@ -163,6 +227,14 @@ export class AnalysisQueue {
             // Update context map
             this.contextMap.updateFile(item.filePath, fileContext);
 
+            // Store in cache
+            analysisCache.set(cacheKey, {
+                contentHash,
+                issues,
+                analyzedAt: Date.now(),
+                rulesVersion: RULES_VERSION,
+            });
+
             // Emit progress
             this.processedCount++;
             for (const handler of this.progressHandlers) {
@@ -177,7 +249,7 @@ export class AnalysisQueue {
             }
 
         } catch (error) {
-            console.error(`[AnalysisQueue] Error processing ${item.filePath}:`, error);
+            logger.error({ err: sanitizeError(error), filePath: item.filePath }, 'Error processing file');
         } finally {
             this.processing.delete(item.filePath);
         }
@@ -231,4 +303,12 @@ export class AnalysisQueue {
             total: this.totalCount,
         };
     }
+}
+
+/**
+ * Clear the analysis cache (call when rules are reloaded or config changes)
+ */
+export function clearAnalysisCache(): void {
+    analysisCache.clear();
+    logger.info('Analysis cache cleared');
 }

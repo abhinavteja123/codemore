@@ -69,12 +69,12 @@ export default function Navbar() {
                           <p className="text-xs text-surface-500">
                             {session.user?.email}
                           </p>
-                          {(session as any).provider && (
+                          {session.provider && (
                             <p className="mt-1 flex items-center gap-1 text-[10px] text-surface-500">
-                              via {(session as any).provider === "github" ? (
+                              via {session.provider === "github" ? (
                                 <><Github size={10} /> GitHub</>
                               ) : (
-                                (session as any).provider
+                                session.provider
                               )}
                             </p>
                           )}

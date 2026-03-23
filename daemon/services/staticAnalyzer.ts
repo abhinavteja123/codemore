@@ -22,6 +22,9 @@ import {
     Severity,
     SymbolInfo,
 } from '../../shared/protocol';
+import { createLogger } from '../lib/logger';
+
+const logger = createLogger('staticAnalyzer');
 
 // ============================================================================
 // Configuration Types
@@ -80,6 +83,63 @@ interface IssueBuilder {
 }
 
 // ============================================================================
+// Suppress Comments
+// ============================================================================
+
+interface SuppressedRule {
+    ruleId: string;
+    line: number; // -1 means entire file
+}
+
+function extractSuppressComments(content: string): SuppressedRule[] {
+    const suppressed: SuppressedRule[] = [];
+    const lines = content.split('\n');
+
+    lines.forEach((line, idx) => {
+        const lineNumber = idx + 1;
+
+        // Same-line: const x = eval(y); // codemore-ignore: no-eval
+        const sameLineMatch = line.match(
+            /\/\/\s*codemore-ignore:\s*([a-zA-Z0-9\-_,\s]+)/
+        );
+        if (sameLineMatch) {
+            sameLineMatch[1].split(',').map(r => r.trim()).filter(Boolean).forEach(ruleId => {
+                suppressed.push({ ruleId, line: lineNumber });
+            });
+        }
+
+        // Next-line: // codemore-ignore-next-line: no-eval
+        const nextLineMatch = line.match(
+            /\/\/\s*codemore-ignore-next-line:\s*([a-zA-Z0-9\-_,\s]+)/
+        );
+        if (nextLineMatch) {
+            nextLineMatch[1].split(',').map(r => r.trim()).filter(Boolean).forEach(ruleId => {
+                suppressed.push({ ruleId, line: lineNumber + 1 });
+            });
+        }
+
+        // File-level: /* codemore-ignore-file: no-eval */
+        const fileMatch = line.match(
+            /\/\*\s*codemore-ignore-file:\s*([a-zA-Z0-9\-_,\s]+)\s*\*\//
+        );
+        if (fileMatch) {
+            fileMatch[1].split(',').map(r => r.trim()).filter(Boolean).forEach(ruleId => {
+                suppressed.push({ ruleId, line: -1 });
+            });
+        }
+    });
+
+    return suppressed;
+}
+
+function isIssueSuppressed(issue: CodeIssue, suppressed: SuppressedRule[]): boolean {
+    return suppressed.some(s =>
+        (s.ruleId === issue.id || s.ruleId === '*') &&
+        (s.line === -1 || s.line === issue.location.range.start.line)
+    );
+}
+
+// ============================================================================
 // Static Analyzer Class
 // ============================================================================
 
@@ -116,36 +176,39 @@ export class StaticAnalyzer {
         this.content = content;
         this.lines = content.split('\n');
 
-        const issues: CodeIssue[] = [];
+        // Extract suppress comments at the start
+        const suppressedRules = extractSuppressComments(content);
+
+        const allIssues: CodeIssue[] = [];
         const ext = path.extname(filePath).toLowerCase();
 
         // Route to specialized analyzers based on file type
         switch (ext) {
             case '.sql':
-                issues.push(...this.analyzeSQLPatterns());
+                allIssues.push(...this.analyzeSQLPatterns());
                 break;
             case '.json':
             case '.jsonc':
-                issues.push(...this.analyzeJSONPatterns());
+                allIssues.push(...this.analyzeJSONPatterns());
                 break;
             case '.yaml':
             case '.yml':
-                issues.push(...this.analyzeYAMLPatterns());
+                allIssues.push(...this.analyzeYAMLPatterns());
                 break;
             case '.md':
             case '.markdown':
                 // Minimal checks for markdown
-                issues.push(...this.analyzeMarkdownPatterns());
+                allIssues.push(...this.analyzeMarkdownPatterns());
                 break;
             case '.sh':
             case '.bash':
             case '.zsh':
-                issues.push(...this.analyzeShellPatterns());
+                allIssues.push(...this.analyzeShellPatterns());
                 break;
             case '.dockerfile':
             case '': // Dockerfile has no extension
                 if (path.basename(filePath).toLowerCase() === 'dockerfile') {
-                    issues.push(...this.analyzeDockerfilePatterns());
+                    allIssues.push(...this.analyzeDockerfilePatterns());
                 }
                 break;
             case '.ts':
@@ -156,14 +219,14 @@ export class StaticAnalyzer {
             case '.cjs':
                 // Full TypeScript/JavaScript analysis
                 this.sourceFile = sourceFile || this.parseFile(filePath, content);
-                issues.push(...this.analyzeTypeScriptFile(context, ext));
+                allIssues.push(...this.analyzeTypeScriptFile(context, ext));
                 break;
             default:
                 // Try to parse as TypeScript for unknown JS-like files
                 if (content.includes('function ') || content.includes('const ') || content.includes('import ')) {
                     try {
                         this.sourceFile = this.parseFile(filePath, content);
-                        issues.push(...this.analyzeTypeScriptFile(context, ext));
+                        allIssues.push(...this.analyzeTypeScriptFile(context, ext));
                     } catch {
                         // Not a valid TS/JS file, skip
                     }
@@ -171,7 +234,18 @@ export class StaticAnalyzer {
                 break;
         }
 
-        return issues;
+        // Filter suppressed issues
+        const finalIssues = allIssues.filter(issue => !isIssueSuppressed(issue, suppressedRules));
+        const suppressedCount = allIssues.length - finalIssues.length;
+
+        if (suppressedCount > 0) {
+            logger.debug(
+                { filePath, suppressedCount },
+                'Some issues suppressed via codemore-ignore comments'
+            );
+        }
+
+        return finalIssues;
     }
 
     /**
@@ -939,8 +1013,18 @@ export class StaticAnalyzer {
         this.visitNodes(this.sourceFile, (node) => {
             // Variable declarations
             if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+                // Skip exported declarations — they are used by consumers
+                const parent = node.parent; // VariableDeclarationList
+                const grandparent = parent?.parent; // VariableStatement
+                const isExported = grandparent &&
+                    ts.isVariableStatement(grandparent) &&
+                    grandparent.modifiers?.some(
+                        m => m.kind === ts.SyntaxKind.ExportKeyword
+                    );
+                if (isExported) return; // exported = used externally
+
                 const name = node.name.text;
-                if (!declared.has(name)) {
+                if (!name.startsWith('_') && !declared.has(name)) {
                     declared.set(name, { node: node.name, used: false });
                 }
             }
@@ -954,8 +1038,37 @@ export class StaticAnalyzer {
                 }
             }
 
+            // Enum declarations
+            if (ts.isEnumDeclaration(node)) {
+                const isExported = node.modifiers?.some(
+                    m => m.kind === ts.SyntaxKind.ExportKeyword
+                );
+                if (isExported) return; // enum members used via enum name
+            }
+
             // Parameters
             if (ts.isParameter(node) && ts.isIdentifier(node.name)) {
+                // Skip parameters inside type declarations — they are
+                // type annotations, not runtime variables
+                let parentNode: ts.Node | undefined = node.parent;
+                let isInTypeContext = false;
+                while (parentNode) {
+                    if (
+                        ts.isTypeAliasDeclaration(parentNode) ||
+                        ts.isFunctionTypeNode(parentNode) ||
+                        ts.isInterfaceDeclaration(parentNode) ||
+                        ts.isCallSignatureDeclaration(parentNode) ||
+                        ts.isMethodSignature(parentNode) ||
+                        ts.isConstructSignatureDeclaration(parentNode) ||
+                        ts.isTypeParameterDeclaration(parentNode)
+                    ) {
+                        isInTypeContext = true;
+                        break;
+                    }
+                    parentNode = parentNode.parent;
+                }
+                if (isInTypeContext) return;
+
                 const name = node.name.text;
                 // Skip underscore-prefixed params (intentionally unused)
                 if (!name.startsWith('_') && !declared.has(name)) {
@@ -967,18 +1080,16 @@ export class StaticAnalyzer {
         // Second pass: collect all usages
         this.visitNodes(this.sourceFile, (node) => {
             if (ts.isIdentifier(node)) {
-                // Skip if this is a declaration
+                // Skip if this is a declaration - check each type separately for type safety
                 const parent = node.parent;
                 if (parent && (
-                    ts.isVariableDeclaration(parent) ||
-                    ts.isFunctionDeclaration(parent) ||
-                    ts.isParameter(parent) ||
-                    ts.isPropertyDeclaration(parent) ||
-                    ts.isMethodDeclaration(parent)
+                    (ts.isVariableDeclaration(parent) && parent.name === node) ||
+                    (ts.isFunctionDeclaration(parent) && parent.name === node) ||
+                    (ts.isParameter(parent) && parent.name === node) ||
+                    (ts.isPropertyDeclaration(parent) && parent.name === node) ||
+                    (ts.isMethodDeclaration(parent) && parent.name === node)
                 )) {
-                    if ((parent as any).name === node) {
-                        return; // This is the declaration itself
-                    }
+                    return; // This is the declaration itself
                 }
                 used.add(node.text);
             }
@@ -1381,25 +1492,28 @@ export class StaticAnalyzer {
             }
         });
 
-        // Detect @ts-ignore comments
-        for (let i = 0; i < this.lines.length; i++) {
-            const line = this.lines[i];
-            if (/@ts-ignore/.test(line)) {
-                issues.push(this.createIssue({
-                    id: `ts-ignore-${this.issueCounter++}`,
-                    title: '@ts-ignore comment found',
-                    description: '@ts-ignore suppresses TypeScript errors. Consider fixing the underlying issue or using @ts-expect-error with an explanation.',
-                    category: 'best-practice',
-                    severity: 'MAJOR',
-                    line: i,
-                    column: 0,
-                    endLine: i,
-                    endColumn: line.length,
-                    codeSnippet: line.trim(),
-                    confidence: 100,
-                }));
+        // Detect @ts-ignore comments (using TypeScript comment trivia API)
+        this.visitNodes(this.sourceFile, (node) => {
+            // Only check statements and declarations that might have leading comments
+            if (ts.isStatement(node) || ts.isDeclaration(node)) {
+                if (this.hasLeadingTsIgnore(node)) {
+                    const { line, column } = this.getPosition(node.getStart());
+                    issues.push(this.createIssue({
+                        id: `ts-ignore-${this.issueCounter++}`,
+                        title: '@ts-ignore comment found',
+                        description: '@ts-ignore suppresses TypeScript errors. Consider fixing the underlying issue or using @ts-expect-error with an explanation.',
+                        category: 'best-practice',
+                        severity: 'MAJOR',
+                        line,
+                        column,
+                        endLine: line,
+                        endColumn: column + 20,
+                        codeSnippet: node.getText().slice(0, 50),
+                        confidence: 100,
+                    }));
+                }
             }
-        }
+        });
 
         return issues;
     }
@@ -1606,10 +1720,21 @@ export class StaticAnalyzer {
                     'updateCache', 'updateLocal', 'updateCounter', 'updateIndex',
                     'saveLocal', 'saveToCache', 'saveState',
                     'deleteLocal', 'deleteFromCache', 'deleteState',
-                    'querySelector', 'querySelectorAll', 'requestAnimationFrame'
+                    'querySelector', 'querySelectorAll', 'requestAnimationFrame',
+                    // Type guards — always synchronous
+                    'isJsonRpcRequest', 'isJsonRpcNotification', 'isJsonRpcResponse',
+                    'isShutdownMessage', 'isValidRequest', 'isValidMessage',
+                    'isTypeGuard', 'hasProperty', 'isInstanceOf',
                 ];
 
                 const lowerName = methodName.toLowerCase();
+
+                // Skip sync guard patterns: functions starting with 'is', 'has', 'check', or 'can'
+                // These are typically synchronous type guards, validators, or permission checks
+                const isSyncGuardPattern = /^(is[A-Z]|has[A-Z]|check[A-Z]|can[A-Z])/.test(methodName);
+                if (isSyncGuardPattern) {
+                    return;
+                }
 
                 // Skip if matches sync exclusion patterns
                 if (syncExclusions.some(ex => lowerName === ex.toLowerCase())) {
@@ -2052,6 +2177,15 @@ export class StaticAnalyzer {
 
             // Console statements (context-aware)
             if (/console\.(log|debug|info|warn|error|trace)\s*\(/.test(line)) {
+                // Skip console checks in script files — they're CLI tools
+                const isScript = this.filePath.includes('/scripts/') ||
+                                 this.filePath.includes('\\scripts\\') ||
+                                 this.filePath.endsWith('.config.js') ||
+                                 this.filePath.endsWith('.config.ts');
+                if (isScript) {
+                    continue; // console.log is acceptable in CLI scripts
+                }
+
                 const fileContext = this.getFileContext(this.filePath);
                 const isError = /console\.error/.test(line);
 
@@ -2162,19 +2296,34 @@ export class StaticAnalyzer {
                 if (ts.isCatchClause(node)) {
                     const block = node.block;
                     if (block.statements.length === 0) {
+                        // Check if the catch block has a comment
+                        const bodyText = block.getFullText().trim();
+                        // Strip the braces to get inner content
+                        const innerText = bodyText.replace(/^\{/, '').replace(/\}$/, '').trim();
+
+                        const hasComment = innerText.startsWith('//') ||
+                                           innerText.startsWith('/*') ||
+                                           innerText.includes('//') ||
+                                           innerText.includes('/*');
+
+                        // MINOR if there's a comment (intentional), MAJOR if truly empty
+                        const severity = hasComment ? 'MINOR' : 'MAJOR';
+
                         const { line, column } = this.getPosition(node.getStart());
                         issues.push(this.createIssue({
                             id: `style-empty-catch-${this.issueCounter++}`,
                             title: 'Empty catch block',
-                            description: 'Empty catch blocks swallow errors silently. At minimum, log the error or re-throw it.',
+                            description: hasComment
+                                ? 'Catch block only contains a comment. Consider logging or handling the error.'
+                                : 'Empty catch blocks swallow errors silently. At minimum, log the error or re-throw it.',
                             category: 'bug',
-                            severity: 'MAJOR',
+                            severity,
                             line,
                             column,
                             endLine: this.getPosition(node.getEnd()).line,
                             endColumn: 0,
                             codeSnippet: 'catch { }',
-                            confidence: 95,
+                            confidence: hasComment ? 75 : 95,
                         }));
                     }
                 }
@@ -2235,6 +2384,12 @@ export class StaticAnalyzer {
                         return;
                     }
 
+                    // Check whitelist first
+                    const numericValue = Number(node.text);
+                    if (StaticAnalyzer.MAGIC_NUMBER_WHITELIST.has(numericValue)) {
+                        return;
+                    }
+
                     // Only flag larger numbers (> 50 instead of > 10) with lower confidence
                     if (value > 50) {
                         const { line, column } = this.getPosition(node.getStart());
@@ -2286,6 +2441,26 @@ export class StaticAnalyzer {
     // ========================================================================
     // Helper Methods
     // ========================================================================
+
+    /**
+     * Magic numbers that should never be flagged (common, boundary, http codes, etc.)
+     */
+    private static readonly MAGIC_NUMBER_WHITELIST = new Set<number>([
+        // Boundary values — universal
+        0, 1, -1, 2, 3,
+        // Percentages and common multipliers
+        10, 100, 1000, 1024,
+        // HTTP status codes
+        200, 201, 204, 301, 302, 400, 401, 403, 404, 409, 429, 500, 502, 503,
+        // Unix file permissions (decimal representations of octal)
+        493,  // 0o755 — executable
+        420,  // 0o644 — readable
+        511,  // 0o777 — all permissions
+        // Common timeouts and intervals (ms)
+        1200, 3000, 5000, 10000, 30000, 60000,
+        // Common buffer/limit sizes
+        256, 512, 8192,
+    ]);
 
     /**
      * Determine file context for context-aware rule application
@@ -2437,5 +2612,26 @@ export class StaticAnalyzer {
             case 'MINOR': return 40;
             case 'INFO': return 20;
         }
+    }
+
+    /**
+     * Check if a node has a @ts-ignore or @ts-nocheck comment using TypeScript's comment trivia API.
+     * This avoids false positives from finding these strings in code/strings/regexes.
+     */
+    private hasLeadingTsIgnore(node: ts.Node): boolean {
+        if (!this.sourceFile) return false;
+
+        const sourceText = this.sourceFile.getFullText();
+        const commentRanges = ts.getLeadingCommentRanges(
+            sourceText,
+            node.getFullStart()
+        );
+
+        if (!commentRanges) return false;
+
+        return commentRanges.some(range => {
+            const commentText = sourceText.slice(range.pos, range.end);
+            return commentText.includes('@ts-ignore') || commentText.includes('@ts-nocheck');
+        });
     }
 }

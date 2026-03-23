@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLatestScan } from "@/lib/database";
+import { UuidSchema } from "@/lib/validation";
 
 // Simple in-memory rate limiter
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -29,8 +30,9 @@ export async function GET(
     });
   }
 
-  // Validate projectId
-  if (!params.projectId || params.projectId.length > 100) {
+  // Validate projectId as UUID
+  const parsed = UuidSchema.safeParse(params.projectId);
+  if (!parsed.success) {
     return new NextResponse("Invalid project ID", { status: 400 });
   }
 
