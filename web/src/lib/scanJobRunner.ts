@@ -15,7 +15,7 @@ import { analyzeProjectWithProductionCore } from "./productionAnalyzer";
 import { createScanJob, getProject } from "./database";
 import { extractProjectFilesFromZipBuffer, fetchGitHubRepoFiles, filterProjectFiles } from "./sourceIngestion";
 import { Project, ProjectFile, ScanJob } from "./types";
-import { isDbEnabled } from "./supabase";
+import { isDbEnabled, validateDbConnection } from "./supabase";
 import { deleteArtifact, loadArtifact } from "./scanArtifacts";
 import { logger, sanitizeError } from './logger';
 
@@ -73,7 +73,13 @@ export function kickScanQueue(): void {
 }
 
 async function processQueueLoop(): Promise<void> {
-  if (workerActive || !isDbEnabled()) {
+  if (workerActive) {
+    return;
+  }
+
+  // Validate DB is actually working before trying to process queue
+  const dbWorking = await validateDbConnection();
+  if (!dbWorking) {
     return;
   }
 
@@ -138,6 +144,20 @@ async function executePersistedJob(jobId: string, projectId: string): Promise<vo
   }
 
   const result = await analyzeProjectWithProductionCore(files);
+  
+  // Log hotspots for visibility (could be stored in DB in future)
+  if (result.hotspots.length > 0) {
+    logger.info({ 
+      jobId, 
+      hotspotCount: result.hotspots.length,
+      topHotspots: result.hotspots.slice(0, 3).map(h => ({
+        lines: `${h.startLine}-${h.endLine}`,
+        severity: h.severity,
+        reason: h.reason.slice(0, 50)
+      }))
+    }, 'Hotspots detected during scan');
+  }
+
   const scan = await saveScan(project.id, result.metrics, result.issues);
 
   // Record health snapshot for trend tracking and regression detection
@@ -162,16 +182,9 @@ async function executePersistedJob(jobId: string, projectId: string): Promise<vo
 }
 
 async function runInlineFallback(request: ScanJobRequest): Promise<Project> {
-  const project =
-    (request.projectId
-      ? await getProject(request.projectId, request.userEmail)
-      : await createProject(
-          request.userEmail,
-          request.name,
-          request.source,
-          request.repoFullName
-        )) || null;
-
+  // Generate a local project ID if no DB
+  const localProjectId = request.projectId || `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  
   let files: ProjectFile[] = [];
   switch (request.type) {
     case "files":
@@ -195,14 +208,32 @@ async function runInlineFallback(request: ScanJobRequest): Promise<Project> {
 
   const result = await analyzeProjectWithProductionCore(files);
 
-  if (project) {
-    await saveProjectFiles(project.id, files);
-    await saveScan(project.id, result.metrics, result.issues);
+  // If DB is enabled, try to save (but don't fail if it doesn't work)
+  let projectId = localProjectId;
+  if (isDbEnabled()) {
+    try {
+      const project = request.projectId
+        ? await getProject(request.projectId, request.userEmail)
+        : await createProject(
+            request.userEmail,
+            request.name,
+            request.source,
+            request.repoFullName
+          );
+      
+      if (project) {
+        projectId = project.id;
+        await saveProjectFiles(project.id, files);
+        await saveScan(project.id, result.metrics, result.issues);
+      }
+    } catch (err) {
+      logger.warn({ err: sanitizeError(err) }, "DB save failed, continuing with local result");
+    }
   }
 
   return {
-    id: project?.id || request.projectId || `${request.source}-${Date.now()}`,
-    name: project?.name || request.name,
+    id: projectId,
+    name: request.name,
     source: request.source,
     repoFullName: request.repoFullName,
     files,

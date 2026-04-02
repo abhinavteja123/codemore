@@ -27,7 +27,7 @@ const EXCLUDED_PATH_SEGMENTS = [
 
 function normalizePath(filePath: string): string {
   // Normalize and strip leading slashes
-  let normalized = filePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  const normalized = filePath.replace(/\\/g, "/").replace(/^\/+/, "");
 
   // Check for path traversal attempts
   if (normalized.includes("../") || normalized.includes("..\\") || normalized === "..") {

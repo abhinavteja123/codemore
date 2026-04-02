@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import HealthScore from "@/components/HealthScore";
+import HealthHistoryChart from "@/components/HealthHistoryChart";
 import SeverityBadge from "@/components/SeverityBadge";
 import CategoryBadge from "@/components/CategoryBadge";
 import { toast } from "sonner";
@@ -821,6 +822,9 @@ export default function ProjectPage() {
                 </div>
               </div>
             </div>
+
+            {/* Health History Chart */}
+            {project?.id && <HealthHistoryChart projectId={project.id} />}
 
             {/* Top Issues */}
             {issues.length > 0 && (

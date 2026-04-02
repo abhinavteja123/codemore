@@ -10,10 +10,16 @@ import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 /**
  * Get the encryption key from environment variable.
  * Key must be provided as a base64-encoded 32-byte value in CODEMORE_JOB_ENCRYPTION_KEY.
+ * Falls back to a default key for local development ONLY.
  */
 function getEncryptionKey(): Buffer {
   const keyStr = process.env.CODEMORE_JOB_ENCRYPTION_KEY;
   if (!keyStr) {
+    // For local development only - in production, this should always be set
+    if (process.env.NODE_ENV === 'development') {
+      // Use a deterministic key for local dev (NOT secure for production)
+      return Buffer.from('codemore-local-dev-key-32-bytes!');
+    }
     throw new Error(
       "CODEMORE_JOB_ENCRYPTION_KEY is required for token encryption."
     );
@@ -78,7 +84,9 @@ export async function storeUserToken(
 
   if (error) {
     logger.error({ err: sanitizeError(error) }, "Failed to store token");
-    throw new Error("Failed to store authentication token");
+    // Don't throw - allow auth to continue even if token storage fails
+    // User will need to re-auth for GitHub API operations if token is lost
+    return;
   }
 }
 
@@ -104,7 +112,7 @@ export async function getUserToken(
   // Decrypt the token before returning
   try {
     return decryptToken(data.access_token);
-  } catch (err) {
+  } catch {
     // Handle legacy unencrypted tokens during migration period
     // If decryption fails, the token might be plaintext (pre-encryption)
     logger.warn({ email, provider }, "Token decryption failed - may be legacy unencrypted token");

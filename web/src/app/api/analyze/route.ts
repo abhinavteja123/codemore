@@ -7,15 +7,16 @@ import { ProjectFile } from "@/lib/types";
 import { logger, sanitizeError } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
-  const csrfError = validateCsrf(req);
-  if (csrfError) return csrfError;
+  // Skip CSRF for demo mode (anonymous file uploads)
+  const session = await getServerSession(authOptions);
+  
+  // Only validate CSRF for authenticated users
+  if (session) {
+    const csrfError = validateCsrf(req);
+    if (csrfError) return csrfError;
+  }
 
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const body = await req.json();
     const files: ProjectFile[] = body.files;
 
@@ -38,12 +39,12 @@ export async function POST(req: NextRequest) {
     // Run analysis
     const result = await analyzeProjectWithProductionCore(files);
 
-    // Save to database if projectId provided
+    // Save to database if projectId provided AND user is authenticated
     let scanId = null;
-    if (body.projectId) {
+    if (body.projectId && session?.user?.email) {
       const { saveScan, saveProjectFiles, getProject } = await import("@/lib/database");
       // Verify user owns this project
-      const project = await getProject(body.projectId, session.user?.email || "");
+      const project = await getProject(body.projectId, session.user.email);
       if (project) {
         await saveProjectFiles(body.projectId, files);
         const scan = await saveScan(body.projectId, result.metrics, result.issues);

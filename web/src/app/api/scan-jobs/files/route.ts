@@ -5,8 +5,13 @@ import { filterProjectFiles } from "@/lib/sourceIngestion";
 import { ProjectFile } from "@/lib/types";
 import { enqueueFileScanJob } from "@/lib/scanJobRunner";
 import { logger, sanitizeError } from "@/lib/logger";
+import { validateCsrf } from "@/lib/csrf";
 
 export async function POST(req: NextRequest) {
+  // CSRF protection for state-changing operation
+  const csrfError = validateCsrf(req);
+  if (csrfError) return csrfError;
+
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email) {

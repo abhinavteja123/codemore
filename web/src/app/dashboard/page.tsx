@@ -56,16 +56,31 @@ export default function DashboardPage() {
   const [userStats, setUserStats] = useState<UserStats | null>(null);
 
   const isGitHub = session?.provider === "github";
+  const isDemo = status === "unauthenticated";
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      signIn();
-    }
-  }, [status]);
+  // Don't force sign-in anymore - allow demo mode
+  // useEffect(() => {
+  //   if (status === "unauthenticated") {
+  //     signIn();
+  //   }
+  // }, [status]);
 
   // Load projects: try DB first, fall back to localStorage
   useEffect(() => {
     async function loadProjects() {
+      // In demo mode, only use localStorage
+      if (isDemo) {
+        const saved = localStorage.getItem("codemore_projects");
+        if (saved) {
+          try {
+            setProjects(JSON.parse(saved));
+          } catch {
+            /* ignore */
+          }
+        }
+        return;
+      }
+      
       try {
         const res = await fetch("/api/projects");
         if (res.ok) {
@@ -109,8 +124,9 @@ export default function DashboardPage() {
       }
     }
 
-    if (session) loadProjects();
-  }, [session]);
+    // Load projects for both authenticated users and demo mode
+    if (status !== "loading") loadProjects();
+  }, [session, status, isDemo]);
 
   const saveProjects = useCallback(
     (p: Project[]) => {
@@ -127,7 +143,14 @@ export default function DashboardPage() {
     try {
       const res = await fetch("/api/github/repos");
       if (res.ok) {
-        setRepos(await res.json());
+        const data = await res.json();
+        // Check if response is an array (repos list) or an object (error/message)
+        if (Array.isArray(data)) {
+          setRepos(data);
+        } else {
+          // Not connected or error - keep repos as empty array
+          setRepos([]);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch repos:", err);

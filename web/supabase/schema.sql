@@ -1,6 +1,34 @@
 -- CodeMore Database Schema
 -- Run this in Supabase SQL Editor to set up your database
 
+-- User tokens table (encrypted OAuth tokens)
+create table if not exists user_tokens (
+  id uuid primary key default gen_random_uuid(),
+  user_email text not null,
+  provider text not null,
+  access_token text not null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(user_email, provider)
+);
+
+-- Health history table (trend tracking)
+create table if not exists health_history (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  scan_id uuid not null references scans(id) on delete cascade,
+  health_score numeric not null default 0,
+  blocker_count integer not null default 0,
+  critical_count integer not null default 0,
+  major_count integer not null default 0,
+  minor_count integer not null default 0,
+  info_count integer not null default 0,
+  total_issues integer not null default 0,
+  files_analyzed integer not null default 0,
+  scanned_at timestamptz default now(),
+  unique(scan_id)
+);
+
 -- Projects table
 create table if not exists projects (
   id uuid primary key default gen_random_uuid(),
@@ -219,6 +247,41 @@ create policy "Users manage own scan jobs" on scan_jobs
       select 1
       from projects
       where projects.id = scan_jobs.project_id
+        and lower(projects.user_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+    )
+  );
+
+-- User tokens table: RLS and indexes
+alter table user_tokens enable row level security;
+create index if not exists idx_user_tokens_email on user_tokens(user_email);
+
+drop policy if exists "Users manage own tokens" on user_tokens;
+create policy "Users manage own tokens" on user_tokens
+  for all to authenticated
+  using (lower(user_email) = lower(coalesce(auth.jwt() ->> 'email', '')))
+  with check (lower(user_email) = lower(coalesce(auth.jwt() ->> 'email', '')));
+
+-- Health history table: RLS and indexes
+alter table health_history enable row level security;
+create index if not exists idx_health_history_project on health_history(project_id);
+create index if not exists idx_health_history_scanned on health_history(scanned_at desc);
+
+drop policy if exists "Users manage own health history" on health_history;
+create policy "Users manage own health history" on health_history
+  for all to authenticated
+  using (
+    exists (
+      select 1
+      from projects
+      where projects.id = health_history.project_id
+        and lower(projects.user_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from projects
+      where projects.id = health_history.project_id
         and lower(projects.user_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
     )
   );

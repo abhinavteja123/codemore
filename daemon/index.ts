@@ -38,6 +38,7 @@ import { ContextMap } from './services/contextMap';
 import { AnalysisQueue } from './services/analysisQueue';
 import { AiService } from './services/aiService';
 import { SuggestionEngine } from './services/suggestionEngine';
+import { loadProjectConfig, CodemoreConfig, DEFAULT_CONFIG as DEFAULT_PROJECT_CONFIG } from './services/configLoader';
 
 // ============================================================================
 // Daemon State
@@ -47,6 +48,7 @@ interface DaemonState {
     initialized: boolean;
     workspacePath: string | null;
     config: DaemonConfig;
+    projectConfig: CodemoreConfig;
     version: string;
 }
 
@@ -54,6 +56,7 @@ const state: DaemonState = {
     initialized: false,
     workspacePath: null,
     config: DEFAULT_CONFIG,
+    projectConfig: DEFAULT_PROJECT_CONFIG,
     version: '1.0.0',
 };
 
@@ -110,7 +113,7 @@ const handlers: Record<string, RequestHandler> = {
     /**
      * Initialize the daemon with workspace path and configuration
      */
-    async initialize(params: unknown): Promise<{ success: boolean; version: string }> {
+    async initialize(params: unknown): Promise<{ success: boolean; version: string; projectConfig?: CodemoreConfig }> {
         const { workspacePath, config } = params as {
             workspacePath: string;
             config: DaemonConfig;
@@ -122,14 +125,31 @@ const handlers: Record<string, RequestHandler> = {
             state.workspacePath = workspacePath;
             state.config = { ...DEFAULT_CONFIG, ...config };
 
+            // Load project-level config from .codemorerc.json
+            state.projectConfig = await loadProjectConfig(workspacePath);
+            log(`Project config loaded: ${JSON.stringify({
+                rules: Object.keys(state.projectConfig.rules).length,
+                ignore: state.projectConfig.ignore.length,
+                maxComplexity: state.projectConfig.maxComplexity,
+            })}`);
+
             // Initialize services
             astParser = new AstParser();
             contextMap = new ContextMap(
                 workspacePath,
-                state.config.excludePatterns,
+                // Merge exclude patterns from both daemon config and project config
+                [...new Set([...state.config.excludePatterns, ...state.projectConfig.ignore])],
                 state.config.maxFileSizeKB
             );
-            aiService = new AiService(state.config);
+            // Create AiService with project config applied to StaticAnalyzer
+            aiService = new AiService(state.config, {
+                maxCyclomaticComplexity: state.projectConfig.maxComplexity,
+                maxFunctionLength: state.projectConfig.maxFunctionLength,
+                maxParameterCount: state.projectConfig.maxParameters,
+                maxLineLength: state.projectConfig.maxLineLength,
+            });
+            // Apply project config for rule overrides
+            aiService.setProjectConfig(state.projectConfig);
             suggestionEngine = new SuggestionEngine(aiService, contextMap);
 
             // Recheck external tool availability (binaries should be pre-packaged)
@@ -190,7 +210,7 @@ const handlers: Record<string, RequestHandler> = {
             state.initialized = true;
             log('Initialization complete');
 
-            return { success: true, version: state.version };
+            return { success: true, version: state.version, projectConfig: state.projectConfig };
         } catch (error) {
             logError('Initialization failed', error);
             throw error;

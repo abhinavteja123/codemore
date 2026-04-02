@@ -1,7 +1,9 @@
 import { AstParser } from "../../../daemon/services/astParser";
 import { StaticAnalyzer } from "../../../daemon/services/staticAnalyzer";
+import { SeverityRemapper } from "../../../daemon/services/severityRemapper";
 import type { FileContext as SharedFileContext } from "../../../shared/protocol";
 import { calculateHealthScoreFromTotals, calculateTechnicalDebt } from "../../../shared/scoring";
+import { identifyHotSpots, HotSpot, getTopHotSpots } from "../../../shared/hotspotDetector";
 import {
   CodeHealthMetrics,
   CodeIssue,
@@ -11,6 +13,26 @@ import {
 } from "./types";
 import { analyzeFile as analyzeFallbackFile } from "./analyzer";
 import { logger, sanitizeError } from './logger';
+
+// Singleton remapper for consistency with daemon
+const severityRemapper = new SeverityRemapper();
+
+/**
+ * ARCHITECTURE NOTE: Web vs Extension Scanning Differences
+ * 
+ * Extension (daemon):
+ *   1. ExternalToolRunner (Biome, Ruff, Semgrep, TFLint, Checkov) - runs binaries
+ *   2. StaticAnalyzer (TypeScript AST-based)
+ *   3. SeverityRemapper (reduces false positives)
+ * 
+ * Web (serverless):
+ *   1. StaticAnalyzer (same as daemon - imported directly)
+ *   2. SeverityRemapper (same as daemon - NOW ADDED)
+ *   3. NO external tools (cannot execute binaries on Vercel/serverless)
+ * 
+ * This means web analysis covers ~60% of what the extension provides.
+ * For full analysis, users should use the VS Code extension.
+ */
 
 const STATIC_PRIMARY_EXTENSIONS = new Set([
   ".ts",
@@ -137,6 +159,7 @@ function buildMetrics(
 export async function analyzeProjectWithProductionCore(files: ProjectFile[]): Promise<{
   issues: CodeIssue[];
   metrics: CodeHealthMetrics;
+  hotspots: HotSpot[];
 }> {
   const parser = new AstParser();
   const staticAnalyzer = new StaticAnalyzer();
@@ -171,9 +194,17 @@ export async function analyzeProjectWithProductionCore(files: ProjectFile[]): Pr
     allIssues.push(...dedupeIssues([...staticIssues, ...fallbackIssues]));
   }
 
-  const issues = dedupeIssues(allIssues);
+  // Apply severity remapping for consistency with extension daemon
+  // This reduces false positives and applies context-aware severity adjustments
+  const remappedIssues = severityRemapper.remapIssues(dedupeIssues(allIssues));
+  
+  // Detect hotspots from all issues
+  const hotspots = identifyHotSpots(remappedIssues);
+  logger.info(`Identified ${hotspots.length} hotspots from ${remappedIssues.length} issues`);
+
   return {
-    issues,
-    metrics: buildMetrics(files, issues, contexts),
+    issues: remappedIssues,
+    metrics: buildMetrics(files, remappedIssues, contexts),
+    hotspots,
   };
 }

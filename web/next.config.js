@@ -23,6 +23,22 @@ const cspHeader = [
 
 const nextConfig = {
   reactStrictMode: true,
+  // Exclude problematic packages from server component bundling
+  // pino uses worker threads which don't work well with Next.js bundler
+  experimental: {
+    serverComponentsExternalPackages: ['pino', 'pino-pretty', 'thread-stream'],
+  },
+  // Also add to webpack externals for API routes
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Mark pino as external to avoid bundling worker threads
+      config.externals = config.externals || [];
+      if (Array.isArray(config.externals)) {
+        config.externals.push('pino', 'pino-pretty', 'thread-stream');
+      }
+    }
+    return config;
+  },
   async headers() {
     return [
       {

@@ -1495,7 +1495,7 @@ export class StaticAnalyzer {
         // Detect @ts-ignore comments (using TypeScript comment trivia API)
         this.visitNodes(this.sourceFile, (node) => {
             // Only check statements and declarations that might have leading comments
-            if (ts.isStatement(node) || ts.isDeclaration(node)) {
+            if (ts.isStatement(node) || ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) {
                 if (this.hasLeadingTsIgnore(node)) {
                     const { line, column } = this.getPosition(node.getStart());
                     issues.push(this.createIssue({

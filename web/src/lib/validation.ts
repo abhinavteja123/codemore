@@ -19,7 +19,7 @@ export const createProjectSchema = z.object({
       "Name can only contain alphanumeric characters, spaces, hyphens, underscores, and dots"
     ),
   source: z.enum(["upload", "github"], {
-    errorMap: () => ({ message: "Source must be 'upload' or 'github'" }),
+    message: "Source must be 'upload' or 'github'",
   }),
   repoFullName: z
     .string()

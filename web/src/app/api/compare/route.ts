@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { validateCsrf } from '@/lib/csrf';
 import { getScanIssues, getHealthHistory } from '@/lib/database';
 import { UuidSchema } from '@/lib/validation';
+import { logger } from '@/lib/logger';
 import { z } from 'zod';
 
 const CompareSchema = z.object({
@@ -71,8 +72,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<ScanCompariso
     const baseHistory = await getHealthHistory(baseScanId);
     const headHistory = await getHealthHistory(headScanId);
 
-    const baseScore = baseHistory.find(h => h.scan_id === baseScanId)?.health_score ?? 0;
-    const headScore = headHistory.find(h => h.scan_id === headScanId)?.health_score ?? 0;
+    const baseScore = baseHistory.find(h => h.scanId === baseScanId)?.healthScore ?? 0;
+    const headScore = headHistory.find(h => h.scanId === headScanId)?.healthScore ?? 0;
 
     const comparison: ScanComparison = {
       baseScanId,
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ScanCompariso
 
     return NextResponse.json(comparison);
   } catch (error) {
-    console.error('Compare endpoint error:', error);
+    logger.error('Compare endpoint error', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json({ error: 'Failed to compare scans' }, { status: 500 });
   }
 }

@@ -10,13 +10,16 @@ export async function GET(_req: NextRequest) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Return empty array for unauthenticated users (demo mode)
+    return NextResponse.json([]);
   }
 
   // Fetch GitHub token from database (not from session)
   const accessToken = await getUserToken(session.user.email, "github");
   if (!accessToken) {
-    return NextResponse.json({ error: "GitHub not connected. Please re-authenticate with GitHub." }, { status: 401 });
+    // User is logged in but hasn't connected GitHub or token not stored
+    // Return empty array - user can still upload files
+    return NextResponse.json([]);
   }
 
   try {

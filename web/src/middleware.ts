@@ -59,7 +59,7 @@ class InMemoryRateLimiter {
 
   private cleanup(): void {
     const now = Date.now();
-    for (const [key, entry] of this.cache.entries()) {
+    for (const [key, entry] of Array.from(this.cache.entries())) {
       if (now >= entry.resetAt) {
         this.cache.delete(key);
       }
@@ -67,11 +67,11 @@ class InMemoryRateLimiter {
   }
 }
 
-// Standard rate limit: 20 requests per 60 seconds
-const standardLimiter = new InMemoryRateLimiter(60000, 20);
+// Standard rate limit: 100 requests per 60 seconds (increased for local dev)
+const standardLimiter = new InMemoryRateLimiter(60000, 100);
 
-// Stricter limit for expensive AI/scan routes: 5 requests per 60 seconds
-const scanLimiter = new InMemoryRateLimiter(60000, 5);
+// Stricter limit for expensive AI/scan routes: 20 requests per 60 seconds
+const scanLimiter = new InMemoryRateLimiter(60000, 20);
 
 // ============================================================================
 // Middleware

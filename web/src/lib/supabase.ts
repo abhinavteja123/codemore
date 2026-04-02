@@ -1,10 +1,13 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
 import { logger } from "./logger";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Track if we've validated the DB connection
+let dbValidated = false;
+let dbWorking = false;
 
 if (!supabaseUrl) {
   logger.warn("NEXT_PUBLIC_SUPABASE_URL not set — database features disabled");
@@ -49,6 +52,49 @@ export function createSupabaseServer(): SupabaseClient | null {
   });
 }
 
+/**
+ * Check if database is enabled and working.
+ * On first call, attempts a simple query to validate the connection.
+ * Subsequent calls use cached result for performance.
+ */
+export async function validateDbConnection(): Promise<boolean> {
+  if (dbValidated) return dbWorking;
+  
+  if (!supabaseAdmin) {
+    dbValidated = true;
+    dbWorking = false;
+    return false;
+  }
+
+  try {
+    // Try a simple query to see if DB is accessible
+    const { error } = await supabaseAdmin
+      .from('projects')
+      .select('id')
+      .limit(1);
+    
+    if (error) {
+      // Table doesn't exist or connection failed
+      logger.warn({ code: error.code }, "Database not available - running in demo mode");
+      dbWorking = false;
+    } else {
+      dbWorking = true;
+    }
+  } catch {
+    dbWorking = false;
+  }
+
+  dbValidated = true;
+  return dbWorking;
+}
+
+/**
+ * Quick synchronous check if DB config exists.
+ * For actual DB operations, use validateDbConnection() first.
+ */
 export function isDbEnabled(): boolean {
+  // If we've validated, use the cached result
+  if (dbValidated) return dbWorking;
+  // Otherwise just check if client exists (caller should validate before operations)
   return supabaseAdmin !== null;
 }

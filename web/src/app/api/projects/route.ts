@@ -4,11 +4,21 @@ import { authOptions } from "@/lib/auth";
 import { getUserProjectSnapshots, createProject, getUserStats } from "@/lib/database";
 import { createProjectSchema, validateBody, formatZodError } from "@/lib/validation";
 import { validateCsrf } from "@/lib/csrf";
+import { validateDbConnection } from "@/lib/supabase";
 
 export async function GET(_req: NextRequest) {
   const session = await getServerSession(authOptions);
+  
+  // For unauthenticated users, return empty projects (demo mode)
   if (!session?.user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ projects: [], stats: null });
+  }
+
+  // Check if DB is actually working
+  const dbWorking = await validateDbConnection();
+  if (!dbWorking) {
+    // Return empty - user can still use upload/analyze without DB
+    return NextResponse.json({ projects: [], stats: null });
   }
 
   const [projects, stats] = await Promise.all([
@@ -26,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Sign in to save projects" }, { status: 401 });
   }
 
   const body = await req.json();

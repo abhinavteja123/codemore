@@ -8,15 +8,15 @@ import { isDbEnabled } from "@/lib/supabase";
 import { saveZipArtifact } from "@/lib/scanArtifacts";
 import { Project } from "@/lib/types";
 import { logger, sanitizeError } from "@/lib/logger";
+import { v4 as uuidv4 } from "uuid";
 
 export async function POST(req: NextRequest) {
-  const csrfError = validateCsrf(req);
-  if (csrfError) return csrfError;
-
   const session = await getServerSession(authOptions);
-
-  if (!session || !session.user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  
+  // Only validate CSRF for authenticated users
+  if (session) {
+    const csrfError = validateCsrf(req);
+    if (csrfError) return csrfError;
   }
 
   const formData = await req.formData();
@@ -33,33 +33,38 @@ export async function POST(req: NextRequest) {
   const projectName =
     ((formData.get("name") as string | null) || archive.name.replace(/\.zip$/i, "")).trim() || "Uploaded Project";
 
+  const userEmail = session?.user?.email || `demo-${uuidv4()}@codemore.local`;
+  const isDemo = !session?.user?.email;
+
   try {
-    if (isDbEnabled()) {
-      const dbProject = await createProject(session.user.email, projectName, "upload");
-      if (!dbProject) {
-        throw new Error("Failed to create project for scan.");
+    // For authenticated users with DB enabled - try DB-backed scan
+    if (!isDemo && isDbEnabled()) {
+      try {
+        const dbProject = await createProject(userEmail, projectName, "upload");
+        if (dbProject) {
+          const dbJob = await createScanJob(dbProject.id, "upload", archive.name);
+          if (dbJob) {
+            const arrayBuffer = await archive.arrayBuffer();
+            await saveZipArtifact(dbJob.id, Buffer.from(arrayBuffer));
+            kickScanQueue();
+
+            return NextResponse.json({
+              projectId: dbProject.id,
+              project: null as Project | null,
+              job: mapDbScanJob(dbJob),
+              queued: true,
+            });
+          }
+        }
+      } catch (dbError) {
+        logger.warn({ err: sanitizeError(dbError) }, "DB-backed scan failed, falling back to inline");
       }
-
-      const dbJob = await createScanJob(dbProject.id, "upload", archive.name);
-      if (!dbJob) {
-        throw new Error("Failed to create scan job.");
-      }
-
-      const arrayBuffer = await archive.arrayBuffer();
-      await saveZipArtifact(dbJob.id, Buffer.from(arrayBuffer));
-      kickScanQueue();
-
-      return NextResponse.json({
-        projectId: dbProject.id,
-        project: null as Project | null,
-        job: mapDbScanJob(dbJob),
-        queued: true,
-      });
     }
 
+    // Fallback: Process inline (works without DB)
     const arrayBuffer = await archive.arrayBuffer();
     const result = await enqueueZipScanJob({
-      userEmail: session.user.email,
+      userEmail,
       projectId: (formData.get("projectId") as string | null) || undefined,
       name: projectName,
       archiveName: archive.name,
@@ -71,6 +76,7 @@ export async function POST(req: NextRequest) {
       project: result.project || null,
       job: result.job,
       queued: result.queued,
+      demo: isDemo,
     });
   } catch (error) {
     logger.error({ err: sanitizeError(error) }, "ZIP scan job failed");

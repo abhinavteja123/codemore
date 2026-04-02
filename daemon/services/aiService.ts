@@ -20,6 +20,8 @@ import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { StaticAnalyzer, StaticAnalyzerConfig } from './staticAnalyzer';
 import { ExternalToolRunner, ExternalToolsConfig } from './externalToolRunner';
 import { SeverityRemapper } from './severityRemapper';
+import { CodemoreConfig, getRuleSeverity, shouldIgnoreFile } from './configLoader';
+import { identifyHotSpots, HotSpot } from '../../shared/hotspotDetector';
 import { createLogger, sanitizeError } from '../lib/logger';
 
 const logger = createLogger('aiService');
@@ -31,14 +33,9 @@ interface CacheEntry {
 
 /**
  * Represents a "hot spot" - a code region that warrants deeper AI analysis
+ * (Now imported from shared/hotspotDetector.ts)
  */
-interface HotSpot {
-    startLine: number;
-    endLine: number;
-    reason: string;
-    severity: Severity;
-    source: 'static' | 'external';
-}
+// interface HotSpot moved to shared/hotspotDetector.ts
 
 /**
  * Analysis result with metadata for performance tracking
@@ -236,7 +233,7 @@ export function parseAiFixResponseText(responseText: string): CodeSuggestion[] {
     }
 
     // First pass: try parsing candidates as-is
-    for (const candidate of candidates) {
+    for (const candidate of Array.from(candidates)) {
         try {
             const parsed = JSON.parse(candidate) as unknown;
             const suggestions = normalizeParsedSuggestions(parsed);
@@ -251,7 +248,7 @@ export function parseAiFixResponseText(responseText: string): CodeSuggestion[] {
 
     // Second pass: try repairing truncated JSON
     logger.info('[AiService] Attempting to repair truncated JSON response...');
-    for (const candidate of candidates) {
+    for (const candidate of Array.from(candidates)) {
         const repaired = tryRepairTruncatedJson(candidate);
         if (repaired && repaired !== candidate) {
             try {
@@ -288,17 +285,60 @@ export function parseAiFixResponseText(responseText: string): CodeSuggestion[] {
 export class AiService {
     private cache = new Map<string, CacheEntry>();
     private config: DaemonConfig;
+    private projectConfig: CodemoreConfig | null = null;
     private geminiModel: GenerativeModel | null = null;
     private staticAnalyzer: StaticAnalyzer;
     private externalToolRunner: ExternalToolRunner;
     private severityRemapper: SeverityRemapper;
 
-    constructor(config: DaemonConfig) {
+    constructor(config: DaemonConfig, analyzerConfig?: Partial<import('./staticAnalyzer').StaticAnalyzerConfig>) {
         this.config = config;
-        this.staticAnalyzer = new StaticAnalyzer();
+        this.staticAnalyzer = new StaticAnalyzer(analyzerConfig);
         this.externalToolRunner = new ExternalToolRunner();
         this.severityRemapper = new SeverityRemapper();
         this.initGemini();
+    }
+
+    /**
+     * Update static analyzer configuration (e.g., from .codemorerc.json)
+     */
+    updateAnalyzerConfig(config: Partial<import('./staticAnalyzer').StaticAnalyzerConfig>): void {
+        this.staticAnalyzer.updateConfig(config);
+    }
+
+    /**
+     * Set project-level configuration from .codemorerc.json
+     * This enables rule severity overrides and file ignoring
+     */
+    setProjectConfig(projectConfig: CodemoreConfig): void {
+        this.projectConfig = projectConfig;
+        logger.info({ ruleCount: Object.keys(projectConfig.rules).length }, 'Project config applied');
+    }
+
+    /**
+     * Apply project config rules to issues (severity overrides, rule disabling)
+     */
+    private applyProjectRulesToIssues(issues: CodeIssue[]): CodeIssue[] {
+        if (!this.projectConfig || Object.keys(this.projectConfig.rules).length === 0) {
+            return issues;
+        }
+
+        return issues.filter(issue => {
+            const severityOverride = getRuleSeverity(issue.id, issue.severity, this.projectConfig!);
+            
+            // Rule disabled via "off"
+            if (severityOverride === 'off') {
+                logger.debug({ ruleId: issue.id }, 'Rule disabled by project config');
+                return false;
+            }
+
+            // Apply severity override if different
+            if (severityOverride !== issue.severity) {
+                issue.severity = severityOverride as Severity;
+            }
+
+            return true;
+        });
     }
 
     /**
@@ -407,7 +447,10 @@ export class AiService {
         logger.info(`[AiService] Analysis complete: ${combinedIssues.length} total issues (${totalTime}ms, no AI)`);
         
         // Apply severity remapping for better UX
-        return this.severityRemapper.remapIssues(combinedIssues);
+        const remappedIssues = this.severityRemapper.remapIssues(combinedIssues);
+
+        // Apply project config rules (severity overrides, rule disabling)
+        return this.applyProjectRulesToIssues(remappedIssues);
     }
 
     /**
@@ -428,83 +471,10 @@ export class AiService {
      * This enables cost-effective AI usage by targeting problem areas
      * 
      * Hot spots are identified from both external tool findings and static analysis
+     * (Delegates to shared/hotspotDetector.ts)
      */
-    private identifyHotSpots(issues: CodeIssue[]): HotSpot[] {
-        const hotSpots: HotSpot[] = [];
-        const lineIssueCount = new Map<number, number>();
-
-        // Count issues per line/region
-        for (const issue of issues) {
-            const line = issue.location.range.start.line;
-            lineIssueCount.set(line, (lineIssueCount.get(line) || 0) + 1);
-        }
-
-        // Identify areas with multiple issues or high-severity issues
-        for (const issue of issues) {
-            const line = issue.location.range.start.line;
-            const issueCount = lineIssueCount.get(line) || 0;
-
-            // Mark as hotspot if:
-            // 1. High severity (BLOCKER, CRITICAL, or MAJOR)
-            // 2. Multiple issues in same area
-            // 3. Complexity-related issues
-            // 4. Security issues from external tools (Semgrep, Checkov)
-            const isHighSeverity = issue.severity === 'BLOCKER' || issue.severity === 'CRITICAL' || issue.severity === 'MAJOR';
-            const hasMultipleIssues = issueCount >= 2;
-            const isComplexityIssue = issue.id.includes('cyclomatic') || 
-                                       issue.id.includes('cognitive') || 
-                                       issue.id.includes('nesting');
-            const isSecurityIssue = issue.category === 'security' ||
-                                     issue.id.startsWith('semgrep-') ||
-                                     issue.id.startsWith('checkov-');
-
-            if (isHighSeverity || hasMultipleIssues || isComplexityIssue || isSecurityIssue) {
-                // Determine source based on issue ID prefix
-                const source: 'static' | 'external' = 
-                    issue.id.startsWith('semgrep-') || 
-                    issue.id.startsWith('biome-') || 
-                    issue.id.startsWith('ruff-') ||
-                    issue.id.startsWith('tflint-') ||
-                    issue.id.startsWith('checkov-') ? 'external' : 'static';
-
-                hotSpots.push({
-                    startLine: issue.location.range.start.line,
-                    endLine: issue.location.range.end.line,
-                    reason: issue.title,
-                    severity: issue.severity,
-                    source,
-                });
-            }
-        }
-
-        // Deduplicate overlapping hotspots
-        return this.deduplicateHotSpots(hotSpots);
-    }
-
-    /**
-     * Deduplicate overlapping hot spots
-     */
-    private deduplicateHotSpots(hotSpots: HotSpot[]): HotSpot[] {
-        if (hotSpots.length === 0) return [];
-
-        // Sort by start line
-        const sorted = [...hotSpots].sort((a, b) => a.startLine - b.startLine);
-        const result: HotSpot[] = [sorted[0]];
-
-        for (let i = 1; i < sorted.length; i++) {
-            const current = sorted[i];
-            const last = result[result.length - 1];
-
-            // If overlapping or adjacent, merge
-            if (current.startLine <= last.endLine + 5) {
-                last.endLine = Math.max(last.endLine, current.endLine);
-                last.reason = `${last.reason}; ${current.reason}`;
-            } else {
-                result.push(current);
-            }
-        }
-
-        return result;
+    private identifyHotSpotsWrapper(issues: CodeIssue[]): HotSpot[] {
+        return identifyHotSpots(issues);
     }
 
     /**
