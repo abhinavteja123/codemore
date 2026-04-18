@@ -221,6 +221,28 @@ export class StaticAnalyzer {
                 this.sourceFile = sourceFile || this.parseFile(filePath, content);
                 allIssues.push(...this.analyzeTypeScriptFile(context, ext));
                 break;
+            case '.py':
+            case '.pyi':
+            case '.pyw':
+            case '.rb':
+            case '.java':
+            case '.go':
+            case '.cs':
+            case '.rs':
+            case '.php':
+            case '.swift':
+            case '.kt':
+            case '.scala':
+            case '.lua':
+            case '.r':
+            case '.c':
+            case '.cpp':
+            case '.cc':
+            case '.h':
+            case '.hpp':
+                // External tools (semgrep, ruff, rubocop, etc.) handle these languages.
+                // Do NOT run TypeScript AST analysis on non-JS/TS files.
+                break;
             default:
                 // Try to parse as TypeScript for unknown JS-like files
                 if (content.includes('function ') || content.includes('const ') || content.includes('import ')) {
@@ -2253,7 +2275,10 @@ export class StaticAnalyzer {
             }
 
             // == instead of ===
-            if (/[^=!<>]==[^=]/.test(line) && !/['"`]/.test(line.split('==')[0].slice(-5))) {
+            // Skip if == appears inside a string/template literal or regex literal
+            if (/[^=!<>]==[^=]/.test(line) &&
+                !/['"`]/.test(line.split('==')[0].slice(-5)) &&
+                !(/\/[^/\n]*==[^/\n]*\//).test(line)) {
                 issues.push(this.createIssue({
                     id: `style-equality-${this.issueCounter++}`,
                     title: 'Use strict equality',

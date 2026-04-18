@@ -9,7 +9,12 @@
       "Bash(npx tsc:*)",
       "Bash(echo EXIT: $?:*)",
       "Bash(npx:*)",
-      "Bash(pushd:*)"
+      "Bash(pushd:*)",
+      "Bash(node -e ' *)",
+      "Bash(grep -E \"\\\\.ts$\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:d.get\\(k\\) for k in ['scripts','devDependencies','jest']}, indent=2\\)\\)\")",
+      "Bash(npm run *)",
+      "Bash(node *)"
     ]
   }
 }

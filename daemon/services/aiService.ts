@@ -282,6 +282,11 @@ export function parseAiFixResponseText(responseText: string): CodeSuggestion[] {
     throw new Error('Failed to parse AI fix response - the AI returned malformed or incomplete JSON');
 }
 
+const AI_RATE_LIMIT = 10; // max requests per minute per provider
+const AI_RATE_WINDOW_MS = 60_000;
+const AI_CIRCUIT_FAILURE_THRESHOLD = 3;
+const AI_CIRCUIT_RESET_MS = 60_000;
+
 export class AiService {
     private cache = new Map<string, CacheEntry>();
     private config: DaemonConfig;
@@ -290,6 +295,9 @@ export class AiService {
     private staticAnalyzer: StaticAnalyzer;
     private externalToolRunner: ExternalToolRunner;
     private severityRemapper: SeverityRemapper;
+    private aiRequestTimestamps = new Map<string, number[]>();
+    private aiCircuitFailures = new Map<string, number>();
+    private aiCircuitOpenTime = new Map<string, number>();
 
     constructor(config: DaemonConfig, analyzerConfig?: Partial<import('./staticAnalyzer').StaticAnalyzerConfig>) {
         this.config = config;
@@ -960,14 +968,20 @@ function getHandler(type) {
                 const responseText = await this.callProviderForFix(provider, prompt);
 
                 try {
-                    return parseAiFixResponseText(responseText);
+                    const result = parseAiFixResponseText(responseText);
+                    this.recordProviderSuccess(provider);
+                    return result;
                 } catch (parseError) {
                     logger.error({ err: sanitizeError(parseError instanceof Error ? parseError : new Error(String(parseError))), provider }, 'Failed to parse AI response JSON');
+                    this.recordProviderFailure(provider);
                     throw new Error(`Failed to parse ${provider} response`);
                 }
             } catch (error) {
                 const err = error instanceof Error ? error : new Error(String(error));
                 logger.warn(`[AiService] Provider ${provider} failed: ${err.message}`);
+                if (!err.message.includes('circuit open') && !err.message.includes('rate limit')) {
+                    this.recordProviderFailure(provider);
+                }
                 errors.push({ provider, error: err });
                 // Continue to next provider
             }
@@ -980,10 +994,48 @@ function getHandler(type) {
         );
     }
 
+    private checkProviderAllowed(provider: string): void {
+        const now = Date.now();
+
+        // Circuit breaker check
+        const openTime = this.aiCircuitOpenTime.get(provider);
+        if (openTime !== undefined) {
+            if (now - openTime < AI_CIRCUIT_RESET_MS) {
+                throw new Error(`AI provider ${provider} circuit open — too many recent failures`);
+            }
+            // Reset after cooldown
+            this.aiCircuitOpenTime.delete(provider);
+            this.aiCircuitFailures.delete(provider);
+        }
+
+        // Rate limit check
+        const timestamps = (this.aiRequestTimestamps.get(provider) ?? []).filter(t => now - t < AI_RATE_WINDOW_MS);
+        if (timestamps.length >= AI_RATE_LIMIT) {
+            throw new Error(`AI provider ${provider} rate limit reached (${AI_RATE_LIMIT} req/min)`);
+        }
+        timestamps.push(now);
+        this.aiRequestTimestamps.set(provider, timestamps);
+    }
+
+    private recordProviderSuccess(provider: string): void {
+        this.aiCircuitFailures.delete(provider);
+        this.aiCircuitOpenTime.delete(provider);
+    }
+
+    private recordProviderFailure(provider: string): void {
+        const failures = (this.aiCircuitFailures.get(provider) ?? 0) + 1;
+        this.aiCircuitFailures.set(provider, failures);
+        if (failures >= AI_CIRCUIT_FAILURE_THRESHOLD) {
+            this.aiCircuitOpenTime.set(provider, Date.now());
+            logger.warn({ provider, failures }, 'AI provider circuit opened');
+        }
+    }
+
     /**
      * Call a specific provider for fix generation
      */
     private async callProviderForFix(provider: string, prompt: string): Promise<string> {
+        this.checkProviderAllowed(provider);
         switch (provider) {
             case 'openai':
                 return this.callOpenAIForFix(prompt);

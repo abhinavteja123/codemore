@@ -156,13 +156,31 @@ function buildMetrics(
   };
 }
 
+const CONFIG_FILENAMES = new Set(['.codemorerc.json', '.codemorerc', 'codemorerc.json']);
+
+function extractAnalyzerConfig(files: ProjectFile[]): { maxFunctionLength?: number; maxCyclomaticComplexity?: number; maxNestingDepth?: number } {
+  const configFile = files.find(f => CONFIG_FILENAMES.has(f.path.split('/').pop() ?? ''));
+  if (!configFile) return {};
+  try {
+    const parsed = JSON.parse(configFile.content) as Record<string, unknown>;
+    const result: { maxFunctionLength?: number; maxCyclomaticComplexity?: number; maxNestingDepth?: number } = {};
+    if (typeof parsed.maxFunctionLength === 'number') result.maxFunctionLength = parsed.maxFunctionLength;
+    if (typeof parsed.maxComplexity === 'number') result.maxCyclomaticComplexity = parsed.maxComplexity;
+    if (typeof parsed.maxNestingDepth === 'number') result.maxNestingDepth = parsed.maxNestingDepth;
+    return result;
+  } catch {
+    return {};
+  }
+}
+
 export async function analyzeProjectWithProductionCore(files: ProjectFile[]): Promise<{
   issues: CodeIssue[];
   metrics: CodeHealthMetrics;
   hotspots: HotSpot[];
 }> {
   const parser = new AstParser();
-  const staticAnalyzer = new StaticAnalyzer();
+  const configOverrides = extractAnalyzerConfig(files);
+  const staticAnalyzer = new StaticAnalyzer(configOverrides);
   const contexts: SharedFileContext[] = [];
   const allIssues: CodeIssue[] = [];
 

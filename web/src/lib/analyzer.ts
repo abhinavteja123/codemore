@@ -41,6 +41,10 @@ function detectLanguage(filePath: string): string {
     sql: "sql",
     sh: "shell",
     bash: "shell",
+    vue: "vue",
+    svelte: "svelte",
+    astro: "astro",
+    mdx: "markdown",
   };
   return langMap[ext] || ext || "unknown";
 }

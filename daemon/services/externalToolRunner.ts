@@ -158,8 +158,6 @@ export class ExternalToolRunner {
     private async checkToolAvailability(): Promise<void> {
         const tools: ExternalTool[] = ['semgrep', 'biome', 'ruff', 'tflint', 'checkov'];
         
-        // Define which tools are bundled vs optional
-        const bundledTools = new Set<ExternalTool>(['biome', 'ruff', 'tflint']);
         const optionalTools = new Set<ExternalTool>(['semgrep', 'checkov']);
         
         for (const tool of tools) {

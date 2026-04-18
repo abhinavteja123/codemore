@@ -36,7 +36,7 @@ export function generateSarif(
       {
         tool: {
           driver: {
-            name: "CodeMore",
+            name: projectName,
             version: "1.0.0",
             informationUri: "https://github.com/codemore/codemore",
             rules: Array.from(rules.values()).map((r) => ({

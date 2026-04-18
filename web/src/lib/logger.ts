@@ -79,6 +79,7 @@ function createLogFn(level: number, levelName: string, bindings: Record<string, 
     if (typeof objOrMsg === "string") {
       logObj = {
         level,
+        levelName,
         time: timestamp,
         service: "codemore-web",
         ...bindings,
@@ -88,6 +89,7 @@ function createLogFn(level: number, levelName: string, bindings: Record<string, 
       const redacted = redact(objOrMsg) as Record<string, unknown>;
       logObj = {
         level,
+        levelName,
         time: timestamp,
         service: "codemore-web",
         ...bindings,

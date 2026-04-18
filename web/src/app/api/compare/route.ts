@@ -101,7 +101,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ScanCompariso
 
     return NextResponse.json(comparison);
   } catch (error) {
-    logger.error('Compare endpoint error', error instanceof Error ? error : new Error(String(error)));
+    logger.error({ err: error instanceof Error ? error.message : String(error) }, 'Compare endpoint error');
     return NextResponse.json({ error: 'Failed to compare scans' }, { status: 500 });
   }
 }
