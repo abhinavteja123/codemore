@@ -1,0 +1,56 @@
+name: Rule PR Validator
+
+on:
+  pull_request:
+    paths:
+      - 'shared/packs/**'
+      - 'shared/rules/**'
+      - 'corpus/rules/**'
+      - 'docs/rules/**'
+      - '.github/workflows/rule-pr-validator.yml'
+
+jobs:
+  validate:
+    name: Validate rule contribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared types
+        run: npm run compile
+
+      - name: Run rule-PR validator
+        id: validator
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/validate-rule-pr.js
+
+      - name: Post failure summary on PR
+        if: failure() && steps.validator.outputs.report != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = process.env.VALIDATOR_REPORT;
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body || 'Rule PR validator failed. See workflow logs.',
+            });
+        env:
+          VALIDATOR_REPORT: ${{ steps.validator.outputs.report }}

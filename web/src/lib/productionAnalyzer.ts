@@ -2,7 +2,7 @@ import { AstParser } from "../../../daemon/services/astParser";
 import { StaticAnalyzer } from "../../../daemon/services/staticAnalyzer";
 import { SeverityRemapper } from "../../../daemon/services/severityRemapper";
 import type { FileContext as SharedFileContext } from "../../../shared/protocol";
-import { calculateHealthScoreFromTotals, calculateTechnicalDebt } from "../../../shared/scoring";
+import { calculateHealthScore, calculateTechnicalDebt, type IssueSeverityCounts } from "../../../shared/scoring";
 import { identifyHotSpots, HotSpot, getTopHotSpots } from "../../../shared/hotspotDetector";
 import {
   CodeHealthMetrics,
@@ -121,14 +121,23 @@ function buildMetrics(
     INFO: 0,
   };
 
+  const issuesByFile = new Map<string, IssueSeverityCounts>();
+
   for (const issue of issues) {
     issuesByCategory[issue.category] += 1;
     issuesBySeverity[issue.severity] += 1;
+
+    const filePath = issue.location.filePath;
+    const fileCounts = issuesByFile.get(filePath) ?? {
+      BLOCKER: 0, CRITICAL: 0, MAJOR: 0, MINOR: 0, INFO: 0,
+    };
+    fileCounts[issue.severity] += 1;
+    issuesByFile.set(filePath, fileCounts);
   }
 
-  // Calculate overall score using shared health scoring formula
-  // Using the legacy function for backward compatibility (total counts instead of per-file)
-  const overallScore = calculateHealthScoreFromTotals(issuesBySeverity, files.length);
+  // Per-file scoring — matches the daemon path in contextMap.ts; replaces the
+  // legacy aggregate path that drifted from the daemon's score for the same input.
+  const overallScore = calculateHealthScore(issuesByFile, files.length);
 
   // Calculate technical debt using shared formula
   const technicalDebtMinutes = calculateTechnicalDebt(issuesBySeverity);
@@ -158,19 +167,42 @@ function buildMetrics(
 
 const CONFIG_FILENAMES = new Set(['.codemorerc.json', '.codemorerc', 'codemorerc.json']);
 
-function extractAnalyzerConfig(files: ProjectFile[]): { maxFunctionLength?: number; maxCyclomaticComplexity?: number; maxNestingDepth?: number } {
+const DEFAULT_IGNORE_PATTERNS = ['node_modules', 'dist', 'build', '.next', 'coverage', '.git'];
+
+function extractProjectConfig(files: ProjectFile[]): {
+  analyzerConfig: { maxFunctionLength?: number; maxCyclomaticComplexity?: number; maxNestingDepth?: number };
+  ignorePatterns: string[];
+} {
   const configFile = files.find(f => CONFIG_FILENAMES.has(f.path.split('/').pop() ?? ''));
-  if (!configFile) return {};
+  if (!configFile) return { analyzerConfig: {}, ignorePatterns: DEFAULT_IGNORE_PATTERNS };
   try {
     const parsed = JSON.parse(configFile.content) as Record<string, unknown>;
-    const result: { maxFunctionLength?: number; maxCyclomaticComplexity?: number; maxNestingDepth?: number } = {};
-    if (typeof parsed.maxFunctionLength === 'number') result.maxFunctionLength = parsed.maxFunctionLength;
-    if (typeof parsed.maxComplexity === 'number') result.maxCyclomaticComplexity = parsed.maxComplexity;
-    if (typeof parsed.maxNestingDepth === 'number') result.maxNestingDepth = parsed.maxNestingDepth;
-    return result;
+    const analyzerConfig: { maxFunctionLength?: number; maxCyclomaticComplexity?: number; maxNestingDepth?: number } = {};
+    if (typeof parsed.maxFunctionLength === 'number') analyzerConfig.maxFunctionLength = parsed.maxFunctionLength;
+    if (typeof parsed.maxComplexity === 'number') analyzerConfig.maxCyclomaticComplexity = parsed.maxComplexity;
+    if (typeof parsed.maxNestingDepth === 'number') analyzerConfig.maxNestingDepth = parsed.maxNestingDepth;
+    const ignorePatterns = [
+      ...DEFAULT_IGNORE_PATTERNS,
+      ...(Array.isArray(parsed.ignore) ? (parsed.ignore as string[]) : []),
+    ];
+    return { analyzerConfig, ignorePatterns };
   } catch {
-    return {};
+    return { analyzerConfig: {}, ignorePatterns: DEFAULT_IGNORE_PATTERNS };
   }
+}
+
+function matchesIgnorePattern(filePath: string, pattern: string): boolean {
+  const normalized = filePath.replace(/\\/g, '/');
+  const name = normalized.split('/').pop() ?? '';
+  if (pattern.includes('*')) {
+    const re = new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '.*') + '$');
+    return re.test(name) || re.test(normalized);
+  }
+  return normalized.includes('/' + pattern) || normalized.includes(pattern + '/') || name === pattern;
+}
+
+function shouldSkipFile(filePath: string, ignorePatterns: string[]): boolean {
+  return ignorePatterns.some(p => matchesIgnorePattern(filePath, p));
 }
 
 export async function analyzeProjectWithProductionCore(files: ProjectFile[]): Promise<{
@@ -179,12 +211,14 @@ export async function analyzeProjectWithProductionCore(files: ProjectFile[]): Pr
   hotspots: HotSpot[];
 }> {
   const parser = new AstParser();
-  const configOverrides = extractAnalyzerConfig(files);
-  const staticAnalyzer = new StaticAnalyzer(configOverrides);
+  const { analyzerConfig, ignorePatterns } = extractProjectConfig(files);
+  const staticAnalyzer = new StaticAnalyzer(analyzerConfig);
   const contexts: SharedFileContext[] = [];
   const allIssues: CodeIssue[] = [];
 
-  for (const file of files) {
+  const filesToAnalyze = files.filter(f => !shouldSkipFile(f.path, ignorePatterns));
+
+  for (const file of filesToAnalyze) {
     let staticIssues: CodeIssue[] = [];
     let context: SharedFileContext | null = null;
 

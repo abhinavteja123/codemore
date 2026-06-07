@@ -35,6 +35,9 @@
     "onStartupFinished"
   ],
   "main": "./dist/extension.js",
+  "bin": {
+    "codemore": "./cli.js"
+  },
   "contributes": {
     "commands": [
       {
@@ -209,6 +212,10 @@
     "test": "node ./out/test/runTest.js",
     "test:unit": "mocha --require ts-node/register 'test/**/*.test.ts'",
     "pretest": "npm run compile",
+    "cli": "node ./cli.js",
+    "cli:scan": "node ./cli.js scan",
+    "self-scan": "node ./cli.js scan . --fail-on BLOCKER --packs vibe-supabase",
+    "validate-rules": "node scripts/validate-rule-pr.js",
     "vsce:package": "npm run download-binaries:all && vsce package",
     "vsce:publish": "npm run download-binaries:all && vsce publish"
   },

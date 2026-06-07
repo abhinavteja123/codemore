@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "module": "CommonJS",
+        "module": "commonjs",
         "target": "ES2022",
         "lib": [
             "ES2022"
@@ -11,12 +11,15 @@
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
-        "moduleResolution": "Node",
+        "moduleResolution": "node10",
         "resolveJsonModule": true
     },
     "include": [
         "*.ts",
         "services/**/*.ts",
+        "cli/**/*.ts",
+        "llm/**/*.ts",
+        "lib/**/*.ts",
         "../shared/**/*.ts"
     ],
     "exclude": [

@@ -1,0 +1,42 @@
+# CodeMore CODEOWNERS
+#
+# This file routes review load by area so contributions don't bottleneck on
+# a single maintainer. Once community maintainers join a pack, add them on
+# the relevant line.
+#
+# Syntax: <path-pattern>  <owners...>
+
+# Project default
+*                                   @K0802s
+
+# Schema & registry — touchy. Core maintainers only.
+/shared/report/                     @K0802s
+/shared/rules/                      @K0802s
+/shared/protocol.ts                 @K0802s
+/shared/scoring.ts                  @K0802s
+
+# Rule packs — open to per-pack maintainers as they emerge
+/shared/packs/core-security/        @K0802s
+/shared/packs/core-quality/         @K0802s
+/shared/packs/vibe-supabase/        @K0802s
+/shared/packs/vibe-auth/            @K0802s
+/shared/packs/vibe-secrets/         @K0802s
+/shared/packs/vibe-frontend/        @K0802s
+
+# Corpus and rule docs — light review, pack maintainers
+/corpus/                            @K0802s
+/docs/rules/                        @K0802s
+
+# Daemon, extension, LLM adapters
+/daemon/                            @K0802s
+/src/                               @K0802s
+/webview/                           @K0802s
+/daemon/llm/                        @K0802s
+
+# Web dashboard — lower priority surface
+/web/                               @K0802s
+
+# Contribution gate & CI — core maintainers only
+/CONTRIBUTING-RULES.md              @K0802s
+/.github/                           @K0802s
+/scripts/                           @K0802s
