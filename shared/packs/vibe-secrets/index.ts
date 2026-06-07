@@ -10,12 +10,14 @@
 import type { Rule } from '../../rules/Rule';
 import { vibePublicEnvLeak } from './vibe-public-env-leak';
 import { vibeHardcodedJwt } from './vibe-hardcoded-jwt';
+import { vibeMcpConfigSecret } from './vibe-mcp-config-secret';
 
 export const PACK_NAME = 'vibe-secrets' as const;
 
 export const PACK_RULES: ReadonlyArray<Rule> = [
   vibePublicEnvLeak,
   vibeHardcodedJwt,
+  vibeMcpConfigSecret,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {

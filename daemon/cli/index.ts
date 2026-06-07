@@ -12,6 +12,7 @@
  */
 
 import { runScan, parseScanArgs } from './commands/scan';
+import { runServeMcp } from './commands/serve-mcp';
 
 const VERSION = '1.1.0';
 
@@ -50,6 +51,8 @@ async function main(argv: string[]): Promise<number> {
     switch (cmd) {
       case 'scan':
         return await runScan(parseScanArgs(rest));
+      case 'serve-mcp':
+        return await runServeMcp(rest);
       default:
         process.stderr.write(`codemore: unknown command "${cmd}". See --help.\n`);
         return 2;

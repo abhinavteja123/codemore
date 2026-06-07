@@ -104,11 +104,12 @@ interface DiscoveredFile {
 }
 
 function shouldIgnoreSegment(segment: string): boolean {
-  if (DEFAULT_IGNORE_DIRS.has(segment)) return true;
-  // Skip hidden dotfile directories (.git, .next, .cache) but not the current dir.
-  // Note: we do NOT skip dotfile FILES here (.env, .codemorerc.json); files are
-  // routed through detectLanguage() below.
-  return segment.startsWith('.') && segment !== '.' && segment !== '..';
+  // Only skip directories explicitly listed in DEFAULT_IGNORE_DIRS.
+  // We do NOT blanket-skip dotfile directories: .cursor/, .claude/,
+  // .github/ contain config that vibe rules genuinely need to inspect
+  // (e.g. mcp.json under .cursor/). Junk dotfile dirs (.git, .next,
+  // .cache, .vscode, .idea, .turbo, .svelte-kit) are listed explicitly.
+  return DEFAULT_IGNORE_DIRS.has(segment);
 }
 
 function matchesUserIgnore(relPath: string, patterns: ReadonlyArray<string>): boolean {

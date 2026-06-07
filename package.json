@@ -251,6 +251,7 @@
   "dependencies": {
     "@biomejs/biome": "^1.9.4",
     "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@sentry/node": "^10.45.0",
     "chokidar": "^3.5.3",
     "diff": "^5.1.0",

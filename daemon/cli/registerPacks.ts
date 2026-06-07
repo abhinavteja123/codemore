@@ -13,6 +13,7 @@
 import { globalRegistry } from '../../shared/rules/registry';
 import { registerInto as registerVibeSupabase } from '../../shared/packs/vibe-supabase';
 import { registerInto as registerVibeSecrets } from '../../shared/packs/vibe-secrets';
+import { registerInto as registerVibeFrontend } from '../../shared/packs/vibe-frontend';
 
 let registered = false;
 
@@ -22,10 +23,10 @@ export function registerAllPacks(): void {
   const bind = globalRegistry.registerPack.bind(globalRegistry);
   registerVibeSupabase(bind);
   registerVibeSecrets(bind);
+  registerVibeFrontend(bind);
   // Future packs go here:
   // registerCoreSecurity(bind);
   // registerVibeAuth(bind);
-  // registerVibeFrontend(bind);
 
   registered = true;
 }

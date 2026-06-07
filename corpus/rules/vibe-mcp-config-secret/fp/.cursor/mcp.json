@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase"],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}",
+        "SUPABASE_SERVICE_ROLE_KEY": "${SUPABASE_SERVICE_ROLE_KEY}"
+      }
+    },
+    "stripe": {
+      "command": "node",
+      "args": ["./mcp-stripe.js"],
+      "env": {
+        "STRIPE_SECRET_KEY": "$STRIPE_SECRET_KEY",
+        "DATABASE_URL": "<REPLACE_ME>",
+        "LOG_LEVEL": "debug"
+      }
+    },
+    "non-secret-config": {
+      "command": "node",
+      "args": ["x.js"],
+      "env": {
+        "PORT": "3000",
+        "FEATURE_FLAG": "enabled"
+      }
+    }
+  }
+}
