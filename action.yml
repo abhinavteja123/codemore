@@ -1,0 +1,157 @@
+name: 'CodeMore — Vibe Scan'
+description: 'Detect production-blocking issues in AI-generated apps and post a fix-ready report on every PR'
+author: 'CodeMore contributors'
+branding:
+  icon: 'shield'
+  color: 'purple'
+
+inputs:
+  path:
+    description: 'Path to scan (relative to the workspace).'
+    required: false
+    default: '.'
+  fail-on:
+    description: 'Fail the action if any issue has severity >= this value. One of BLOCKER, CRITICAL, MAJOR, MINOR, INFO, NONE.'
+    required: false
+    default: 'BLOCKER'
+  packs:
+    description: 'Comma-separated rule packs to enable (e.g. "vibe-supabase,vibe-secrets"). Empty = all registered packs.'
+    required: false
+    default: ''
+  experimental:
+    description: 'Include rules in lifecycle:experimental. Recommended while the catalog is young.'
+    required: false
+    default: 'true'
+  comment-on-pr:
+    description: 'Post the report as a PR comment (only effective on pull_request events).'
+    required: false
+    default: 'true'
+  upload-artifact:
+    description: 'Upload the full codemore-report.json as a workflow artifact.'
+    required: false
+    default: 'true'
+
+outputs:
+  report-path:
+    description: 'Path to the JSON report on disk.'
+    value: ${{ steps.scan.outputs.report-path }}
+  blockers:
+    description: 'Number of BLOCKER-severity findings.'
+    value: ${{ steps.scan.outputs.blockers }}
+  score:
+    description: 'Overall health score (0-100).'
+    value: ${{ steps.scan.outputs.score }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Install CodeMore dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        CODEMORE_SKIP_BINARY_DOWNLOAD: '1'
+      run: |
+        # Use ci when the lockfile is present (the published action ships one),
+        # fall back to install for forks that may have stale lockfiles.
+        if [ -f package-lock.json ]; then
+          npm ci --no-audit --no-fund
+        else
+          npm install --no-audit --no-fund
+        fi
+
+    - name: Run CodeMore scan
+      id: scan
+      shell: bash
+      env:
+        CODEMORE_INPUT_PATH: ${{ inputs.path }}
+        CODEMORE_INPUT_PACKS: ${{ inputs.packs }}
+        CODEMORE_INPUT_EXPERIMENTAL: ${{ inputs.experimental }}
+      run: |
+        REPORT_PATH="$GITHUB_WORKSPACE/codemore-report.json"
+        ARGS=(scan "$CODEMORE_INPUT_PATH" --json)
+        if [ "$CODEMORE_INPUT_EXPERIMENTAL" = "true" ]; then
+          ARGS+=(--enable-experimental)
+        fi
+        if [ -n "$CODEMORE_INPUT_PACKS" ]; then
+          ARGS+=(--packs "$CODEMORE_INPUT_PACKS")
+        fi
+        node "${{ github.action_path }}/cli.js" "${ARGS[@]}" > "$REPORT_PATH"
+
+        # Human-readable summary to the action log.
+        node "${{ github.action_path }}/cli.js" scan "$CODEMORE_INPUT_PATH" \
+          $([ "$CODEMORE_INPUT_EXPERIMENTAL" = "true" ] && echo "--enable-experimental") \
+          $([ -n "$CODEMORE_INPUT_PACKS" ] && echo "--packs $CODEMORE_INPUT_PACKS") || true
+
+        BLOCKERS=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$REPORT_PATH','utf8')).summary.bySeverity.BLOCKER)")
+        SCORE=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$REPORT_PATH','utf8')).summary.score)")
+
+        echo "report-path=$REPORT_PATH" >> "$GITHUB_OUTPUT"
+        echo "blockers=$BLOCKERS" >> "$GITHUB_OUTPUT"
+        echo "score=$SCORE" >> "$GITHUB_OUTPUT"
+
+    - name: Format PR comment
+      if: ${{ inputs.comment-on-pr == 'true' && github.event_name == 'pull_request' }}
+      id: format-comment
+      shell: bash
+      run: |
+        COMMENT_PATH="$GITHUB_WORKSPACE/codemore-comment.md"
+        node "${{ github.action_path }}/scripts/format-pr-comment.js" "${{ steps.scan.outputs.report-path }}" > "$COMMENT_PATH"
+        echo "comment-path=$COMMENT_PATH" >> "$GITHUB_OUTPUT"
+
+    - name: Post PR comment
+      if: ${{ inputs.comment-on-pr == 'true' && github.event_name == 'pull_request' }}
+      uses: actions/github-script@v7
+      env:
+        COMMENT_PATH: ${{ steps.format-comment.outputs.comment-path }}
+      with:
+        script: |
+          const fs = require('fs');
+          const body = fs.readFileSync(process.env.COMMENT_PATH, 'utf8');
+          const marker = '<!-- codemore-pr-comment -->';
+          const annotated = marker + '\n' + body;
+          const { owner, repo } = context.repo;
+          const issue_number = context.issue.number;
+          // Upsert: find an existing comment with our marker, edit it; else create.
+          const existing = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+          const mine = existing.find(c => c.body && c.body.includes(marker));
+          if (mine) {
+            await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body: annotated });
+          } else {
+            await github.rest.issues.createComment({ owner, repo, issue_number, body: annotated });
+          }
+
+    - name: Upload report artifact
+      if: ${{ inputs.upload-artifact == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: codemore-report
+        path: ${{ steps.scan.outputs.report-path }}
+        retention-days: 14
+
+    - name: Enforce fail-on threshold
+      if: ${{ inputs.fail-on != 'NONE' }}
+      shell: bash
+      env:
+        REPORT_PATH: ${{ steps.scan.outputs.report-path }}
+        THRESHOLD: ${{ inputs.fail-on }}
+      run: |
+        node -e "
+          const fs = require('fs');
+          const r = JSON.parse(fs.readFileSync(process.env.REPORT_PATH, 'utf8'));
+          const rank = {BLOCKER:5,CRITICAL:4,MAJOR:3,MINOR:2,INFO:1};
+          const t = rank[process.env.THRESHOLD];
+          if (!t) { console.error('codemore-action: unknown fail-on threshold ' + process.env.THRESHOLD); process.exit(2); }
+          const hit = r.issues.find(i => rank[i.severity] >= t);
+          if (hit) {
+            console.error('codemore-action: failing the job — at least one issue >= ' + process.env.THRESHOLD);
+            console.error('  first hit: ' + hit.id + ' at ' + hit.evidence.file + ':' + hit.evidence.line);
+            process.exit(1);
+          } else {
+            console.log('codemore-action: no findings >= ' + process.env.THRESHOLD + '; passing.');
+          }
+        "
