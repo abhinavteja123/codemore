@@ -20,6 +20,7 @@ import { scanProject } from '../cli/projectScanner';
 import { registerAllPacks } from '../cli/registerPacks';
 import { globalRegistry } from '../../shared/rules/registry';
 import type { RuleContext } from '../../shared/rules/Rule';
+import { validateFix } from '../services/validatorHarness';
 
 // CJS-friendly imports — the SDK ships both ESM and CJS builds, and our
 // daemon tsconfig is commonjs.
@@ -223,6 +224,47 @@ export async function runMcpServer(): Promise<void> {
         targetLine: iss.evidence.line,
         suggestedFix: iss.suggestedFix,
       });
+    },
+  );
+
+  // ---------------------------------------------------------------------
+  // validate_fix — closes the agentic loop.
+  // ---------------------------------------------------------------------
+  server.tool(
+    'validate_fix',
+    'After you propose a fix, call this with the issue\'s instanceId and the proposed new file ' +
+      'content. The harness re-runs the same rules in-memory on the new content and returns ' +
+      'pass/fail. Use this as the stop signal for your fix-then-verify loop: if passed=true, ' +
+      'apply the patch on disk; if passed=false, feed the diagnostic back into your planner and retry.',
+    {
+      instanceId: z
+        .string()
+        .describe('The instanceId field from a previous scan_project / scan_file result.'),
+      newContent: z
+        .string()
+        .describe('The proposed new full content of the file. Replacement-only — no unified diffs yet.'),
+      includeOtherRules: z
+        .boolean()
+        .optional()
+        .describe('Also report findings from rules other than the targeted one. Useful for "did my fix introduce a new issue?" checks. Default false.'),
+    },
+    async ({ instanceId, newContent, includeOtherRules }: {
+      instanceId: string;
+      newContent: string;
+      includeOtherRules?: boolean;
+    }) => {
+      const iss = issueCache.get(instanceId);
+      if (!iss) {
+        return textResult({
+          error: 'unknown-instance-id',
+          message: 'No issue with this instanceId is cached. Re-run scan_project to populate.',
+        });
+      }
+      const result = validateFix(iss, newContent, {
+        enableExperimental: true,
+        includeOtherRules: includeOtherRules ?? false,
+      });
+      return textResult(result);
     },
   );
 
