@@ -1,111 +1,148 @@
 # CodeMore
 
-> **AI-powered code intelligence for VS Code — fast, private, and developer-centric.**
+> **The static analyzer your AI agent reads.**
+> Detect production-blocking bugs in vibe-coded apps and hand a structured, fix-ready report straight to Cursor, Claude Code, Codex, or Copilot.
 
-CodeMore is a VS Code extension that combines automated static analysis, security scanning, and on-demand AI-powered fixes into a single zero-friction workflow. Most analysis happens entirely on your local machine, ensuring your code stays private and feedback stays instant.
+CodeMore is the protocol layer between code-quality scanners and AI coding agents. It catches the systemic issues that show up in AI-generated apps — disabled Supabase RLS, public-prefixed secrets, hardcoded JWTs, permissive CORS, XSS sinks — and returns a schema-stable report (`codemore-report.json` v1.0.0) that any LLM can read, fix, and verify against.
 
----
-
-## Table of Contents
-
-- [Features](#features)
-- [How It Works](#how-it-works)
-- [Supported Languages](#supported-languages)
-- [Getting Started](#getting-started)
-- [Commands](#commands)
-- [Keyboard Shortcuts](#keyboard-shortcuts)
-- [Configuration](#configuration)
-- [Architecture](#architecture)
-- [Building from Source](#building-from-source)
-- [Privacy & Data Usage](#privacy--data-usage)
-- [Contributing](#contributing)
+> **Why this exists.** Veracode 2025/26: 45 % of AI-generated code carries OWASP Top-10 vulnerabilities. Symbiotic: 98 % of 1,072 scanned vibe-coded apps had ≥ 1 security flaw. GitGuardian SOSS 2026: 29 M secrets leaked on public GitHub in 2025, with AI-tool commits leaking at 2× the human baseline. Existing scanners target human reviewers via dashboards; CodeMore targets the LLM that wrote the code in the first place.
 
 ---
 
-## Features
+## Install in 30 seconds
 
-| Feature | Description |
-|---|---|
-| **Real-time Analysis** | Detects bugs, code smells, security vulnerabilities, and performance anti-patterns automatically on save. |
-| **Built-in Static Analyzer** | Custom TypeScript AST engine evaluates cyclomatic complexity, nesting depth, dead code, and more — no AI cost. |
-| **Industry-standard Linters** | Pre-bundled binaries for Biome, Ruff, Semgrep, TFLint, and Checkov. Zero setup required. |
-| **On-demand AI Fixes** | Request a context-aware fix for any specific issue. AI is only called when *you* ask for it. |
-| **Code Quality Dashboard** | A dedicated activity bar panel showing health metrics, issue severity breakdown, and a diff preview for every suggested fix. |
-| **Multi-provider AI Support** | Works with OpenAI, Anthropic Claude, Google Gemini, or a self-hosted local LLM. |
-| **Daemon Architecture** | Analysis runs in a separate process so the editor stays fully responsive during heavy scans. |
+Pick the surface that matches how you ship code.
+
+### CLI — for any local project
+
+```bash
+npx codemore scan .
+```
+
+Or install globally:
+
+```bash
+npm install -g codemore
+codemore scan ./my-vibe-app
+```
+
+### GitHub Action — for any PR on GitHub
+
+```yaml
+# .github/workflows/codemore.yml
+on:
+  pull_request:
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, pull-requests: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: K0802s/codemore@v1
+```
+
+Posts a fix-ready PR comment that AI coding agents can act on. Full reference: [`docs/github-action.md`](docs/github-action.md).
+
+### MCP server — for Cursor, Claude Code, Codex
+
+Add to your agent's MCP config (e.g. `~/.cursor/mcp.json` or `~/.config/Claude/claude_desktop_config.json`):
+
+```jsonc
+{
+  "mcpServers": {
+    "codemore": { "command": "npx", "args": ["codemore", "serve-mcp"] }
+  }
+}
+```
+
+The agent gains 5 tools: `scan_project`, `scan_file`, `explain_issue`, `suggest_fix`, **`validate_fix`**. The last one closes the loop — the agent proposes a patch, calls `validate_fix(instanceId, newContent)`, gets a pass/fail verdict in-memory without writing to disk. Snyk-Agent-Fix-style remediation in CodeMore's schema.
+
+### VS Code extension — for IDE integration
+
+1. Open VS Code → Extensions → search **CodeMore** → Install.
+2. Reload when prompted — analysis starts automatically on save.
 
 ---
 
-## How It Works
+## What it catches
 
-CodeMore uses a three-layer pipeline to maximize speed while keeping AI costs optional and transparent.
+7 of 11 planned vibe rules ship today across 3 packs. Each rule includes a true-positive fixture, a false-positive fixture, a docs page, and is verified by the rule-PR validator bot before merge.
 
-### Layer 1 — External Tools (always local)
-
-On every file save, pre-bundled binaries are run in the background daemon process:
-
-| Tool | Purpose | Languages |
+| Pack | Rule | Catches |
 |---|---|---|
-| **Biome** | Linting & formatting | JavaScript, TypeScript |
-| **Ruff** | Fast linting | Python |
-| **Semgrep** | Security vulnerability scanning | 30+ languages |
-| **TFLint** | Infrastructure-as-Code analysis | Terraform |
-| **Checkov** | IaC security & compliance | Terraform, CloudFormation, K8s |
+| **vibe-supabase** | `vibe-supabase-rls-disabled` | `CREATE TABLE` without `ENABLE ROW LEVEL SECURITY`. The CVE-2025-48757 / Lovable class. |
+|  | `vibe-supabase-rls-permissive` | Policies with `USING (true)` or `WITH CHECK (true)` — RLS enabled but functionally off. |
+| **vibe-secrets** | `vibe-public-env-leak` | `NEXT_PUBLIC_*` / `VITE_*` / `EXPO_PUBLIC_*` carrying `SERVICE_ROLE`, `SECRET`, `PRIVATE_KEY`, etc. The Moltbook class. |
+|  | `vibe-hardcoded-jwt` | Three-segment JWT-shape string literals committed to source. |
+|  | `vibe-mcp-config-secret` | Real credentials pasted into `mcp.json` / `claude_desktop_config.json` / `.cursor/mcp.json` env blocks. |
+| **vibe-frontend** | `vibe-cors-wildcard-credentials` | `Access-Control-Allow-Origin: *` combined with credentials. Browser drops it; auth-cookied calls silently fail. |
+|  | `vibe-xss-dangerously-set` | React's `dangerouslySetInnerHTML` with a dynamic source. The 86%-XSS-failure class. |
 
-### Layer 2 — Built-in Static Analysis (always local)
+Plus 4 harder rules planned (data-flow / cross-file): `vibe-supabase-anon-key-bundled`, `vibe-no-rate-limit`, `vibe-auth-inverted`, `vibe-prompt-injection-sink`. See [`CONTRIBUTING-RULES.md`](CONTRIBUTING-RULES.md) to add one.
 
-CodeMore's own TypeScript-AST engine runs in parallel and detects:
-
-- **Complexity** — cyclomatic & cognitive complexity, deeply-nested blocks
-- **Dead code** — unused variables, unreachable branches, redundant imports
-- **Security** — hardcoded secrets, unsafe `eval`, `innerHTML` injection risks
-- **Performance** — inefficient loops, unnecessary re-renders, memory leak patterns
-- **TypeScript best practices** — missing types, improper `any`, dangerous casts
-- **Style** — overly long functions, excessive parameters, line length violations
-
-### Layer 3 — AI Analysis (opt-in, on demand)
-
-AI is **never** invoked automatically. The workflow is:
-
-1. Open the **Code Quality Dashboard** and select any detected issue.
-2. Click **Generate AI Fix**.
-3. CodeMore gathers the relevant code snippet, surrounding context, imports, and existing diagnostics.
-4. This focused context is sent to your configured AI provider over encrypted HTTPS.
-5. The AI response is shown as a **diff preview** — review it before applying a single line.
-
-> Your source code reaches an external server only during this explicit step.
+Every rule supports inline and file-level suppression (`// codemore-ignore: rule-id`, `-- codemore-ignore: rule-id`, `# codemore-ignore: rule-id`, `/* codemore-ignore-file: rule-id */`) and can be turned off per-project in `.codemorerc.json`.
 
 ---
 
-## Supported Languages
+## The report schema
 
-| Language | External Tool | Built-in Analyzer |
-|---|---|---|
-| TypeScript / JavaScript | Biome, Semgrep | Full AST analysis |
-| Python | Ruff, Semgrep | Partial |
-| Terraform / HCL | TFLint, Checkov | — |
-| CloudFormation / K8s YAML | Checkov | — |
-| Go, Java, C#, Ruby, and more | Semgrep | — |
+The whole point of CodeMore is the contract. The schema is locked at v1.0.0 ([`shared/report/schema.json`](shared/report/schema.json)).
+
+Every issue carries:
+
+```jsonc
+{
+  "id": "vibe-supabase-rls-disabled",
+  "instanceId": "uuid",                     // for validate_fix calls
+  "severity": "BLOCKER",
+  "confidence": 0.6,
+  "evidence": { "file": "...", "line": 14, "snippet": "..." },
+  "whyItMatters": "...",                    // for the agent's reasoning
+  "citation": "https://codemore.dev/rules/vibe-supabase-rls-disabled",
+  "suggestedFix": {
+    "type": "code-patch",
+    "instructions": "...",
+    "verificationCriteria": ["..."]         // what makes the fix complete
+  }
+}
+```
+
+The report also includes `agentInstructions` (preamble, ordering hint, do-not-touch globs, stop-on policy) so an agent reads the file and knows how to behave.
+
+---
+
+## How it works (technical layers)
+
+CodeMore is built as three layers an agent can compose:
+
+### Layer 1 — Local-first scanning (no network)
+
+- **Bundled linters** (Biome, Ruff, Semgrep, TFLint, Checkov) for fast, broad coverage.
+- **Built-in rule registry** — the vibe pack above; pure-function detectors with lifecycle gating (experimental → beta → stable) and confidence ceilings.
+- **TypeScript-AST engine** for the deeper checks (complexity, dead code, framework-specific patterns).
+
+Source code never leaves your machine during a scan.
+
+### Layer 2 — Structured report (v1.0.0 schema)
+
+The output of every scan, no matter which surface ran it. Both human-readable (Markdown PR comments via the GitHub Action) and machine-readable (JSON for agents).
+
+### Layer 3 — Agentic loop (opt-in, you control the agent)
+
+Via the MCP server, your agent of choice (Cursor, Claude Code, Codex, …) drives the loop:
+
+```
+scan_project ──► pick issue ──► suggest_fix ──► (agent applies patch) ──► validate_fix
+       ▲                                                                       │
+       └───────────────────────────────────────────────────────────────────────┘
+                                  (fail → retry, pass → next issue)
+```
+
+`validate_fix` re-runs the same rule on the proposed new file content in memory and returns a line-anchored pass/fail. The agent never has to guess whether its patch worked.
 
 ---
 
-## Getting Started
 
-### Installation from Marketplace
-
-1. Open VS Code and go to the **Extensions** view (`Ctrl+Shift+X`).
-2. Search for **CodeMore** and click **Install**.
-3. Reload the window if prompted — analysis starts automatically when you open a workspace.
-
-### Optional: Enable AI Fixes
-
-1. Open **Settings** (`Ctrl+,`) and search for `codemore`.
-2. Set `codemore.aiProvider` to your preferred provider (`openai`, `anthropic`, `gemini`, or `local`).
-3. Enter your API key in `codemore.apiKey`.
-
-> API keys are stored in VS Code's encrypted **Secret Storage** and never leave your machine except when making an AI request.
-
----
 
 ## Commands
 
