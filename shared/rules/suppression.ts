@@ -28,22 +28,39 @@ export interface SuppressedRule {
   line: number;
 }
 
-// Comment leaders recognised across the languages CodeMore scans:
+// Comment leaders recognised across the languages CodeMore scans.
+//
+// Single-line forms (terminate at end of line):
 //   //  → JS/TS/Go/Rust/C/C++/C#/Java/Swift/Kotlin/Scala
 //   --  → SQL/Haskell/Lua/Ada
 //   #   → Python/Ruby/Shell/YAML/TOML/Dockerfile
-//   /* ... */ → C-style block (used by file-level directive across all
-//               languages that recognise it; also covers CSS, SCSS, JSON5)
-const LINE_LEADER = '(?:\\/\\/|--|#)';
+//
+// Block-comment forms also accepted for same-line and next-line directives so
+// JSX comments like `{/* codemore-ignore-next-line: rule-id */}` work, plus
+// any language where only block comments are available (CSS, SCSS, JSON5).
+//
+//   /* codemore-ignore: rule-id */
+//   /* codemore-ignore-next-line: rule-id */
+//   /* codemore-ignore-file: rule-id */
+const LINE_LEADER = '(?:\\/\\/|--|#|\\/\\*)';
 
 const SAME_LINE_RE  = new RegExp(`${LINE_LEADER}\\s*codemore-ignore:\\s*([a-zA-Z0-9\\-_,\\s*]+)`);
 const NEXT_LINE_RE  = new RegExp(`${LINE_LEADER}\\s*codemore-ignore-next-line:\\s*([a-zA-Z0-9\\-_,\\s*]+)`);
 const FILE_LEVEL_RE = /\/\*\s*codemore-ignore-file:\s*([a-zA-Z0-9\-_,\s*]+)\s*\*\//;
 
 function parseRuleList(raw: string): string[] {
+  // The capture allows `*` so wildcard suppression (`codemore-ignore: *`)
+  // works. But that also lets the closing `*/` of a block comment leak
+  // into the captured rule id as `rule-id *`. Strip trailing comment
+  // artifacts (`*`, `/`, whitespace) per token — while preserving a
+  // standalone `*` as the wildcard.
   return raw
     .split(',')
-    .map(r => r.trim())
+    .map(token => {
+      const t = token.trim();
+      if (t === '*') return '*';
+      return t.replace(/[\s*/]+$/, '');
+    })
     .filter(Boolean);
 }
 
