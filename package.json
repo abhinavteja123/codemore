@@ -25,11 +25,19 @@
     "url": "https://github.com/codemore/codemore-vscode"
   },
   "files": [
+    "cli.js",
+    "action.yml",
+    "lib/**",
     "dist/**",
     "daemon/dist/**",
     "bin/**",
     "resources/**",
-    "README.md"
+    "shared/report/schema.json",
+    "scripts/format-pr-comment.js",
+    "scripts/validate-rule-pr.js",
+    "scripts/download-binaries.js",
+    "README.md",
+    "CONTRIBUTING-RULES.md"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -216,6 +224,9 @@
     "cli:scan": "node ./cli.js scan",
     "self-scan": "node ./cli.js scan . --fail-on BLOCKER --packs vibe-supabase",
     "validate-rules": "node scripts/validate-rule-pr.js",
+    "build:publish": "tsc -p tsconfig.publish.json",
+    "clean:publish": "node -e \"require('fs').rmSync('lib',{recursive:true,force:true})\"",
+    "prepack": "npm run clean:publish && npm run build:publish",
     "vsce:package": "npm run download-binaries:all && vsce package",
     "vsce:publish": "npm run download-binaries:all && vsce publish"
   },
@@ -244,7 +255,6 @@
     "style-loader": "^3.3.3",
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3",
     "webpack": "^5.89.0",
     "webpack-cli": "^5.1.4"
   },
@@ -262,6 +272,8 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tree-kill": "^1.2.2",
-    "uuid": "^9.0.1"
+    "typescript": "^5.3.3",
+    "uuid": "^9.0.1",
+    "zod": "^3.25.76"
   }
 }

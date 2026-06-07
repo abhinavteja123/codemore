@@ -2,11 +2,14 @@
 /**
  * CodeMore CLI launcher.
  *
- * Resolution strategy:
- *   1. If a compiled CLI bundle exists at daemon/dist/cli/index.js, use it.
- *      This is the path used after `npm run compile` and in published builds.
- *   2. Otherwise fall back to ts-node and run from source. This is the dev
- *      path; ts-node lives in devDependencies.
+ * Resolution order (first match wins):
+ *   1. lib/daemon/cli/index.js      — produced by `tsc -p tsconfig.publish.json`.
+ *                                     This is the path shipped to npm.
+ *   2. daemon/dist/cli/index.js     — produced by `npm run compile` (webpack).
+ *                                     Used by the VS Code extension dev loop.
+ *   3. ts-node + daemon/cli/index.ts — dev fallback. Requires ts-node, which
+ *                                     lives in devDependencies of THIS repo
+ *                                     but is NOT a runtime dep of the npm pkg.
  */
 
 'use strict';
@@ -14,11 +17,16 @@
 const fs = require('fs');
 const path = require('path');
 
-const compiled = path.resolve(__dirname, 'daemon', 'dist', 'cli', 'index.js');
+const candidates = [
+  path.resolve(__dirname, 'lib', 'daemon', 'cli', 'index.js'),
+  path.resolve(__dirname, 'daemon', 'dist', 'cli', 'index.js'),
+];
 
 async function run() {
   let mod;
-  if (fs.existsSync(compiled)) {
+  const compiled = candidates.find((p) => fs.existsSync(p));
+
+  if (compiled) {
     mod = require(compiled);
   } else {
     process.env.TS_NODE_PROJECT = path.resolve(__dirname, 'daemon', 'tsconfig.json');
@@ -28,7 +36,8 @@ async function run() {
     } catch (err) {
       console.error(
         'codemore: no compiled CLI found and ts-node is not installed.\n' +
-        '  Run `npm run compile` to build, or install ts-node for dev mode.',
+        '  Run `npm run build:publish` to build (or `npm run compile` for the dev bundle),\n' +
+        '  or install ts-node for dev mode.',
       );
       process.exit(2);
     }

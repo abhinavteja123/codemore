@@ -31,3 +31,7 @@ npm-debug.log*
 
 # Test coverage
 coverage/
+
+# CLI publish output
+lib/
+codemore-*.tgz

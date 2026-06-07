@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "moduleResolution": "node10",
+    "outDir": "lib",
+    "rootDir": ".",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "sourceMap": false,
+    "declaration": true,
+    "declarationMap": false,
+    "removeComments": false
+  },
+  "include": [
+    "daemon/index.ts",
+    "daemon/services/**/*.ts",
+    "daemon/cli/**/*.ts",
+    "daemon/llm/**/*.ts",
+    "daemon/lib/**/*.ts",
+    "daemon/mcp/**/*.ts",
+    "shared/packs/**/*.ts",
+    "shared/report/**/*.ts",
+    "shared/rules/**/*.ts",
+    "shared/scoring.ts",
+    "shared/hotspotDetector.ts",
+    "shared/protocol.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "lib",
+    "dist",
+    "out",
+    "daemon/dist",
+    "web",
+    "webview",
+    "src",
+    "test",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+}

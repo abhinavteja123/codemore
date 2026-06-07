@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write   # to create GitHub Releases
+  id-token: write   # for npm provenance
+
+jobs:
+  release:
+    name: Build, test, publish to npm, GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - name: Verify tag matches package.json
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -e 'console.log(require(\"./package.json\").version)')"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+          echo "Releasing version $PKG_VERSION"
+
+      - name: Install
+        env:
+          CODEMORE_SKIP_BINARY_DOWNLOAD: '1'
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint || true   # non-fatal until the legacy paths are cleaned
+
+      - name: Run rule-PR validator (must pass)
+        run: node scripts/validate-rule-pr.js
+
+      - name: Self-scan (must report 0 BLOCKERs)
+        run: node cli.js scan . --enable-experimental --fail-on BLOCKER
+
+      - name: Build publish bundle
+        run: npm run build:publish
+
+      - name: Pack and inspect
+        id: pack
+        run: |
+          npm pack
+          TGZ=$(ls codemore-*.tgz | head -1)
+          echo "tarball=$TGZ" >> "$GITHUB_OUTPUT"
+          echo "Tarball size: $(du -h "$TGZ" | cut -f1)"
+          echo "Tarball files: $(tar -tzf "$TGZ" | wc -l)"
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: ${{ steps.pack.outputs.tarball }}
