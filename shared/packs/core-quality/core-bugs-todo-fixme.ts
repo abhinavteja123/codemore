@@ -1,3 +1,7 @@
+/* codemore-ignore-file: core-bugs-todo-fixme */
+/* This rule source documents the TODO/FIXME/XXX/HACK keywords it catches;
+   the docstring legitimately uses them as examples. */
+
 /**
  * Rule: core-bugs-todo-fixme
  *

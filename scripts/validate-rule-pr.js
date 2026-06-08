@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+/* codemore-ignore-file: core-quality-leftover-console, core-bugs-todo-fixme */
+/* Validator bot script — console output IS the user-facing UX during PR runs. */
+
 /* eslint-disable no-console */
 
 /**

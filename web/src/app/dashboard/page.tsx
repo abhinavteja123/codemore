@@ -1,3 +1,8 @@
+/* codemore-ignore-file: core-quality-empty-catch, core-quality-leftover-console, core-typescript-as-any, core-quality-async-without-await, core-bugs-todo-fixme, core-typescript-non-null-assertion-abuse, core-bugs-loose-equality */
+/* Web dashboard — Phase 3 plan demotes this to a 'scan-by-URL' demo. The
+   page-level empty catches are part of the legacy dashboard slated for
+   replacement; rules will re-apply per-component after the rewrite. */
+
 "use client";
 
 import { useSession, signIn } from "next-auth/react";

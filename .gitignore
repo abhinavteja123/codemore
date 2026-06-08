@@ -32,8 +32,10 @@ npm-debug.log*
 # Test coverage
 coverage/
 
-# CLI publish output
-lib/
+# CLI publish output — only the root-level lib/ from tsconfig.publish.json.
+# Bare `lib/` would also match every nested src/lib, daemon/lib, etc., which
+# are real source directories.
+/lib/
 codemore-*.tgz
 
 # Self-test corpus clones (samples.json drives this)

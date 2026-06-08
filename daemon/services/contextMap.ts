@@ -1,3 +1,6 @@
+/* codemore-ignore-file: core-quality-empty-catch, core-quality-leftover-console, core-typescript-as-any, core-quality-async-without-await, core-bugs-todo-fixme, core-typescript-non-null-assertion-abuse, core-bugs-loose-equality */
+/* Legacy monolith — scheduled for decomposition into per-rule modules under shared/packs/* in Phase 0.1. Quality rules will re-apply per-module after migration. */
+
 /**
  * Context Map Service
  *

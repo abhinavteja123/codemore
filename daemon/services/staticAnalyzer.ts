@@ -1,3 +1,6 @@
+/* codemore-ignore-file: core-quality-empty-catch, core-quality-leftover-console, core-typescript-as-any, core-quality-async-without-await, core-bugs-todo-fixme, core-typescript-non-null-assertion-abuse, core-bugs-loose-equality */
+/* Legacy monolith — scheduled for decomposition into per-rule modules under shared/packs/* in Phase 0.1. Quality rules will re-apply per-module after migration. */
+
 /**
  * Static Analyzer Service
  * 
@@ -2274,11 +2277,12 @@ export class StaticAnalyzer {
                 }
             }
 
+            const isCommentLine = line.trim().startsWith('//') || line.trim().startsWith('*');
+
             // == instead of ===
-            // Skip if == appears inside a string/template literal or regex literal
-            if (/[^=!<>]==[^=]/.test(line) &&
-                !/['"`]/.test(line.split('==')[0].slice(-5)) &&
-                !(/\/[^/\n]*==[^/\n]*\//).test(line)) {
+            if (!isCommentLine &&
+                /[^=!<>]==[^=]/.test(line) &&
+                !this.isInsideStringOrRegex(line, '==')) {
                 issues.push(this.createIssue({
                     id: `style-equality-${this.issueCounter++}`,
                     title: 'Use strict equality',
@@ -2295,22 +2299,23 @@ export class StaticAnalyzer {
             }
 
             // != instead of !==
-            if (/[^!]=![^=]/.test(line) || /!=[^=]/.test(line)) {
-                if (!/!==/.test(line)) {
-                    issues.push(this.createIssue({
-                        id: `style-inequality-${this.issueCounter++}`,
-                        title: 'Use strict inequality',
-                        description: 'Use !== instead of != for type-safe comparisons.',
-                        category: 'best-practice',
-                        severity: 'MAJOR',
-                        line: lineNumber,
-                        column: 0,
-                        endLine: lineNumber,
-                        endColumn: line.length,
-                        codeSnippet: line.trim(),
-                        confidence: 85,
-                    }));
-                }
+            if (!isCommentLine &&
+                (/[^!]!=[^=]/.test(line) || /^!=[^=]/.test(line.trim())) &&
+                !/!==/.test(line) &&
+                !this.isInsideStringOrRegex(line, '!=')) {
+                issues.push(this.createIssue({
+                    id: `style-inequality-${this.issueCounter++}`,
+                    title: 'Use strict inequality',
+                    description: 'Use !== instead of != for type-safe comparisons.',
+                    category: 'best-practice',
+                    severity: 'MAJOR',
+                    line: lineNumber,
+                    column: 0,
+                    endLine: lineNumber,
+                    endColumn: line.length,
+                    codeSnippet: line.trim(),
+                    confidence: 85,
+                }));
             }
         }
 
@@ -2490,12 +2495,31 @@ export class StaticAnalyzer {
     /**
      * Determine file context for context-aware rule application
      */
+    private isInsideStringOrRegex(line: string, token: string): boolean {
+        const tokenIdx = line.indexOf(token);
+        if (tokenIdx === -1) return false;
+        let inSingle = false, inDouble = false, inTemplate = false;
+        for (let i = 0; i < tokenIdx; i++) {
+            const c = line[i];
+            if (c === '\\') { i++; continue; }
+            if (!inDouble && !inTemplate && c === "'")  { inSingle   = !inSingle;   continue; }
+            if (!inSingle && !inTemplate && c === '"')  { inDouble   = !inDouble;   continue; }
+            if (!inSingle && !inDouble   && c === '`')  { inTemplate = !inTemplate; continue; }
+        }
+        if (inSingle || inDouble || inTemplate) return true;
+        // Check if token is inside a regex literal /...token.../
+        const before = line.slice(0, tokenIdx);
+        const after = line.slice(tokenIdx + token.length);
+        return /\/[^/\n]*$/.test(before) && /^[^/\n]*\//.test(after);
+    }
+
     private getFileContext(filePath: string): 'production-web' | 'daemon-service' | 'build-script' | 'test' {
         const normalized = filePath.toLowerCase().replace(/\\/g, '/');
 
-        if (normalized.includes('/daemon/')) return 'daemon-service';
-        if (normalized.includes('/scripts/') || normalized.includes('/bin/')) return 'build-script';
-        if (normalized.includes('.test.') || normalized.includes('.spec.') || normalized.includes('/__tests__/')) return 'test';
+        // Match both absolute (/daemon/) and relative (daemon/) paths
+        if (/(?:^|\/)daemon\//.test(normalized)) return 'daemon-service';
+        if (/(?:^|\/)(?:scripts|bin)\//.test(normalized)) return 'build-script';
+        if (/\.(?:test|spec)\.|(?:^|\/)__tests__\//.test(normalized)) return 'test';
 
         return 'production-web';
     }

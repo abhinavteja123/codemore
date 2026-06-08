@@ -1,3 +1,8 @@
+/* codemore-ignore-file: core-quality-empty-catch, core-quality-leftover-console, core-typescript-as-any, core-quality-async-without-await, core-bugs-todo-fixme, core-typescript-non-null-assertion-abuse, core-bugs-loose-equality */
+/* Test file — pragmatic shimming + console output during test runs are
+   intentional. The test-path heuristic already downgrades severity to
+   MINOR/INFO; this directive removes the noise from CI summaries. */
+
 import { strict as assert } from "assert";
 import {
   getCachedSuggestionsForProjectIssue,

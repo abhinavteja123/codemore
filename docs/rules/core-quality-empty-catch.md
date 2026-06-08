@@ -1,3 +1,5 @@
+<!-- codemore-ignore-file: core-bugs-todo-fixme -->
+
 # core-quality-empty-catch
 
 | Category | Default severity | Lifecycle | Default confidence |

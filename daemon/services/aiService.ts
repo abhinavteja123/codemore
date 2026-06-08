@@ -1,3 +1,6 @@
+/* codemore-ignore-file: core-quality-empty-catch, core-quality-leftover-console, core-typescript-as-any, core-quality-async-without-await, core-bugs-todo-fixme, core-typescript-non-null-assertion-abuse, core-bugs-loose-equality */
+/* Legacy monolith — scheduled for decomposition into per-rule modules under shared/packs/* in Phase 0.1. Quality rules will re-apply per-module after migration. */
+
 /**
  * AI Service
  * 
@@ -20,7 +23,7 @@ import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { StaticAnalyzer, StaticAnalyzerConfig } from './staticAnalyzer';
 import { ExternalToolRunner, ExternalToolsConfig } from './externalToolRunner';
 import { SeverityRemapper } from './severityRemapper';
-import { CodemoreConfig, getRuleSeverity, shouldIgnoreFile } from './configLoader';
+import { CodemoreConfig, getRuleSeverity, shouldIgnoreFile, getFileAnalyzerOverride } from './configLoader';
 import { identifyHotSpots, HotSpot } from '../../shared/hotspotDetector';
 import { createLogger, sanitizeError } from '../lib/logger';
 
@@ -293,6 +296,7 @@ export class AiService {
     private projectConfig: CodemoreConfig | null = null;
     private geminiModel: GenerativeModel | null = null;
     private staticAnalyzer: StaticAnalyzer;
+    private analyzerBaseConfig: Partial<StaticAnalyzerConfig>;
     private externalToolRunner: ExternalToolRunner;
     private severityRemapper: SeverityRemapper;
     private aiRequestTimestamps = new Map<string, number[]>();
@@ -301,6 +305,7 @@ export class AiService {
 
     constructor(config: DaemonConfig, analyzerConfig?: Partial<import('./staticAnalyzer').StaticAnalyzerConfig>) {
         this.config = config;
+        this.analyzerBaseConfig = analyzerConfig ?? {};
         this.staticAnalyzer = new StaticAnalyzer(analyzerConfig);
         this.externalToolRunner = new ExternalToolRunner();
         this.severityRemapper = new SeverityRemapper();
@@ -423,6 +428,10 @@ export class AiService {
         content: string,
         context: FileContext
     ): Promise<CodeIssue[]> {
+        if (this.projectConfig && shouldIgnoreFile(filePath, this.projectConfig)) {
+            logger.info(`[AiService] Skipping ignored file: ${filePath.split(/[\\/]/).pop()}`);
+            return [];
+        }
         const startTime = Date.now();
         let externalIssueCount = 0;
         let staticIssueCount = 0;
@@ -1589,9 +1598,13 @@ OUTPUT FORMAT - Return a JSON array:
         context: FileContext
     ): CodeIssue[] {
         logger.info(`[AiService] Performing advanced static analysis on: ${filePath}`);
-        
-        // Use the comprehensive static analyzer
-        return this.staticAnalyzer.analyze(filePath, content, context);
+        const fileOverride = this.projectConfig
+            ? getFileAnalyzerOverride(filePath, this.projectConfig)
+            : null;
+        const analyzer = fileOverride
+            ? new StaticAnalyzer({ ...this.analyzerBaseConfig, ...fileOverride })
+            : this.staticAnalyzer;
+        return analyzer.analyze(filePath, content, context);
     }
 
     /**

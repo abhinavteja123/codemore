@@ -1,3 +1,5 @@
+<!-- codemore-ignore-file: core-bugs-todo-fixme -->
+
 # core-bugs-todo-fixme
 
 | Category | Default severity | Lifecycle | Default confidence |

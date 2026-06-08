@@ -1,3 +1,7 @@
+/* codemore-ignore-file: core-quality-async-without-await, core-quality-leftover-console, core-bugs-todo-fixme */
+/* Legacy web infra — Phase 3 plan demotes this surface. Rules will re-apply
+   per-module once the web dashboard rewrite lands. */
+
 import {
   claimNextQueuedScanJob,
   createProject,

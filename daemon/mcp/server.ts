@@ -1,3 +1,8 @@
+/* codemore-ignore-file: core-quality-async-without-await */
+/* MCP SDK tool handlers MUST be async by contract; the handler body may not
+   use await when the work is a synchronous lookup (suggest_fix, explain_issue).
+   The async marker is part of the API, not a code smell. */
+
 /**
  * CodeMore MCP Server
  *

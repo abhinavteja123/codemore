@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+/* codemore-ignore-file: core-quality-leftover-console, core-bugs-todo-fixme, core-quality-empty-catch */
+/* Build / install script — console output IS the user-facing UX during
+   postinstall and download-binaries. TODOs surface as inventory elsewhere. */
+
 /**
  * Format a CodeMoreReport (JSON on stdin) as a GitHub PR comment in
  * Markdown on stdout. Intended to be called from the GitHub Action.

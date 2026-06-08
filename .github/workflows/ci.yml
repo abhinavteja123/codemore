@@ -75,9 +75,9 @@ jobs:
         run: npm ci
       - name: Compile
         run: npm run compile
-      - name: Self-scan
-        run: |
-          # TODO (Phase 1): once the CLI lands, run:
-          #   npx codemore scan . --fail-on BLOCKER --report codemore-report.json
-          # Until then this job records that the gate exists and is wired up.
-          echo "Self-scan placeholder — wires up once the CLI ships in Phase 1."
+      - name: Build publish bundle
+        run: npm run build:publish
+      - name: Self-scan (fail on any BLOCKER)
+        run: node cli.js scan . --enable-experimental --fail-on BLOCKER
+      - name: Rule-PR validator (must pass)
+        run: node scripts/validate-rule-pr.js

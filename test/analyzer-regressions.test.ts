@@ -1,7 +1,18 @@
+/* codemore-ignore-file: core-quality-empty-catch, core-quality-leftover-console, core-typescript-as-any, core-quality-async-without-await, core-bugs-todo-fixme, core-typescript-non-null-assertion-abuse, core-bugs-loose-equality */
+/* Test file — pragmatic shimming + console output during test runs are
+   intentional. The test-path heuristic already downgrades severity to
+   MINOR/INFO; this directive removes the noise from CI summaries. */
+
 import { strict as assert } from "assert";
 import { StaticAnalyzer } from "../daemon/services/staticAnalyzer";
 import { FileContext } from "../shared/protocol";
 import { analyzeFile as analyzeWebFile } from "../web/src/lib/analyzer";
+import {
+  shouldIgnoreFile,
+  getFileAnalyzerOverride,
+  DEFAULT_CONFIG,
+  CodemoreConfig,
+} from "../daemon/services/configLoader";
 
 function createContext(filePath: string, language: string): FileContext {
   return {
@@ -172,5 +183,120 @@ describe("analyzer regressions", () => {
       false,
       "65-line function should not be flagged when maxFunctionLength is 80"
     );
+  });
+
+  it("does not flag == inside a comment line", () => {
+    const analyzer = new StaticAnalyzer();
+    const content = `
+      // == instead of ===
+      // != instead of !==
+      // Use === for strict equality == comparisons
+    `;
+    const issues = analyzer.analyze(
+      "src/utils.ts",
+      content,
+      createContext("src/utils.ts", "typescript")
+    );
+    assert.equal(
+      issues.some((i) => i.title === "Use strict equality" || i.title === "Use strict inequality"),
+      false,
+      "== or != inside comment lines should not be flagged"
+    );
+  });
+
+  it("does not flag == inside a long string literal", () => {
+    const analyzer = new StaticAnalyzer();
+    // == is 24+ chars from the opening quote — old 5-char check would miss this
+    const content = `const msg = "Use of loose equality (== or !=) is bad";`;
+    const issues = analyzer.analyze(
+      "src/rules.ts",
+      content,
+      createContext("src/rules.ts", "typescript")
+    );
+    assert.equal(
+      issues.some((i) => i.title === "Use strict equality"),
+      false,
+      "== inside a string literal should not be flagged regardless of distance from quote"
+    );
+  });
+
+  it("does not flag != inside a regex literal as inequality violation", () => {
+    const analyzer = new StaticAnalyzer();
+    const content = `if (/[^!]!=[^=]/.test(line) || /!=[^=]/.test(line)) { check(); }`;
+    const issues = analyzer.analyze(
+      "daemon/services/staticAnalyzer.ts",
+      content,
+      createContext("daemon/services/staticAnalyzer.ts", "typescript")
+    );
+    assert.equal(
+      issues.some((i) => i.title === "Use strict inequality"),
+      false,
+      "!= inside a regex literal should not be flagged"
+    );
+  });
+
+  it("getFileContext returns daemon-service for relative paths without leading slash", () => {
+    const analyzer = new StaticAnalyzer();
+    // Simulate web scan path: relative, no leading /
+    const content = `import * as fs from 'fs';\nconst exists = fs.existsSync(configPath);`;
+    const issues = analyzer.analyze(
+      "daemon/services/configLoader.ts",
+      content,
+      createContext("daemon/services/configLoader.ts", "typescript")
+    );
+    assert.equal(
+      issues.some((i) => i.title?.includes("existsSync") || i.title?.includes("Synchronous")),
+      false,
+      "existsSync in daemon/services should not be flagged (daemon-service context)"
+    );
+  });
+});
+
+describe("configLoader", () => {
+  it("shouldIgnoreFile matches glob pattern against absolute path filename", () => {
+    const config: CodemoreConfig = { ...DEFAULT_CONFIG, ignore: ["accuracy*.mjs"] };
+    assert.equal(
+      shouldIgnoreFile("/Users/dev/project/accuracy2.mjs", config),
+      true,
+      "accuracy*.mjs should match accuracy2.mjs by filename"
+    );
+  });
+
+  it("shouldIgnoreFile does not match unrelated file against glob pattern", () => {
+    const config: CodemoreConfig = { ...DEFAULT_CONFIG, ignore: ["accuracy*.mjs"] };
+    assert.equal(
+      shouldIgnoreFile("/Users/dev/project/src/utils.ts", config),
+      false
+    );
+  });
+
+  it("getFileAnalyzerOverride returns override thresholds for matching path", () => {
+    const config: CodemoreConfig = {
+      ...DEFAULT_CONFIG,
+      overrides: [{ files: ["daemon/services/**"], maxLineLength: 160 }],
+    };
+    const result = getFileAnalyzerOverride("daemon/services/staticAnalyzer.ts", config);
+    assert.equal(result?.maxLineLength, 160);
+  });
+
+  it("getFileAnalyzerOverride returns null for non-matching path", () => {
+    const config: CodemoreConfig = {
+      ...DEFAULT_CONFIG,
+      overrides: [{ files: ["daemon/services/**"], maxLineLength: 160 }],
+    };
+    assert.equal(getFileAnalyzerOverride("src/utils.ts", config), null);
+  });
+
+  it("getFileAnalyzerOverride merges multiple matching override blocks", () => {
+    const config: CodemoreConfig = {
+      ...DEFAULT_CONFIG,
+      overrides: [
+        { files: ["daemon/**"], maxLineLength: 160 },
+        { files: ["daemon/services/**"], maxFunctionLength: 100 },
+      ],
+    };
+    const result = getFileAnalyzerOverride("daemon/services/aiService.ts", config);
+    assert.equal(result?.maxLineLength, 160);
+    assert.equal(result?.maxFunctionLength, 100);
   });
 });
