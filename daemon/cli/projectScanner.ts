@@ -38,6 +38,13 @@ const DEFAULT_IGNORE_DIRS = new Set([
   // The validator invokes the CLI with corpus/rules/<id>/{tp,fp} as the
   // explicit root, which bypasses this ignore.
   'corpus',
+  // Compile outputs (publish bundle + webpack daemon bundle) — never scan
+  // generated code, the rule sources are the canonical thing.
+  'lib',
+  // Corpus runner clones go here (gitignored). Sampling these would create
+  // a feedback loop where the scanner finds issues it then claims as its
+  // own corpus stats.
+  '.samples-cache',
 ]);
 
 // Extensions the registry currently knows how to dispatch to a rule.
