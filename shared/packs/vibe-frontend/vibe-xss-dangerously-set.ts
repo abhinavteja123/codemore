@@ -26,6 +26,7 @@
  */
 
 import type { Rule, RuleContext, RuleFinding } from '../../rules/Rule';
+import { findDangerouslySetInnerHTML } from '../../rules/astHelpers';
 
 // Match dangerouslySetInnerHTML={{ __html: <expression> }}.
 // The value group uses non-greedy [\s\S]+? so template-literal interpolation
@@ -74,6 +75,11 @@ export const vibeXssDangerouslySet: Rule = {
   pack: 'vibe-frontend',
   lifecycle: 'experimental',
   languages: ['typescript', 'javascript'],
+  // React-family only. `frameworkDetect` collapses `next` -> 'nextjs' (and
+  // drops the bare `react` label), so we list both — apps that import React
+  // directly emit 'react', apps using Next emit 'nextjs', and rarer setups
+  // (remix, expo) emit those labels.
+  targetFrameworks: ['react', 'nextjs', 'remix', 'expo'],
   category: 'security',
   defaultSeverity: 'BLOCKER',
   defaultConfidence: 0.9,
@@ -87,36 +93,31 @@ export const vibeXssDangerouslySet: Rule = {
   citation: 'https://codemore.dev/rules/vibe-xss-dangerously-set',
 
   detect(ctx: RuleContext): RuleFinding[] {
-    // JSX lives in .tsx/.jsx normally, but folks also embed it in .ts files.
-    // Skip files that obviously don't contain React (no React import or JSX tag).
-    if (!/react|jsx|tsx|dangerouslySetInnerHTML/i.test(ctx.content)) return [];
+    // Quick reject — most TS/JS files don't contain JSX at all.
+    if (!/dangerouslySetInnerHTML/.test(ctx.content)) return [];
 
-    const findings: RuleFinding[] = [];
-    DANGEROUS_SET_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = DANGEROUS_SET_RE.exec(ctx.content)) !== null) {
-      const value = m.groups?.value ?? '';
-      const kind = classifyValueExpression(value);
-
-      const line = lineForOffset(ctx.content, m.index);
+    const buildFinding = (
+      kind: 'literal-string' | 'static-svg' | 'dynamic',
+      line: number,
+      column: number,
+      valueText: string,
+    ): RuleFinding => {
       const snippet = (ctx.lines[line - 1] ?? '').trim();
-
       const severity: 'BLOCKER' | 'MAJOR' = kind === 'dynamic' ? 'BLOCKER' : 'MAJOR';
       const confidence = kind === 'dynamic' ? 0.9 : 0.75;
       const why =
         kind === 'dynamic'
-          ? `Value source: \`${value.trim().slice(0, 80)}\` — dynamic. Any path that lets a user contribute to this expression is a stored-XSS bug.`
+          ? `Value source: \`${valueText.trim().slice(0, 80)}\` — dynamic. Any path that lets a user contribute to this expression is a stored-XSS bug.`
           : kind === 'static-svg'
           ? `Value source: inline SVG literal. Lower urgency, but inline SVG should be a React component (Icon library or imported svg), not injected HTML.`
-          : `Value source: string literal. Still a design smell — render the markup as JSX instead so React\'s escaping protects you when the source later becomes dynamic.`;
-
-      findings.push({
+          : `Value source: string literal. Still a design smell — render the markup as JSX instead so React's escaping protects you when the source later becomes dynamic.`;
+      return {
         severity,
         confidence,
         evidence: {
           file: ctx.filePath,
           line,
-          column: 1,
+          column,
           snippet,
           matchedPattern: `dangerously-set-${kind}`,
         },
@@ -141,9 +142,29 @@ export const vibeXssDangerouslySet: Rule = {
             'Re-scan reports vibe-xss-dangerously-set resolved for this file',
           ],
         },
-      });
+      };
+    };
+
+    // AST path — exact JSX attribute traversal. Eliminates the
+    // "JSX-as-string in a fixture/test file" false-positive class entirely.
+    if (ctx.sourceFile) {
+      const findings: RuleFinding[] = [];
+      for (const hit of findDangerouslySetInnerHTML(ctx.sourceFile)) {
+        findings.push(buildFinding(hit.valueKind, hit.line, hit.column, hit.valueText));
+      }
+      return findings;
     }
 
+    // Regex fallback. Only used when the source file failed to parse.
+    const findings: RuleFinding[] = [];
+    DANGEROUS_SET_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = DANGEROUS_SET_RE.exec(ctx.content)) !== null) {
+      const value = m.groups?.value ?? '';
+      const kind = classifyValueExpression(value);
+      const line = lineForOffset(ctx.content, m.index);
+      findings.push(buildFinding(kind, line, 1, value));
+    }
     return findings;
   },
 };

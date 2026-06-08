@@ -83,6 +83,14 @@ export interface Suppression {
   scope?: SuppressionScope;
 }
 
+/**
+ * Baseline classification for an issue, when scan was run with --baseline.
+ * - 'new'      : present in current scan, absent from baseline (actionable)
+ * - 'baseline' : present in both (informational, pre-existing)
+ * - 'resolved' : present in baseline, absent from current scan (synthetic)
+ */
+export type BaselineStatus = 'new' | 'baseline' | 'resolved';
+
 export interface ReportIssue {
   /** Stable rule id, kebab-case, namespaced by pack. */
   id: string;
@@ -103,6 +111,8 @@ export interface ReportIssue {
   citation: string;
   suggestedFix?: SuggestedFix;
   suppression?: Suppression;
+  /** Set only when scan was run with --baseline. Absent otherwise. */
+  baselineStatus?: BaselineStatus;
 }
 
 export type StopCondition = 'first-validator-failure' | 'first-rule-failure' | 'never';

@@ -14,6 +14,7 @@ import * as path from 'path';
 import { registerAllPacks } from '../registerPacks';
 import { scanProject, reportExceeds } from '../projectScanner';
 import type { CodeMoreReport, Severity } from '../../../shared/report/types';
+import { applyBaseline, isBaselineFile, isCountedForFailOn } from '../baselineDiff';
 
 export interface ScanArgs {
   path: string;
@@ -23,6 +24,8 @@ export interface ScanArgs {
   packs?: string[];
   enableExperimental: boolean;
   frameworks: string[];
+  /** Path to a baseline file produced by `codemore baseline create`. */
+  baseline?: string;
 }
 
 const SEVERITIES: ReadonlyArray<Severity> = ['BLOCKER', 'CRITICAL', 'MAJOR', 'MINOR', 'INFO'];
@@ -38,6 +41,7 @@ export function parseScanArgs(argv: string[]): ScanArgs {
   let failOn: Severity | undefined;
   let packs: string[] | undefined;
   let enableExperimental = false;
+  let baseline: string | undefined;
   const frameworks: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -68,6 +72,11 @@ export function parseScanArgs(argv: string[]): ScanArgs {
         for (const f of v.split(',').map(s => s.trim())) if (f) frameworks.push(f);
         break;
       }
+      case '--baseline': {
+        baseline = argv[++i];
+        if (!baseline) throw new Error('--baseline expects a file path');
+        break;
+      }
       default:
         if (arg.startsWith('--')) throw new Error(`Unknown flag: ${arg}`);
         if (positional) throw new Error(`Unexpected positional: ${arg}`);
@@ -85,6 +94,7 @@ export function parseScanArgs(argv: string[]): ScanArgs {
     packs,
     enableExperimental,
     frameworks,
+    baseline,
   };
 }
 
@@ -148,6 +158,34 @@ export async function runScan(args: ScanArgs): Promise<number> {
     frameworks: args.frameworks,
   });
 
+  let baselineApplied = false;
+  if (args.baseline) {
+    const baselineAbs = path.resolve(args.baseline);
+    if (!fs.existsSync(baselineAbs)) {
+      process.stderr.write(`codemore: baseline file not found: ${baselineAbs}\n`);
+      return 2;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(fs.readFileSync(baselineAbs, 'utf8'));
+    } catch (err) {
+      process.stderr.write(`codemore: baseline file is not valid JSON: ${(err as Error).message}\n`);
+      return 2;
+    }
+    if (!isBaselineFile(parsed)) {
+      process.stderr.write(`codemore: ${baselineAbs} is not a valid CodeMore baseline file\n`);
+      return 2;
+    }
+    const r = applyBaseline(report, parsed);
+    baselineApplied = true;
+    process.stderr.write(
+      `Baseline applied (${baselineAbs}):\n` +
+      `  new:      ${r.newCount}\n` +
+      `  baseline: ${r.baselineCount} (pre-existing, not failing CI)\n` +
+      `  resolved: ${r.resolvedCount}\n\n`,
+    );
+  }
+
   if (args.json) {
     process.stdout.write(JSON.stringify(report, null, 2) + '\n');
   } else {
@@ -159,9 +197,28 @@ export async function runScan(args: ScanArgs): Promise<number> {
     process.stderr.write(`Report written to ${args.out}\n`);
   }
 
-  if (args.failOn && reportExceeds(report, args.failOn)) {
-    process.stderr.write(`codemore: failing because at least one issue is >= ${args.failOn}\n`);
-    return 1;
+  if (args.failOn) {
+    const exceeded = baselineApplied
+      ? reportExceedsForFailOn(report, args.failOn)
+      : reportExceeds(report, args.failOn);
+    if (exceeded) {
+      const scope = baselineApplied ? ' (new since baseline)' : '';
+      process.stderr.write(`codemore: failing because at least one issue${scope} is >= ${args.failOn}\n`);
+      return 1;
+    }
   }
   return 0;
+}
+
+/**
+ * Baseline-aware fail-on check: counts only issues with baselineStatus 'new'.
+ * Used in place of `reportExceeds` when a baseline file is supplied.
+ */
+function reportExceedsForFailOn(report: CodeMoreReport, failOn: Severity): boolean {
+  const threshold = severityRank(failOn);
+  for (const iss of report.issues) {
+    if (!isCountedForFailOn(iss)) continue;
+    if (severityRank(iss.severity) >= threshold) return true;
+  }
+  return false;
 }

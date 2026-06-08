@@ -193,6 +193,11 @@
             "directive": { "type": "string", "description": "e.g. '// codemore-ignore: vibe-supabase-rls-disabled'" },
             "scope": { "type": "string", "enum": ["same-line", "next-line", "file"] }
           }
+        },
+        "baselineStatus": {
+          "type": "string",
+          "enum": ["new", "baseline", "resolved"],
+          "description": "Set only when scan was run with --baseline. 'new' = not in baseline (gates --fail-on); 'baseline' = pre-existing; 'resolved' = synthetic placeholder for keys that disappeared since the baseline."
         }
       }
     }

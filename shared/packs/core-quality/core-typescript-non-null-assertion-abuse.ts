@@ -20,6 +20,7 @@
 /* codemore-ignore-file: core-typescript-non-null-assertion-abuse */
 
 import type { Rule, RuleContext, RuleFinding } from '../../rules/Rule';
+import { findNonNullExpressions } from '../../rules/astHelpers';
 
 // `!.` and `![` immediately after an identifier, `)`, or `]`.
 // Negative lookbehind avoids matching `!=` and `!==`.
@@ -69,26 +70,17 @@ export const coreTypescriptNonNullAssertionAbuse: Rule = {
   citation: 'https://codemore.dev/rules/core-typescript-non-null-assertion-abuse',
 
   detect(ctx: RuleContext): RuleFinding[] {
-    const sanitized = stripCommentsAndStrings(ctx.content);
     const testCtx = isTestContext(ctx.filePath);
-    const findings: RuleFinding[] = [];
 
-    NON_NULL_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = NON_NULL_RE.exec(sanitized)) !== null) {
-      // The regex includes the preceding char in the match; the `!` is at
-      // m.index + 1.
-      const bangIdx = m.index + 1;
-      const line = lineForOffset(ctx.content, bangIdx);
+    const pushFinding = (line: number, column: number, findings: RuleFinding[]): void => {
       const snippet = (ctx.lines[line - 1] ?? '').trim();
-
       findings.push({
         severity: testCtx ? 'INFO' : 'MINOR',
         confidence: testCtx ? 0.55 : 0.75,
         evidence: {
           file: ctx.filePath,
           line,
-          column: 1,
+          column,
           snippet,
           matchedPattern: testCtx ? 'non-null-test-context' : 'non-null-assertion',
         },
@@ -114,6 +106,28 @@ export const coreTypescriptNonNullAssertionAbuse: Rule = {
           ],
         },
       });
+    };
+
+    // AST path — `ts.NonNullExpression` exact match. Also catches trailing
+    // `value!;` patterns the regex (which required a following `.` or `[`)
+    // missed.
+    if (ctx.sourceFile) {
+      const findings: RuleFinding[] = [];
+      for (const hit of findNonNullExpressions(ctx.sourceFile)) {
+        pushFinding(hit.line, hit.column, findings);
+      }
+      return findings;
+    }
+
+    // Regex fallback (no TS parse available — extremely rare for .ts files).
+    const sanitized = stripCommentsAndStrings(ctx.content);
+    const findings: RuleFinding[] = [];
+    NON_NULL_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = NON_NULL_RE.exec(sanitized)) !== null) {
+      const bangIdx = m.index + 1;
+      const line = lineForOffset(ctx.content, bangIdx);
+      pushFinding(line, 1, findings);
     }
     return findings;
   },

@@ -13,6 +13,7 @@
 
 import { runScan, parseScanArgs } from './commands/scan';
 import { runServeMcp } from './commands/serve-mcp';
+import { runBaseline } from './commands/baseline';
 import { toolVersion } from '../../shared/toolVersion';
 
 const VERSION = toolVersion();
@@ -21,11 +22,14 @@ function printUsage(): void {
   process.stdout.write(
     `codemore ${VERSION}\n\n` +
     `Usage:\n` +
-    `  codemore scan <path> [flags]\n\n` +
+    `  codemore scan <path> [flags]\n` +
+    `  codemore baseline <create|update|drop|show> [path]\n` +
+    `  codemore serve-mcp\n\n` +
     `Flags (scan):\n` +
     `  --json                       Emit the full report as JSON on stdout.\n` +
     `  --out <file>                 Also write the JSON report to <file>.\n` +
     `  --fail-on <severity>         Exit non-zero if any issue >= severity (BLOCKER, CRITICAL, MAJOR, MINOR, INFO).\n` +
+    `  --baseline <file>            Compare against a baseline; only NEW issues count toward --fail-on.\n` +
     `  --packs <a,b,...>            Run only these packs (default: all).\n` +
     `  --enable-experimental        Include rules with lifecycle: experimental.\n` +
     `  --framework <name>           Hint a framework (repeatable; comma-separated).\n\n` +
@@ -52,6 +56,8 @@ async function main(argv: string[]): Promise<number> {
     switch (cmd) {
       case 'scan':
         return await runScan(parseScanArgs(rest));
+      case 'baseline':
+        return await runBaseline(rest);
       case 'serve-mcp':
         return await runServeMcp(rest);
       default:

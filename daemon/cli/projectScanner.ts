@@ -32,6 +32,7 @@ import {
 import { toolVersion } from '../../shared/toolVersion';
 import { createIgnoreResolver, type IgnoreResolver } from './ignoreResolver';
 import { detectFrameworks } from './frameworkDetect';
+import { loadCodemorerc } from './codemorercLoader';
 
 // Pinned skip set used as a hard fail-safe even when an external project
 // has no .gitignore. `IgnoreResolver` carries the same set plus the
@@ -235,7 +236,30 @@ function summarise(
 export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
   const startedAt = Date.now();
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES;
-  const userIgnore = opts.ignore ?? [];
+
+  // Load .codemorerc.json from the scan root (may be missing — loader
+  // returns an empty result). User overrides win over caller defaults
+  // for ignore + rules; for packs and experimental, caller wins so CLI
+  // flags can override the file.
+  const rc = loadCodemorerc(opts.root);
+
+  const userIgnore = Array.from(new Set([
+    ...(opts.ignore ?? []),
+    ...rc.ignore,
+  ]));
+
+  const enabledPacks = (opts.enabledPacks && opts.enabledPacks.length > 0)
+    ? opts.enabledPacks
+    : (rc.packs.length > 0 ? rc.packs : undefined);
+
+  const ruleOverrides = {
+    ...rc.ruleOverrides,
+    ...(opts.ruleOverrides ?? {}),
+  };
+
+  const enableExperimental =
+    typeof opts.enableExperimental === 'boolean' ? opts.enableExperimental :
+    typeof rc.experimental === 'boolean' ? rc.experimental : undefined;
 
   // Frameworks: union the caller-supplied list (typically empty in CLI mode)
   // with auto-detected signals from package.json + structural cues. Rules
@@ -269,7 +293,11 @@ export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
     }
 
     const ctx = buildContext(file, content, frameworks);
-    const result = globalRegistry.scanFile(ctx, opts);
+    const result = globalRegistry.scanFile(ctx, {
+      enabledPacks,
+      ruleOverrides,
+      enableExperimental,
+    });
 
     issues.push(...result.issues);
     linesOfCode += countMeaningfulLines(content);

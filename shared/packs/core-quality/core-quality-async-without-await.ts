@@ -31,6 +31,7 @@
 /* codemore-ignore-file: core-quality-async-without-await */
 
 import type { Rule, RuleContext, RuleFinding } from '../../rules/Rule';
+import { findAsyncWithoutAwait } from '../../rules/astHelpers';
 
 // Match the HEADER of an async function up to its closing param `)`. The
 // body brace is found by `findBodyBraceAfter()` below — it walks forward
@@ -140,6 +141,41 @@ export const coreQualityAsyncWithoutAwait: Rule = {
   citation: 'https://codemore.dev/rules/core-quality-async-without-await',
 
   detect(ctx: RuleContext): RuleFinding[] {
+    // AST path — exact, no regex edge cases. Skips nested function bodies
+    // correctly (an inner await doesn't satisfy the outer async).
+    if (ctx.sourceFile) {
+      const findings: RuleFinding[] = [];
+      for (const hit of findAsyncWithoutAwait(ctx.sourceFile)) {
+        const snippet = (ctx.lines[hit.line - 1] ?? '').trim();
+        findings.push({
+          evidence: {
+            file: ctx.filePath,
+            line: hit.line,
+            column: hit.column,
+            snippet,
+            matchedPattern: `async-without-await:${hit.kind}`,
+          },
+          suggestedFix: {
+            type: 'code-patch',
+            instructions:
+              'Either drop the `async` keyword (the function is synchronous), or add the missing ' +
+              '`await`. If the function MUST stay async for an interface contract (e.g. it implements ' +
+              'a method that other implementations DO await), suppress with a comment that names the ' +
+              'interface and explains why.',
+            verificationCriteria: [
+              'The function either uses `await` in its body OR is no longer marked async',
+              'All callers continue to work (either they already awaited, or no longer need to)',
+              'Re-scan reports core-quality-async-without-await resolved for this function',
+            ],
+          },
+        });
+      }
+      return findings;
+    }
+
+    // Regex fallback for environments where the TS parser couldn't load
+    // a SourceFile (extremely rare; the walker always populates it for
+    // .ts/.tsx/.js/.jsx/.mjs/.cjs).
     const sanitised = stripCommentsAndStrings(ctx.content);
     const findings: RuleFinding[] = [];
 
