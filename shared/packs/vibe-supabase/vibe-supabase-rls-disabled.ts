@@ -57,10 +57,10 @@ export const vibeSupabaseRlsDisabled: Rule = {
   pack: 'vibe-supabase',
   lifecycle: 'experimental',
   languages: ['sql'],
-  // NB: deliberately omitting `targetFrameworks` until project-level
-  // framework detection lands. The rule applies to any SQL file with
-  // a bare CREATE TABLE; non-Supabase projects can suppress via config.
-  // When framework detection ships, set targetFrameworks: ['supabase'].
+  // Restored in Phase 1.5: framework detection now populates ctx.frameworks
+  // from package.json deps + structural signals (supabase/migrations dir).
+  // Non-Supabase projects scanning plain SQL won't trigger this rule.
+  targetFrameworks: ['supabase'],
   category: 'security',
   defaultSeverity: 'BLOCKER',
   defaultConfidence: 0.85,

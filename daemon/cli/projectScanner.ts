@@ -31,6 +31,7 @@ import {
 } from '../../shared/scoring';
 import { toolVersion } from '../../shared/toolVersion';
 import { createIgnoreResolver, type IgnoreResolver } from './ignoreResolver';
+import { detectFrameworks } from './frameworkDetect';
 
 // Pinned skip set used as a hard fail-safe even when an external project
 // has no .gitignore. `IgnoreResolver` carries the same set plus the
@@ -235,7 +236,13 @@ export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
   const startedAt = Date.now();
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES;
   const userIgnore = opts.ignore ?? [];
-  const frameworks = opts.frameworks ?? [];
+
+  // Frameworks: union the caller-supplied list (typically empty in CLI mode)
+  // with auto-detected signals from package.json + structural cues. Rules
+  // with `targetFrameworks` declared filter on this set.
+  const autoFrameworks = detectFrameworks(opts.root);
+  const callerFrameworks = opts.frameworks ?? [];
+  const frameworks = Array.from(new Set([...callerFrameworks, ...autoFrameworks]));
 
   const resolver = createIgnoreResolver(opts.root, {
     extraPatterns: userIgnore.length > 0 ? userIgnore : undefined,
