@@ -29,6 +29,10 @@ let webviewProvider: WebviewProvider | undefined;
 let outputChannel: vscode.OutputChannel;
 let statusBarItem: vscode.StatusBarItem;
 let daemonNotificationDisposables: vscode.Disposable[] = [];
+// Diagnostic collection — what shows up as squiggles in the editor.
+// Populated from `daemon/issuesUpdated`. Kept module-scoped so deactivate
+// can clear it via context.subscriptions.
+let diagnosticCollection: vscode.DiagnosticCollection | undefined;
 
 // Debounce timers (module-level for cleanup in deactivate)
 let debounceTimer: NodeJS.Timeout | undefined;
@@ -122,6 +126,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 { webviewOptions: { retainContextWhenHidden: true } }
             )
         );
+
+        // Diagnostic collection — surfaced as squiggles in the editor and
+        // listed in the Problems panel. Created here so it's available
+        // before the first scan response lands.
+        diagnosticCollection = vscode.languages.createDiagnosticCollection('codemore');
+        context.subscriptions.push(diagnosticCollection);
 
         // Register commands BEFORE daemon starts
         // This ensures commands are available even if daemon fails
@@ -525,6 +535,7 @@ function setupDaemonNotifications(): void {
 
     daemonNotificationDisposables.push(rpcClient.onNotification('daemon/issuesUpdated', (params: { issues: CodeIssue[] }) => {
         currentIssues = params.issues;
+        publishDiagnostics(currentIssues);
         webviewProvider?.postMessage({
             type: 'issuesUpdate',
             issues: currentIssues,
@@ -546,6 +557,57 @@ function setupDaemonNotifications(): void {
             outputChannel.appendLine(`Details: ${JSON.stringify(params.details)}`);
         }
     }));
+}
+
+/**
+ * Translate the registry's CodeIssue list into VS Code diagnostics and
+ * publish them into the editor + Problems panel.
+ *
+ * We replace the entire collection on every update (rather than diff) —
+ * the registry always emits the full set, and the alternative (per-file
+ * diff) would complicate cache invalidation when files are deleted.
+ *
+ * Severity mapping mirrors the daemon's CANONICAL_TO_OLD table so what
+ * the user sees as red squiggles matches what the report calls a BLOCKER:
+ *   BLOCKER / CRITICAL → Error
+ *   MAJOR / MINOR      → Warning
+ *   INFO               → Information
+ */
+function publishDiagnostics(issues: CodeIssue[]): void {
+    if (!diagnosticCollection) return;
+    diagnosticCollection.clear();
+
+    const byFile = new Map<string, vscode.Diagnostic[]>();
+    for (const iss of issues) {
+        const file = iss.location.filePath;
+        const range = new vscode.Range(
+            Math.max(0, iss.location.range.start.line - 1),
+            Math.max(0, iss.location.range.start.column - 1),
+            Math.max(0, iss.location.range.end.line - 1),
+            Math.max(0, iss.location.range.end.column - 1),
+        );
+        const diag = new vscode.Diagnostic(range, iss.title, severityToVsCode(iss.severity));
+        diag.source = 'codemore';
+        // The legacy CodeIssue.id is per-instance (ULID-shaped), not stable
+        // across scans. We attach the title as `code` so users can ⌘-click
+        // to filter the Problems panel by rule.
+        diag.code = iss.title;
+        const list = byFile.get(file) ?? [];
+        list.push(diag);
+        byFile.set(file, list);
+    }
+    for (const [file, diags] of byFile) {
+        diagnosticCollection.set(vscode.Uri.file(file), diags);
+    }
+}
+
+function severityToVsCode(s: CodeIssue['severity']): vscode.DiagnosticSeverity {
+    switch (s) {
+        case 'BLOCKER': case 'CRITICAL': return vscode.DiagnosticSeverity.Error;
+        case 'MAJOR':   case 'MINOR':    return vscode.DiagnosticSeverity.Warning;
+        case 'INFO':                     return vscode.DiagnosticSeverity.Information;
+        default:                         return vscode.DiagnosticSeverity.Hint;
+    }
 }
 
 /**
