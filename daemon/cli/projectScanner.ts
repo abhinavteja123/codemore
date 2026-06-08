@@ -29,6 +29,7 @@ import {
   calculateTechnicalDebt,
   type IssueSeverityCounts,
 } from '../../shared/scoring';
+import { toolVersion } from '../../shared/toolVersion';
 
 // Skipped regardless of where they appear in the tree.
 const UNIVERSAL_IGNORE_DIRS = new Set([
@@ -289,7 +290,7 @@ export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
   return {
     schemaVersion: SCHEMA_VERSION,
     scannedAt: new Date(startedAt).toISOString(),
-    tool: { name: 'codemore', version: '1.1.0' },
+    tool: { name: 'codemore', version: toolVersion() },
     project: {
       root: opts.root,
       framework: frameworks[0] ?? null,

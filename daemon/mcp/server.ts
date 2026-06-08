@@ -26,6 +26,7 @@ import { registerAllPacks } from '../cli/registerPacks';
 import { globalRegistry } from '../../shared/rules/registry';
 import type { RuleContext } from '../../shared/rules/Rule';
 import { validateFix } from '../services/validatorHarness';
+import { toolVersion } from '../../shared/toolVersion';
 
 // CJS-friendly imports — the SDK ships both ESM and CJS builds, and our
 // daemon tsconfig is commonjs.
@@ -90,7 +91,7 @@ function buildSingleFileContext(filePath: string, content: string, languageHint?
 export async function runMcpServer(): Promise<void> {
   registerAllPacks();
 
-  const server = new McpServer({ name: 'codemore', version: '1.1.0' });
+  const server = new McpServer({ name: 'codemore', version: toolVersion() });
 
   // ---------------------------------------------------------------------
   // scan_project

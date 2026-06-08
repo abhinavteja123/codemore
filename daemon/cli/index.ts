@@ -13,8 +13,9 @@
 
 import { runScan, parseScanArgs } from './commands/scan';
 import { runServeMcp } from './commands/serve-mcp';
+import { toolVersion } from '../../shared/toolVersion';
 
-const VERSION = '1.1.0';
+const VERSION = toolVersion();
 
 function printUsage(): void {
   process.stdout.write(
