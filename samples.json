@@ -1,0 +1,23 @@
+{
+  "$schema-version": "1",
+  "description": "Seed list of vibe-coded / Supabase / Next.js apps the corpus runner scans for catalog calibration. Add entries here; samples.json drives `npm run scan:samples`.",
+  "cacheDir": ".samples-cache",
+  "samples": [
+    {
+      "name": "synthetic-realistic-vibe-app",
+      "source": "local",
+      "path": "C:/tmp/realistic-vibe-app",
+      "expectsBlockers": 9,
+      "expectsScoreAtMost": 90,
+      "notes": "Built in /tmp by the project's own pressure-test driver. Covers all 7 shipped rules."
+    },
+    {
+      "name": "supabase-nextjs-starter",
+      "source": "git",
+      "url": "https://github.com/vercel/next.js.git",
+      "ref": "canary",
+      "subpath": "examples/with-supabase",
+      "notes": "Vercel's official Next.js + Supabase example. Should report few or no BLOCKERs — used as a smoke-test that the catalog isn't accidentally flagging good code."
+    }
+  ]
+}

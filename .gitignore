@@ -35,3 +35,7 @@ coverage/
 # CLI publish output
 lib/
 codemore-*.tgz
+
+# Self-test corpus clones (samples.json drives this)
+.samples-cache/
+SAMPLES_REPORT.md

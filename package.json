@@ -224,6 +224,8 @@
     "cli:scan": "node ./cli.js scan",
     "self-scan": "node ./cli.js scan . --fail-on BLOCKER --packs vibe-supabase",
     "validate-rules": "node scripts/validate-rule-pr.js",
+    "scan:samples": "node scripts/scan-samples.js",
+    "scan:samples:refresh": "node scripts/scan-samples.js --refresh",
     "build:publish": "tsc -p tsconfig.publish.json",
     "clean:publish": "node -e \"require('fs').rmSync('lib',{recursive:true,force:true})\"",
     "prepack": "npm run clean:publish && npm run build:publish",
