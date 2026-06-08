@@ -1,11 +1,13 @@
 {
   "name": "codemore",
   "displayName": "CodeMore",
-  "description": "Developer-Centric Code Intelligence Tool with AI-powered suggestions and project-wide analysis",
-  "version": "1.0.0",
+  "description": "The static analyzer your AI agent reads — finds production-blocking bugs in vibe-coded apps (CLI, GitHub Action, MCP server).",
+  "version": "0.1.0",
+  "license": "MIT",
   "publisher": "codemore",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.85.0",
+    "node": ">=18"
   },
   "categories": [
     "Linters",
