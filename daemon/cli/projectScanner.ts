@@ -30,28 +30,13 @@ import {
   type IssueSeverityCounts,
 } from '../../shared/scoring';
 import { toolVersion } from '../../shared/toolVersion';
+import { createIgnoreResolver, type IgnoreResolver } from './ignoreResolver';
 
-// Skipped regardless of where they appear in the tree.
+// Pinned skip set used as a hard fail-safe even when an external project
+// has no .gitignore. `IgnoreResolver` carries the same set plus the
+// project's own .gitignore + tsconfig.outDir for full coverage.
 const UNIVERSAL_IGNORE_DIRS = new Set([
-  'node_modules', 'dist', 'build', '.next', '.git', 'out', 'coverage',
-  '.vscode', '.idea', '.cache', 'target', '.svelte-kit', '.turbo',
-]);
-
-// Skipped ONLY when they appear as a direct child of the scan root.
-// `lib`, `corpus`, and `.samples-cache` are CodeMore-internal names; nested
-// occurrences (e.g. `src/lib/`, `packages/foo/corpus/`) are legitimate
-// source directories that must be scanned.
-const ROOT_ONLY_IGNORE_DIRS = new Set([
-  // Compile output (tsconfig.publish.json -> lib/). Generated code; the
-  // rule sources are the canonical thing.
-  'lib',
-  // Rule-PR validator fixtures. The validator invokes the CLI with
-  // corpus/rules/<id>/{tp,fp} as the explicit root, which bypasses the
-  // ignore by being below the configured root.
-  'corpus',
-  // Corpus runner clones (samples.json). Sampling these creates a
-  // feedback loop where self-scan picks up external findings.
-  '.samples-cache',
+  'node_modules', '.git',
 ]);
 
 // Extensions the registry currently knows how to dispatch to a rule.
@@ -117,28 +102,19 @@ interface DiscoveredFile {
   language: string;
 }
 
-function shouldIgnoreSegment(segment: string, depth: number): boolean {
-  // Universal: skip wherever it appears.
-  if (UNIVERSAL_IGNORE_DIRS.has(segment)) return true;
-  // Root-only: skip only when this segment is a direct child of the scan
-  // root (depth 1). Nested occurrences (`src/lib`, `packages/foo/corpus`)
-  // are real source directories and must be scanned.
-  if (depth === 1 && ROOT_ONLY_IGNORE_DIRS.has(segment)) return true;
-  // Dotfile dirs (.cursor/, .claude/, .github/) are NOT blanket-skipped —
-  // those contain config that vibe rules genuinely need to inspect.
-  return false;
+function shouldIgnoreSegment(segment: string): boolean {
+  return UNIVERSAL_IGNORE_DIRS.has(segment);
 }
 
-function matchesUserIgnore(relPath: string, patterns: ReadonlyArray<string>): boolean {
-  const norm = relPath.replace(/\\/g, '/');
-  return patterns.some(p => norm.includes(p));
-}
-
-function walk(root: string, userIgnore: ReadonlyArray<string>): DiscoveredFile[] {
+function walk(
+  root: string,
+  userIgnore: ReadonlyArray<string>,
+  resolver: IgnoreResolver,
+): DiscoveredFile[] {
   const out: DiscoveredFile[] = [];
   const rootAbs = path.resolve(root);
 
-  function recur(dir: string, depth: number) {
+  function recur(dir: string) {
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -148,12 +124,16 @@ function walk(root: string, userIgnore: ReadonlyArray<string>): DiscoveredFile[]
 
     for (const entry of entries) {
       const full = path.join(dir, entry.name);
-      const rel = path.relative(rootAbs, full);
+      const rel = path.relative(rootAbs, full).replace(/\\/g, '/');
 
       if (entry.isDirectory()) {
-        if (shouldIgnoreSegment(entry.name, depth + 1)) continue;
-        if (matchesUserIgnore(rel, userIgnore)) continue;
-        recur(full, depth + 1);
+        if (shouldIgnoreSegment(entry.name)) continue;
+        if (resolver.shouldIgnore(rel, 'dir')) continue;
+        // Legacy explicit ignore patterns passed via opts.ignore — kept as
+        // a substring fallback for old call sites; new code should use the
+        // resolver's .codemorerc layer.
+        if (userIgnore.length > 0 && userIgnore.some(p => rel.includes(p))) continue;
+        recur(full);
         continue;
       }
 
@@ -161,13 +141,14 @@ function walk(root: string, userIgnore: ReadonlyArray<string>): DiscoveredFile[]
       const ext = path.extname(entry.name).toLowerCase();
       const language = detectLanguage(entry.name, ext);
       if (!language) continue;
-      if (matchesUserIgnore(rel, userIgnore)) continue;
+      if (resolver.shouldIgnore(rel, 'file')) continue;
+      if (userIgnore.length > 0 && userIgnore.some(p => rel.includes(p))) continue;
 
-      out.push({ absPath: full, relPath: rel.replace(/\\/g, '/'), extension: ext, language });
+      out.push({ absPath: full, relPath: rel, extension: ext, language });
     }
   }
 
-  recur(rootAbs, 0);
+  recur(rootAbs);
   return out;
 }
 
@@ -256,7 +237,10 @@ export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
   const userIgnore = opts.ignore ?? [];
   const frameworks = opts.frameworks ?? [];
 
-  const discovered = walk(opts.root, userIgnore);
+  const resolver = createIgnoreResolver(opts.root, {
+    extraPatterns: userIgnore.length > 0 ? userIgnore : undefined,
+  });
+  const discovered = walk(opts.root, userIgnore, resolver);
   const issues: ReportIssue[] = [];
   let linesOfCode = 0;
   let filesAnalyzed = 0;
@@ -317,7 +301,7 @@ export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
 
 /** Helper for tests: a quick file count without running the registry. */
 export function discoverFiles(root: string, userIgnore: ReadonlyArray<string> = []): string[] {
-  return walk(root, userIgnore).map(f => f.relPath);
+  return walk(root, userIgnore, createIgnoreResolver(root, { extraPatterns: userIgnore })).map(f => f.relPath);
 }
 
 /** Severity priority for fail-on threshold checks. */

@@ -1,3 +1,4 @@
+/* codemore-ignore-file: core-quality-empty-catch */
 /**
  * Resolve the CodeMore tool version from package.json at runtime.
  *

@@ -41,3 +41,7 @@ codemore-*.tgz
 # Self-test corpus clones (samples.json drives this)
 .samples-cache/
 SAMPLES_REPORT.md
+
+# Legacy extension issue exports — one-off audit artefacts, not source.
+codemore-issues-*.json
+ai mentor bugs.json
