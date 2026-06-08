@@ -42,17 +42,11 @@ const logger = pino({
         pid: process.pid,
     },
     timestamp: pino.stdTimeFunctions.isoTime,
-    // Use pino-pretty in development for readable output
-    transport: isDevelopment
-        ? {
-            target: 'pino-pretty',
-            options: {
-                colorize: true,
-                translateTime: 'SYS:standard',
-                ignore: 'pid,hostname',
-            },
-        }
-        : undefined,
+    // No pino-pretty transport. The daemon's stdout is consumed by the
+    // VS Code extension's output channel, which just shows lines verbatim
+    // — pretty colour escapes there look like noise, not improvement.
+    // Removing the transport also eliminates the worker-thread sidecar
+    // (worker.js) that the webpack bundle can't locate.
 });
 
 /**

@@ -282,10 +282,13 @@ const handlers: Record<string, RequestHandler> = {
      * keeps working unchanged. We additionally fire a
      * `daemon/issuesUpdated` notification with the registry's issues —
      * that's how the webview + diagnostic collection get populated.
+     *
+     * `force` (legacy cache-bypass flag) is no longer load-bearing:
+     * the registry path runs the rules every time and has no per-scan
+     * cache. We accept the parameter for callers that still pass it,
+     * but the scan is always fresh — no behaviour difference today.
      */
-    async analyzeWorkspace(params: unknown): Promise<{ totalFiles: number; analysisId: string }> {
-        const { force } = (params as { force?: boolean }) || {};
-
+    async analyzeWorkspace(_params: unknown): Promise<{ totalFiles: number; analysisId: string }> {
         if (!state.workspacePath) {
             throw new Error('Daemon not initialized');
         }
