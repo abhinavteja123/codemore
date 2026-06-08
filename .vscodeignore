@@ -1,0 +1,90 @@
+# .vscodeignore — denylist for vsce (the .vsix packager).
+#
+# Goal: ship only what the extension needs at runtime:
+#   - dist/extension.js       (webpack-bundled extension entry)
+#   - dist/webview.js         (webpack-bundled webview)
+#   - daemon/dist/**.js       (webpack-bundled daemon — the forked child)
+#   - package.json, README.md, LICENSE, resources/* (icons)
+#
+# Everything below this header is excluded.
+
+# ---- dependencies ------------------------------------------------------
+node_modules/**
+**/node_modules/**
+
+# ---- source / dev artefacts -------------------------------------------
+src/**
+shared/**
+webview/**
+test/**
+out/**
+lib/**
+docs/**
+web/**
+corpus/**
+.samples-cache/**
+.docs-cache/**
+.vscode/**
+.vscode-test/**
+.github/**
+.husky/**
+scripts/**
+samples.json
+daemon/index.ts
+daemon/services/**
+daemon/lib/**
+daemon/llm/**
+daemon/cli/**
+daemon/mcp/**
+daemon/tests/**
+daemon/tsconfig*.json
+
+# ---- typescript sources + sourcemaps ----------------------------------
+**/*.ts
+**/*.tsx
+**/*.map
+**/*.tsbuildinfo
+tsconfig*.json
+
+# ---- external-tool binaries (~80 MB of biome/ruff/tflint per platform)
+# The new pipeline runs in-process; we no longer dispatch to these.
+bin/**
+
+# ---- bundles we ship a slimmer variant of -----------------------------
+daemon/dist/*.LICENSE.txt
+
+# ---- npm-publish artefacts (not used by VSIX) -------------------------
+shared/report/schema.json
+cli.js
+action.yml
+
+# ---- legacy / scratch docs --------------------------------------------
+CONTRIBUTING-RULES.md
+CODEBASE_DEEP_DIVE.md
+OPUS_CODEMORE_PROMPT.md
+PUBLISHING.md
+vsc-extension-quickstart.md
+codemore-issues-*.json
+ai mentor bugs.json
+verify-*.mjs
+analyze.mjs
+webaccuracy.mjs
+accuracy*.mjs
+*.vsix
+
+# ---- repo hygiene -----------------------------------------------------
+.git/**
+.gitignore
+.gitattributes
+.editorconfig
+.eslintrc*
+.eslintignore
+.npmrc
+.nvmrc
+.codemorerc.json
+.codemore-baseline.json
+.package.json.files.bak
+.claude/**
+SAMPLES_REPORT.md
+MEMORY.md
+webpack.*.config.js
