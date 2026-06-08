@@ -43,6 +43,7 @@ import { AiService } from './services/aiService';
 import { SuggestionEngine } from './services/suggestionEngine';
 import { loadProjectConfig, CodemoreConfig, DEFAULT_CONFIG as DEFAULT_PROJECT_CONFIG } from './services/configLoader';
 import { runRegistryScan, scanFileWithRegistry } from './services/registryAdapter';
+import type { ReportSummary, Severity as ReportSeverity } from '../shared/report/types';
 import * as path from 'path';
 
 // ============================================================================
@@ -55,6 +56,15 @@ interface DaemonState {
     config: DaemonConfig;
     projectConfig: CodemoreConfig;
     version: string;
+    /**
+     * Most recent registry-scan result. The webview polls getAllIssues +
+     * getMetrics after each scan; both read this cache. Empty until the
+     * first analyzeWorkspace call lands.
+     */
+    latestRegistryIssues: CodeIssue[];
+    latestRegistrySummary: ReportSummary | null;
+    /** Total files discovered during the most recent walker pass. */
+    latestTotalFiles: number;
 }
 
 const state: DaemonState = {
@@ -63,6 +73,9 @@ const state: DaemonState = {
     config: DEFAULT_CONFIG,
     projectConfig: DEFAULT_PROJECT_CONFIG,
     version: '1.0.0',
+    latestRegistryIssues: [],
+    latestRegistrySummary: null,
+    latestTotalFiles: 0,
 };
 
 // ============================================================================
@@ -113,6 +126,45 @@ function logError(message: string, error?: unknown): void {
 function scanSingleFileWithRegistry(absFilePath: string, content: string): CodeIssue[] {
     const root = state.workspacePath || path.dirname(absFilePath);
     return scanFileWithRegistry(root, absFilePath, content);
+}
+
+/**
+ * Translate the schema-stable ReportSummary into the legacy dashboard's
+ * CodeHealthMetrics shape so the webview's `getMetrics` polling produces
+ * sensible numbers without needing a separate dashboard refactor.
+ */
+function deriveMetricsFromSummary(summary: ReportSummary, totalFiles: number): CodeHealthMetrics {
+    const issuesBySeverity: Record<ReportSeverity, number> = {
+        BLOCKER:  summary.bySeverity.BLOCKER  ?? 0,
+        CRITICAL: summary.bySeverity.CRITICAL ?? 0,
+        MAJOR:    summary.bySeverity.MAJOR    ?? 0,
+        MINOR:    summary.bySeverity.MINOR    ?? 0,
+        INFO:     summary.bySeverity.INFO     ?? 0,
+    };
+
+    // Coerce category counts into the legacy IssueCategory keyspace. The
+    // registry can emit categories we don't list, so unknown buckets land
+    // in 'code-smell' to avoid `undefined` defeating the dashboard charts.
+    const knownCategories = new Set(['bug', 'code-smell', 'performance', 'security', 'maintainability', 'accessibility', 'best-practice']);
+    const issuesByCategory: Record<string, number> = {
+        bug: 0, 'code-smell': 0, performance: 0, security: 0, maintainability: 0, accessibility: 0, 'best-practice': 0,
+    };
+    for (const [cat, n] of Object.entries(summary.byCategory)) {
+        const key = knownCategories.has(cat) ? cat : 'code-smell';
+        issuesByCategory[key] = (issuesByCategory[key] ?? 0) + n;
+    }
+
+    return {
+        overallScore: summary.score,
+        issuesByCategory: issuesByCategory as CodeHealthMetrics['issuesByCategory'],
+        issuesBySeverity,
+        filesAnalyzed: summary.filesAnalyzed,
+        totalFiles: Math.max(totalFiles, summary.filesAnalyzed),
+        linesOfCode: summary.linesOfCode,
+        // Registry doesn't track averageComplexity; 0 reads as "n/a" in the UI.
+        averageComplexity: 0,
+        technicalDebtMinutes: summary.technicalDebtMinutes,
+    };
 }
 
 // ============================================================================
@@ -299,9 +351,16 @@ const handlers: Record<string, RequestHandler> = {
             enableExperimental: true,
         });
 
-        // Tell the extension about the fresh issue list. The handler
-        // clears `currentIssues` and re-populates from this payload.
+        // Persist for the webview's pull-style RPCs (getAllIssues / getMetrics).
+        // Without this the dashboard would keep reading empty contextMap data.
+        state.latestRegistryIssues  = issues;
+        state.latestRegistrySummary = report.summary;
+        state.latestTotalFiles      = report.summary.filesAnalyzed;
+
+        // Push the fresh list to the extension. Extension fans this out to
+        // the diagnostic collection (squiggles) and the webview (dashboard).
         notify('daemon/issuesUpdated', { issues });
+        notify('daemon/metricsUpdated', { metrics: deriveMetricsFromSummary(report.summary, state.latestTotalFiles) });
         notify('daemon/analysisComplete', { issues, summary: report.summary });
 
         return { totalFiles: report.summary.filesAnalyzed, analysisId: `scan-${Date.now()}` };
@@ -400,11 +459,19 @@ const handlers: Record<string, RequestHandler> = {
     },
 
     /**
-     * Get code health metrics
+     * Get code health metrics.
+     *
+     * Reads from the registry scan cache when present (post-Phase-3 path);
+     * otherwise falls back to the legacy contextMap aggregator so an empty
+     * dashboard isn't shown before the first scan.
      */
     async getMetrics(): Promise<{ metrics: CodeHealthMetrics }> {
         if (!contextMap) {
             throw new Error('Daemon not initialized');
+        }
+
+        if (state.latestRegistrySummary) {
+            return { metrics: deriveMetricsFromSummary(state.latestRegistrySummary, state.latestTotalFiles) };
         }
 
         const metrics = contextMap.getHealthMetrics();
@@ -438,11 +505,18 @@ const handlers: Record<string, RequestHandler> = {
     },
 
     /**
-     * Get all issues across the project
+     * Get all issues across the project.
+     *
+     * Returns the registry scan's cache when present so the dashboard
+     * webview's "Issues" tab sees the same set as the Problems panel.
      */
     async getAllIssues(): Promise<{ issues: CodeIssue[] }> {
         if (!contextMap) {
             throw new Error('Daemon not initialized');
+        }
+
+        if (state.latestRegistryIssues.length > 0 || state.latestRegistrySummary) {
+            return { issues: state.latestRegistryIssues };
         }
 
         const issues = contextMap.getAllIssues();
