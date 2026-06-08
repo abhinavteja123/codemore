@@ -46,7 +46,10 @@ const LINE_LEADER = '(?:\\/\\/|--|#|\\/\\*)';
 
 const SAME_LINE_RE  = new RegExp(`${LINE_LEADER}\\s*codemore-ignore:\\s*([a-zA-Z0-9\\-_,\\s*]+)`);
 const NEXT_LINE_RE  = new RegExp(`${LINE_LEADER}\\s*codemore-ignore-next-line:\\s*([a-zA-Z0-9\\-_,\\s*]+)`);
-const FILE_LEVEL_RE = /\/\*\s*codemore-ignore-file:\s*([a-zA-Z0-9\-_,\s*]+)\s*\*\//;
+// File-level directive in either a C-style block comment (most languages)
+// or an HTML/markdown comment (for .md docs / HTML / XML / Vue templates).
+const FILE_LEVEL_BLOCK_RE = /\/\*\s*codemore-ignore-file:\s*([a-zA-Z0-9\-_,\s*]+)\s*\*\//;
+const FILE_LEVEL_HTML_RE  = /<!--\s*codemore-ignore-file:\s*([a-zA-Z0-9\-_,\s*]+)\s*-->/;
 
 function parseRuleList(raw: string): string[] {
   // The capture allows `*` so wildcard suppression (`codemore-ignore: *`)
@@ -91,7 +94,7 @@ export function extractSuppressComments(content: string): SuppressedRule[] {
       }
     }
 
-    const fileMatch = line.match(FILE_LEVEL_RE);
+    const fileMatch = line.match(FILE_LEVEL_BLOCK_RE) ?? line.match(FILE_LEVEL_HTML_RE);
     if (fileMatch) {
       for (const ruleId of parseRuleList(fileMatch[1])) {
         suppressed.push({ ruleId, line: -1 });

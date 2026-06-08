@@ -1,3 +1,4 @@
+<!-- codemore-ignore-file: core-security-hardcoded-secret-pattern -->
 # vibe-public-env-leak
 
 | Category | Default severity | Lifecycle | Default confidence |

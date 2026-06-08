@@ -11,6 +11,7 @@ import type { Rule } from '../../rules/Rule';
 import { coreSecurityEval } from './core-security-eval';
 import { coreSecurityInnerhtmlAssignment } from './core-security-innerhtml-assignment';
 import { coreSecurityShellInjection } from './core-security-shell-injection';
+import { coreSecurityHardcodedSecretPattern } from './core-security-hardcoded-secret-pattern';
 
 export const PACK_NAME = 'core-security' as const;
 
@@ -18,6 +19,7 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   coreSecurityEval,
   coreSecurityInnerhtmlAssignment,
   coreSecurityShellInjection,
+  coreSecurityHardcodedSecretPattern,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {
