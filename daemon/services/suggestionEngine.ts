@@ -12,6 +12,7 @@ import * as path from 'path';
 import { LRUCache } from 'lru-cache';
 import { AiService } from './aiService';
 import { ContextMap } from './contextMap';
+import { scanFileWithRegistry } from './registryAdapter';
 import {
     CodeIssue,
     CodeSuggestion,
@@ -50,23 +51,32 @@ export class SuggestionEngine {
     }
 
     /**
-     * Analyze a file and return issues
+     * Analyze a file and return issues.
+     *
+     * Now routes through the rule-registry's per-file scan (same code
+     * path as `codemore scan`). The legacy AI/monolith analyser is kept
+     * elsewhere only for explicit AI-fix generation. Doing both — analysis
+     * and fix-generation — through the registry would be a bigger refactor
+     * we'll do alongside the agentic loop unification.
      */
     async analyzeFile(
         filePath: string,
         content: string,
         context: FileContext
     ): Promise<CodeIssue[]> {
-        logger.debug({ filePath }, 'Analyzing file');
+        logger.debug({ filePath }, 'Analyzing file (registry path)');
 
-        const issues = await this.aiService.analyzeCode(filePath, content, context);
+        // contextMap holds the project root; we get there via the path of
+        // any tracked file. Cheap to compute, no I/O.
+        const workspacePath = this.contextMap.getWorkspacePath();
+        const issues = scanFileWithRegistry(workspacePath, filePath, content);
 
-        // Cache issues
-        for (const issue of issues) {
-            this.issueCache.set(issue.id, issue);
-        }
+        // Cache by id so getSuggestionsForIssue can look up the issue later
+        // — the old contract.
+        for (const issue of issues) this.issueCache.set(issue.id, issue);
 
-        // Sort by priority (severity + impact + confidence)
+        // Sort by priority (severity + impact + confidence) so callers
+        // that only show top-N still pick the right N.
         issues.sort((a, b) => {
             const scoreA = this.calculatePriority(a);
             const scoreB = this.calculatePriority(b);

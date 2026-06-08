@@ -42,6 +42,8 @@ import { AnalysisQueue } from './services/analysisQueue';
 import { AiService } from './services/aiService';
 import { SuggestionEngine } from './services/suggestionEngine';
 import { loadProjectConfig, CodemoreConfig, DEFAULT_CONFIG as DEFAULT_PROJECT_CONFIG } from './services/configLoader';
+import { runRegistryScan, scanFileWithRegistry } from './services/registryAdapter';
+import * as path from 'path';
 
 // ============================================================================
 // Daemon State
@@ -104,6 +106,13 @@ function log(message: string): void {
 function logError(message: string, error?: unknown): void {
     logger.error({ err: sanitizeError(error) }, message);
     notify('daemon/error', { message, details: error instanceof Error ? error.message : String(error) });
+}
+
+// Per-file registry scan lives in services/registryAdapter; thin wrapper
+// here lets callers omit the workspace path on every call.
+function scanSingleFileWithRegistry(absFilePath: string, content: string): CodeIssue[] {
+    const root = state.workspacePath || path.dirname(absFilePath);
+    return scanFileWithRegistry(root, absFilePath, content);
 }
 
 // ============================================================================
@@ -233,58 +242,66 @@ const handlers: Record<string, RequestHandler> = {
     },
 
     /**
-     * Analyze a single file
+     * Analyze a single file via the rule registry.
+     *
+     * The legacy implementation pushed the file through the staticAnalyzer
+     * monolith, which produced ~1,800 issues on this repo and ~58% scope-FPs
+     * on third-party projects. We now scope the registry's per-file path
+     * to this one file: same code path the CLI uses, same clean signal.
      */
     async analyzeFile(params: unknown): Promise<{ issues: CodeIssue[]; context: FileContext }> {
         const { filePath, content } = params as { filePath: string; content?: string };
 
-        if (!astParser || !contextMap || !suggestionEngine) {
+        if (!astParser || !contextMap) {
             throw new Error('Daemon not initialized');
         }
 
-        log(`Analyzing file: ${filePath}`);
+        log(`Analyzing file (registry): ${filePath}`);
 
-        // Get file content if not provided
         const fileContent = content || await contextMap.getFileContent(filePath);
 
-        // Parse AST and extract context
+        // Keep the AST parse + context map update — the webview's symbol
+        // browser still relies on this, and the registry's per-file run
+        // benefits from the parsed source. Cost: one redundant parse on
+        // this hot path; acceptable until we unify the parsers.
         const ast = await astParser.parse(filePath, fileContent);
         const fileContext = astParser.extractContext(filePath, ast, fileContent);
-
-        // Update context map
         contextMap.updateFile(filePath, fileContext);
 
-        // Generate issues using AI
-        const issues = await suggestionEngine.analyzeFile(filePath, fileContent, fileContext);
+        const issues = scanSingleFileWithRegistry(filePath, fileContent);
         fileContext.issues = issues;
 
         return { issues, context: fileContext };
     },
 
     /**
-     * Analyze the entire workspace
+     * Analyze the entire workspace via the rule registry.
+     *
+     * Returns the same { totalFiles, analysisId } shape the legacy
+     * implementation did, so the extension's notification-driven UI
+     * keeps working unchanged. We additionally fire a
+     * `daemon/issuesUpdated` notification with the registry's issues —
+     * that's how the webview + diagnostic collection get populated.
      */
     async analyzeWorkspace(params: unknown): Promise<{ totalFiles: number; analysisId: string }> {
         const { force } = (params as { force?: boolean }) || {};
 
-        if (!contextMap || !analysisQueue) {
+        if (!state.workspacePath) {
             throw new Error('Daemon not initialized');
         }
 
-        log('Starting workspace analysis...');
+        log('Starting workspace scan (registry)...');
 
-        // Reset analysis counters for new workspace analysis
-        analysisQueue.reset();
+        const { issues, report } = await runRegistryScan(state.workspacePath, {
+            enableExperimental: true,
+        });
 
-        const files = await contextMap.getAllFiles();
-        const analysisId = `analysis-${Date.now()}`;
+        // Tell the extension about the fresh issue list. The handler
+        // clears `currentIssues` and re-populates from this payload.
+        notify('daemon/issuesUpdated', { issues });
+        notify('daemon/analysisComplete', { issues, summary: report.summary });
 
-        // Queue all files for analysis
-        for (const filePath of files) {
-            await analysisQueue.enqueue(filePath);
-        }
-
-        return { totalFiles: files.length, analysisId };
+        return { totalFiles: report.summary.filesAnalyzed, analysisId: `scan-${Date.now()}` };
     },
 
     /**

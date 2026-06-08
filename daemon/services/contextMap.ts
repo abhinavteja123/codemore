@@ -37,6 +37,9 @@ export class ContextMap {
         private maxFileSizeKB: number = 500
     ) { }
 
+    /** Expose the workspace root so other services don't have to plumb it. */
+    getWorkspacePath(): string { return this.workspacePath; }
+
     /**
      * Scan workspace for all files
      */
