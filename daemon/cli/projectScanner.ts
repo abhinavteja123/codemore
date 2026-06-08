@@ -30,20 +30,26 @@ import {
   type IssueSeverityCounts,
 } from '../../shared/scoring';
 
-const DEFAULT_IGNORE_DIRS = new Set([
+// Skipped regardless of where they appear in the tree.
+const UNIVERSAL_IGNORE_DIRS = new Set([
   'node_modules', 'dist', 'build', '.next', '.git', 'out', 'coverage',
   '.vscode', '.idea', '.cache', 'target', '.svelte-kit', '.turbo',
-  // CodeMore-internal: the corpus dir holds intentionally-bad fixtures used
-  // by the rule-PR validator. They must never be flagged by a normal scan.
-  // The validator invokes the CLI with corpus/rules/<id>/{tp,fp} as the
-  // explicit root, which bypasses this ignore.
-  'corpus',
-  // Compile outputs (publish bundle + webpack daemon bundle) — never scan
-  // generated code, the rule sources are the canonical thing.
+]);
+
+// Skipped ONLY when they appear as a direct child of the scan root.
+// `lib`, `corpus`, and `.samples-cache` are CodeMore-internal names; nested
+// occurrences (e.g. `src/lib/`, `packages/foo/corpus/`) are legitimate
+// source directories that must be scanned.
+const ROOT_ONLY_IGNORE_DIRS = new Set([
+  // Compile output (tsconfig.publish.json -> lib/). Generated code; the
+  // rule sources are the canonical thing.
   'lib',
-  // Corpus runner clones go here (gitignored). Sampling these would create
-  // a feedback loop where the scanner finds issues it then claims as its
-  // own corpus stats.
+  // Rule-PR validator fixtures. The validator invokes the CLI with
+  // corpus/rules/<id>/{tp,fp} as the explicit root, which bypasses the
+  // ignore by being below the configured root.
+  'corpus',
+  // Corpus runner clones (samples.json). Sampling these creates a
+  // feedback loop where self-scan picks up external findings.
   '.samples-cache',
 ]);
 
@@ -110,13 +116,16 @@ interface DiscoveredFile {
   language: string;
 }
 
-function shouldIgnoreSegment(segment: string): boolean {
-  // Only skip directories explicitly listed in DEFAULT_IGNORE_DIRS.
-  // We do NOT blanket-skip dotfile directories: .cursor/, .claude/,
-  // .github/ contain config that vibe rules genuinely need to inspect
-  // (e.g. mcp.json under .cursor/). Junk dotfile dirs (.git, .next,
-  // .cache, .vscode, .idea, .turbo, .svelte-kit) are listed explicitly.
-  return DEFAULT_IGNORE_DIRS.has(segment);
+function shouldIgnoreSegment(segment: string, depth: number): boolean {
+  // Universal: skip wherever it appears.
+  if (UNIVERSAL_IGNORE_DIRS.has(segment)) return true;
+  // Root-only: skip only when this segment is a direct child of the scan
+  // root (depth 1). Nested occurrences (`src/lib`, `packages/foo/corpus`)
+  // are real source directories and must be scanned.
+  if (depth === 1 && ROOT_ONLY_IGNORE_DIRS.has(segment)) return true;
+  // Dotfile dirs (.cursor/, .claude/, .github/) are NOT blanket-skipped —
+  // those contain config that vibe rules genuinely need to inspect.
+  return false;
 }
 
 function matchesUserIgnore(relPath: string, patterns: ReadonlyArray<string>): boolean {
@@ -128,7 +137,7 @@ function walk(root: string, userIgnore: ReadonlyArray<string>): DiscoveredFile[]
   const out: DiscoveredFile[] = [];
   const rootAbs = path.resolve(root);
 
-  function recur(dir: string) {
+  function recur(dir: string, depth: number) {
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -141,9 +150,9 @@ function walk(root: string, userIgnore: ReadonlyArray<string>): DiscoveredFile[]
       const rel = path.relative(rootAbs, full);
 
       if (entry.isDirectory()) {
-        if (shouldIgnoreSegment(entry.name)) continue;
+        if (shouldIgnoreSegment(entry.name, depth + 1)) continue;
         if (matchesUserIgnore(rel, userIgnore)) continue;
-        recur(full);
+        recur(full, depth + 1);
         continue;
       }
 
@@ -157,7 +166,7 @@ function walk(root: string, userIgnore: ReadonlyArray<string>): DiscoveredFile[]
     }
   }
 
-  recur(rootAbs);
+  recur(rootAbs, 0);
   return out;
 }
 
