@@ -1,0 +1,27 @@
+{
+  "$comment": "SHA-256 hashes for every binary downloaded by scripts/download-binaries.js. Keys are <tool>/<version>/<platform>. To populate or refresh, run `node scripts/download-binaries.js --capture-hashes`. Mismatch at download time is fatal — see the verifyHash() function for the failure message.",
+  "biome": {
+    "v1.5.3": {
+      "darwin-arm64": null,
+      "darwin-x64": null,
+      "linux-x64": null,
+      "win32-x64": "01c0f14c0a0a2e6bbf5e6db1e00a024a9128017eee1e3d2f795fc4f36ab0584c"
+    }
+  },
+  "ruff": {
+    "0.14.14": {
+      "darwin-arm64": null,
+      "darwin-x64": null,
+      "linux-x64": null,
+      "win32-x64": "1c9ccbc007819d275cb97a3ad365c22824ee0cc32b9f97593c8133999d30e906"
+    }
+  },
+  "tflint": {
+    "v0.50.3": {
+      "darwin-arm64": null,
+      "darwin-x64": null,
+      "linux-x64": null,
+      "win32-x64": "6764028ee77410e24bc7590f1a5a42a2e1bff6d1fbd025d28051975b39fb5f67"
+    }
+  }
+}

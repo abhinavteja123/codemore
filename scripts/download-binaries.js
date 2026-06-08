@@ -16,12 +16,99 @@ const https = require('https');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { exec } = require('child_process');
 const { promisify } = require('util');
 
 const execAsync = promisify(exec);
 
 const BIN_DIR = path.join(__dirname, '..', 'bin');
+const HASHES_PATH = path.join(__dirname, 'binary-hashes.json');
+
+// CLI flags: --skip-download, --current-platform, --capture-hashes.
+// --capture-hashes downloads each binary, computes its SHA-256, and writes
+// scripts/binary-hashes.json. Use this when bumping a tool's version: bump
+// the URL/version above, run `node scripts/download-binaries.js --capture-hashes`,
+// review the diff on the JSON, commit.
+const ARGV = new Set(process.argv.slice(2));
+const CAPTURE_HASHES = ARGV.has('--capture-hashes');
+
+function loadPinnedHashes() {
+  if (!fs.existsSync(HASHES_PATH)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(HASHES_PATH, 'utf8'));
+  } catch (err) {
+    console.warn(`  warn: scripts/binary-hashes.json is not valid JSON (${err.message}). Treating as empty.`);
+    return {};
+  }
+}
+
+function lookupPinnedHash(hashes, tool, version, platform) {
+  const v = hashes[tool] && hashes[tool][version];
+  return v ? v[platform] ?? null : null;
+}
+
+/** Compute SHA-256 of a file. Streams; safe for large binaries. */
+function sha256Of(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(filePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('end', () => resolve(hash.digest('hex')));
+    stream.on('error', reject);
+  });
+}
+
+/**
+ * Verify a downloaded file against a pinned hash.
+ *
+ * - Pinned hash present and matches → OK, log ✓.
+ * - Pinned hash present and mismatches → delete the file and throw. This
+ *   is the supply-chain safety net: a compromised mirror, a CDN swap, or
+ *   a tampered package can never silently land in the user's bin/.
+ * - Pinned hash is `null` (placeholder) → warn loudly but continue, so
+ *   maintainers know to populate the hash. Also print the computed hash
+ *   so they can paste it straight into binary-hashes.json.
+ * - Pinned hashes file missing entirely → behave as the placeholder case.
+ *
+ * In --capture-hashes mode we don't throw on mismatch; instead we just
+ * record the actual hash and let the caller persist it.
+ */
+async function verifyOrCaptureHash(filePath, tool, version, platform, hashes, captureBucket) {
+  const expected = lookupPinnedHash(hashes, tool, version, platform);
+  const actual = await sha256Of(filePath);
+
+  if (CAPTURE_HASHES) {
+    captureBucket[tool] = captureBucket[tool] || {};
+    captureBucket[tool][version] = captureBucket[tool][version] || {};
+    captureBucket[tool][version][platform] = actual;
+    console.log(`  captured SHA-256 for ${tool}/${version}/${platform}: ${actual}`);
+    return;
+  }
+
+  if (!expected) {
+    console.warn(
+      `  ⚠️  No SHA-256 pinned for ${tool}/${version}/${platform}.\n` +
+      `     Supply-chain verification skipped — the binary could be tampered with.\n` +
+      `     To pin: paste this into scripts/binary-hashes.json under ${tool}.${version}.${platform}:\n` +
+      `       "${actual}"`,
+    );
+    return;
+  }
+
+  if (expected.toLowerCase() !== actual.toLowerCase()) {
+    try { fs.unlinkSync(filePath); } catch {}
+    throw new Error(
+      `SHA-256 verification FAILED for ${tool}/${version}/${platform}.\n` +
+      `  expected: ${expected}\n` +
+      `  actual:   ${actual}\n` +
+      `Refusing to install. If you trust this download, update scripts/binary-hashes.json. ` +
+      `Otherwise this could be a compromised mirror.`,
+    );
+  }
+
+  console.log(`  ✓ SHA-256 verified for ${tool}/${version}/${platform}`);
+}
 
 /**
  * Get current platform identifier
@@ -210,44 +297,68 @@ async function extractArchive(archivePath, destDir, binaryName) {
 /**
  * Download and setup a tool for a specific platform
  */
-async function downloadToolForPlatform(toolName, toolConfig, platform) {
+async function downloadToolForPlatform(toolName, toolConfig, platform, pinnedHashes, captureBucket) {
     const url = toolConfig.platforms[platform];
     if (!url) {
         console.log(`  ⚠️  No binary available for ${platform}`);
         return;
     }
-    
+
     const platformDir = path.join(BIN_DIR, platform);
     if (!fs.existsSync(platformDir)) {
         fs.mkdirSync(platformDir, { recursive: true });
     }
-    
+
     const binaryName = toolConfig.binaryName;
     const ext = platform === 'win32-x64' ? '.exe' : '';
     const finalBinaryPath = path.join(platformDir, binaryName + ext);
-    
+
     // Check if already downloaded
-    if (fs.existsSync(finalBinaryPath)) {
+    if (fs.existsSync(finalBinaryPath) && !CAPTURE_HASHES) {
         console.log(`  ✓ Already downloaded: ${finalBinaryPath}`);
+        // Still verify the on-disk binary against the pinned hash. This catches
+        // tampering after the initial install (a malicious npm hook, a manual
+        // swap, etc.). Cheap: SHA-256 on ~10 MB is <100 ms.
+        try {
+            await verifyOrCaptureHash(finalBinaryPath, toolName, toolConfig.version, platform, pinnedHashes, captureBucket);
+        } catch (err) {
+            console.error(`  ✗ Pinned-hash check failed for existing binary: ${err.message}`);
+            throw err;
+        }
         return;
     }
-    
+
     try {
+        let verifyTarget;
         if (toolConfig.isDirect) {
-            // Direct binary download
+            // Direct binary download — verify the binary itself.
             await downloadFile(url, finalBinaryPath);
             fs.chmodSync(finalBinaryPath, 0o755);
+            verifyTarget = finalBinaryPath;
         } else {
-            // Download archive and extract
+            // Download archive — verify the ARCHIVE (before extraction). The
+            // archive is what the upstream release attests to; the unpacked
+            // binary's bytes vary with extractor implementation details.
             const archiveExt = url.endsWith('.zip') ? '.zip' : '.tar.gz';
             const archivePath = path.join(platformDir, `${binaryName}${archiveExt}`);
             await downloadFile(url, archivePath);
+            verifyTarget = archivePath;
+            await verifyOrCaptureHash(verifyTarget, toolName, toolConfig.version, platform, pinnedHashes, captureBucket);
             await extractArchive(archivePath, platformDir, binaryName + ext);
+            // Archive was verified pre-extract; we don't re-verify the binary.
+            console.log(`  ✓ Installed: ${finalBinaryPath}`);
+            return;
         }
-        
+
+        await verifyOrCaptureHash(verifyTarget, toolName, toolConfig.version, platform, pinnedHashes, captureBucket);
         console.log(`  ✓ Installed: ${finalBinaryPath}`);
     } catch (error) {
         console.error(`  ✗ Failed to download ${toolName} for ${platform}:`, error.message);
+        // Re-throw on verification failure so install actually fails — better
+        // a broken install than a silently-tampered binary.
+        if (error.message && error.message.includes('SHA-256 verification FAILED')) {
+            throw error;
+        }
     }
 }
 
@@ -256,7 +367,13 @@ async function downloadToolForPlatform(toolName, toolConfig, platform) {
  */
 async function downloadAllTools(currentPlatformOnly = false) {
     console.log('📦 Downloading external analysis tool binaries...\n');
-    
+
+    const pinnedHashes = loadPinnedHashes();
+    const captureBucket = CAPTURE_HASHES ? {} : null;
+    if (CAPTURE_HASHES) {
+        console.log('🔐 --capture-hashes mode: will record SHA-256 of every downloaded binary into scripts/binary-hashes.json\n');
+    }
+
     let platforms;
     if (currentPlatformOnly) {
         const currentPlatform = getCurrentPlatform();
@@ -270,16 +387,33 @@ async function downloadAllTools(currentPlatformOnly = false) {
         platforms = ['darwin-arm64', 'darwin-x64', 'linux-x64', 'win32-x64'];
         console.log('🌍 Downloading for all platforms (for packaging)\n');
     }
-    
+
     for (const [toolName, toolConfig] of Object.entries(TOOLS)) {
         console.log(`\n🔧 ${toolName} (${toolConfig.version})`);
-        
+
         for (const platform of platforms) {
             console.log(`\n  Platform: ${platform}`);
-            await downloadToolForPlatform(toolName, toolConfig, platform);
+            await downloadToolForPlatform(toolName, toolConfig, platform, pinnedHashes, captureBucket || {});
         }
     }
-    
+
+    if (CAPTURE_HASHES) {
+        // Merge captured hashes with the existing pin file (preserving the
+        // $comment header and any platforms we didn't re-download).
+        const merged = { ...pinnedHashes };
+        if (!merged.$comment) {
+            merged.$comment = 'SHA-256 hashes for every binary downloaded by scripts/download-binaries.js.';
+        }
+        for (const [tool, versions] of Object.entries(captureBucket)) {
+            merged[tool] = merged[tool] || {};
+            for (const [version, plats] of Object.entries(versions)) {
+                merged[tool][version] = { ...(merged[tool][version] || {}), ...plats };
+            }
+        }
+        fs.writeFileSync(HASHES_PATH, JSON.stringify(merged, null, 2) + '\n');
+        console.log(`\n📝 Wrote captured hashes to scripts/binary-hashes.json`);
+    }
+
     console.log('\n✅ Binary download complete!');
     console.log('\nNote: Checkov is Python-based and not bundled. It will be used if installed by the user.');
 }
