@@ -7,17 +7,40 @@
       "name": "synthetic-realistic-vibe-app",
       "source": "local",
       "path": "C:/tmp/realistic-vibe-app",
-      "expectsBlockers": 9,
-      "expectsScoreAtMost": 90,
-      "notes": "Built in /tmp by the project's own pressure-test driver. Covers all 7 shipped rules."
+      "notes": "Vibe-rule pressure-test app. Covers the 7 vibe-* pack rules: RLS-off, RLS permissive, public-env leak, hardcoded JWT, MCP config secret, CORS wildcard+creds, dangerouslySetInnerHTML."
     },
     {
-      "name": "supabase-nextjs-starter",
+      "name": "synthetic-messy-vibe-app",
+      "source": "local",
+      "path": "C:/tmp/messy-vibe-app",
+      "notes": "General-rule pressure-test app. Covers eval, shell-injection, as-any, loose-equality, non-null-assertion, empty-catch, leftover-console, TODO/FIXME, async-without-await, hardcoded provider secret."
+    },
+    {
+      "name": "vercel-with-supabase",
       "source": "git",
       "url": "https://github.com/vercel/next.js.git",
-      "ref": "canary",
       "subpath": "examples/with-supabase",
-      "notes": "Vercel's official Next.js + Supabase example. Should report few or no BLOCKERs — used as a smoke-test that the catalog isn't accidentally flagging good code."
+      "notes": "Vercel's official Next.js + Supabase example. Expected clean — smoke-test that the catalog isn't false-positiving on reference code."
+    },
+    {
+      "name": "vercel-with-clerk",
+      "source": "git",
+      "url": "https://github.com/vercel/next.js.git",
+      "subpath": "examples/with-clerk",
+      "notes": "Vercel's official Next.js + Clerk example. Expected clean."
+    },
+    {
+      "name": "vercel-api-routes-rest",
+      "source": "git",
+      "url": "https://github.com/vercel/next.js.git",
+      "subpath": "examples/api-routes-rest",
+      "notes": "Vercel's Next.js REST API routes example. Expected clean."
+    },
+    {
+      "name": "nextauth-example",
+      "source": "git",
+      "url": "https://github.com/nextauthjs/next-auth-example.git",
+      "notes": "Auth.js (NextAuth) official example. Expected clean."
     }
   ]
 }
