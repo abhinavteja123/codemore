@@ -1,0 +1,11 @@
+{
+  "name": "vibe-no-rate-limit-fp",
+  "private": true,
+  "description": "Fixture: Next.js app with an API route AND @upstash/ratelimit. The rule must NOT fire.",
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "*",
+    "@upstash/ratelimit": "^1.0.0",
+    "@upstash/redis": "^1.0.0"
+  }
+}

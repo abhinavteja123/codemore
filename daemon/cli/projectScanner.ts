@@ -33,6 +33,8 @@ import { toolVersion } from '../../shared/toolVersion';
 import { createIgnoreResolver, type IgnoreResolver } from './ignoreResolver';
 import { detectFrameworks } from './frameworkDetect';
 import { loadCodemorerc } from './codemorercLoader';
+import { buildProjectIndex } from './projectIndex';
+import type { ProjectIndex } from '../../shared/rules/Rule';
 
 // Pinned skip set used as a hard fail-safe even when an external project
 // has no .gitignore. `IgnoreResolver` carries the same set plus the
@@ -168,6 +170,7 @@ function buildContext(
   discovered: DiscoveredFile,
   content: string,
   frameworks: ReadonlyArray<string>,
+  projectIndex: ProjectIndex | undefined,
 ): RuleContext {
   return {
     filePath: discovered.relPath,
@@ -177,6 +180,7 @@ function buildContext(
     lines: content.split('\n'),
     sourceFile: parseIfTypeScript(discovered.relPath, content, discovered.extension),
     frameworks,
+    projectIndex,
   };
 }
 
@@ -277,6 +281,12 @@ export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
     extraPatterns: userIgnore.length > 0 ? userIgnore : undefined,
   });
   const discovered = walk(opts.root, userIgnore, resolver);
+
+  // Build the cross-file ProjectIndex once. Rules that don't need it
+  // simply ignore the optional field; rules that DO need it can rely
+  // on the same import-graph / route-inventory snapshot.
+  const projectIndex = buildProjectIndex(opts.root);
+
   const issues: ReportIssue[] = [];
   let linesOfCode = 0;
   let filesAnalyzed = 0;
@@ -297,7 +307,7 @@ export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
       continue;
     }
 
-    const ctx = buildContext(file, content, frameworks);
+    const ctx = buildContext(file, content, frameworks, projectIndex);
     const result = globalRegistry.scanFile(ctx, {
       enabledPacks,
       ruleOverrides,

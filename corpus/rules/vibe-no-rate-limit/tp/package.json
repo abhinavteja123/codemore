@@ -1,0 +1,9 @@
+{
+  "name": "vibe-no-rate-limit-tp",
+  "private": true,
+  "description": "Fixture: Next.js app with an API route but NO rate-limit library anywhere. The rule must fire.",
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "*"
+  }
+}

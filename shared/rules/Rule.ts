@@ -17,6 +17,37 @@ import type {
 } from '../report/types';
 
 /**
+ * Cross-file snapshot built once per scan and reused by every rule.
+ *
+ * The shape is the minimum that Phase 2B rules need; future fields are
+ * additive. The CLI builds this in `daemon/cli/projectIndex.ts` and the
+ * MCP server inherits it from the same scan pipeline.
+ *
+ * Rules MUST treat this as read-only.
+ */
+export interface ProjectIndex {
+  /** Project root used to build this index (absolute path). */
+  readonly root: string;
+  /** Every module specifier imported anywhere in the project. */
+  readonly allImports: ReadonlySet<string>;
+  /** Files identified as API route handlers (Next.js or Express). */
+  readonly routeFiles: ReadonlyArray<{
+    readonly absPath: string;
+    readonly relPath: string;
+    readonly style: 'next-app-router' | 'next-pages-api' | 'express' | 'unknown';
+    readonly methods: ReadonlyArray<string>;
+  }>;
+  /** True when at least one rate-limit library is imported anywhere. */
+  readonly hasRateLimitLib: boolean;
+  /** True when at least one schema validator (zod/yup/etc.) is imported anywhere. */
+  readonly hasValidatorLib: boolean;
+  /** True when at least one auth-helper name is referenced anywhere. */
+  readonly hasAuthHelper: boolean;
+  /** True when @supabase/* is imported anywhere. */
+  readonly hasSupabase: boolean;
+}
+
+/**
  * What a rule sees when it runs.
  *
  * Rules MUST NOT mutate any field of this context. The same context is
@@ -48,6 +79,14 @@ export interface RuleContext {
   readonly frameworks: ReadonlyArray<string>;
   /** Optional sibling-file lookup for cross-file analysis. */
   readonly resolveFile?: (relativePath: string) => string | null;
+  /**
+   * Optional cross-file snapshot (import graph, route inventory, presence
+   * of auth/rate-limit/validator libs). Built once per scan by the CLI;
+   * absent in single-file callers (legacy daemon analyzer fallback,
+   * IDE quick-fix preview, etc.). Rules that NEED this should early-return
+   * when undefined rather than guess.
+   */
+  readonly projectIndex?: ProjectIndex;
 }
 
 /**

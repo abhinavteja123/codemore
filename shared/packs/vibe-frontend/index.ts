@@ -9,12 +9,14 @@
 import type { Rule } from '../../rules/Rule';
 import { vibeCorsWildcardCredentials } from './vibe-cors-wildcard-credentials';
 import { vibeXssDangerouslySet } from './vibe-xss-dangerously-set';
+import { vibeNoRateLimit } from './vibe-no-rate-limit';
 
 export const PACK_NAME = 'vibe-frontend' as const;
 
 export const PACK_RULES: ReadonlyArray<Rule> = [
   vibeCorsWildcardCredentials,
   vibeXssDangerouslySet,
+  vibeNoRateLimit,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {
