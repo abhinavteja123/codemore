@@ -109,11 +109,12 @@ function looksLikePlaceholder(token: string): boolean {
 
 export const coreSecurityHardcodedSecretPattern: Rule = {
   id: 'core-security-hardcoded-secret-pattern',
-  version: '1.0.0',
+  version: '1.1.0',
   pack: 'core-security',
   lifecycle: 'experimental',
-  // Apply broadly — strings can leak into any of these.
-  languages: ['typescript', 'javascript', 'json', 'yaml', 'env', 'markdown'],
+  // Apply broadly — provider tokens are plain strings and can leak into
+  // any text-shaped file. Python + shell added in Phase 7A.
+  languages: ['typescript', 'javascript', 'json', 'yaml', 'env', 'markdown', 'python', 'shell'],
   category: 'security',
   defaultSeverity: 'BLOCKER',
   defaultConfidence: 0.95,

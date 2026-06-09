@@ -21,6 +21,8 @@ import { vibeSupplyChainHallucinatedImport } from './vibe-supply-chain-hallucina
 // Phase 7A — Python native pack
 import { coreSecurityPyEval } from './core-security-py-eval';
 import { coreSecurityPyShellInjection } from './core-security-py-shell-injection';
+import { vibePySsrfFetchUserInput } from './vibe-py-ssrf-fetch-user-input';
+import { vibePySecretInLog } from './vibe-py-secret-in-log';
 
 export const PACK_NAME = 'core-security' as const;
 
@@ -37,6 +39,8 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   vibeSupplyChainHallucinatedImport,
   coreSecurityPyEval,
   coreSecurityPyShellInjection,
+  vibePySsrfFetchUserInput,
+  vibePySecretInLog,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {
