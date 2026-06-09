@@ -196,6 +196,9 @@ function runShow(args: BaselineShowArgs): number {
   return 0;
 }
 
+// Reason: CLI dispatcher signature. All `run<Cmd>` siblings return Promise<number>;
+// some branches genuinely await scans, the trivial subcommands (drop/show) don't.
+// codemore-ignore-next-line: core-quality-async-without-await
 export async function runBaseline(argv: string[]): Promise<number> {
   const sub = argv[0];
   const rest = argv.slice(1);

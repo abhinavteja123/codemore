@@ -58,8 +58,14 @@ export class RpcClient implements vscode.Disposable {
     constructor(private readonly outputChannel: vscode.OutputChannel) { }
 
     /**
-     * Make an RPC call to the daemon
+     * Make an RPC call to the daemon.
+     *
+     * Reason for codemore-ignore-next-line below: returns a Promise that
+     * resolves when the daemon replies via IPC. The body uses
+     * `new Promise(...)` (no `await` needed); `async` is kept so future
+     * timeout/retry logic can use it ergonomically.
      */
+    // codemore-ignore-next-line: core-quality-async-without-await
     async call<M extends keyof DaemonMethods>(
         method: M,
         params: DaemonMethods[M]['params'],

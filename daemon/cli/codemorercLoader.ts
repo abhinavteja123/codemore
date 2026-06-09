@@ -52,6 +52,10 @@ export interface CodemorerCLoaded {
 
 function tryParseJson(raw: string): unknown {
   // Tolerant: strip block comments + line comments + trailing commas.
+  // Reason for codemore-ignore-next-line below: fast-path attempt; the slow
+  // JSONC strip runs unconditionally below if JSON.parse fails. Meaningful
+  // fallback exists, not a silent swallow.
+  // codemore-ignore-next-line: core-quality-empty-catch
   try { return JSON.parse(raw); } catch { /* try jsonc */ }
   const stripped = raw
     .replace(/\/\*[\s\S]*?\*\//g, '')

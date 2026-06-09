@@ -1,8 +1,3 @@
-/* codemore-ignore-file: core-quality-empty-catch, core-quality-leftover-console, core-typescript-as-any, core-quality-async-without-await, core-bugs-todo-fixme, core-typescript-non-null-assertion-abuse, core-bugs-loose-equality */
-/* Web dashboard — Phase 3 plan demotes this to a 'scan-by-URL' demo. The
-   page-level empty catches are part of the legacy dashboard slated for
-   replacement; rules will re-apply per-component after the rewrite. */
-
 /**
  * CodeMore VS Code Extension - Main Entry Point
  * 
@@ -93,9 +88,15 @@ async function startDaemonAndInitialize(context: vscode.ExtensionContext): Promi
 }
 
 /**
- * Extension activation entry point
- * Called when the extension is activated (on startup or first command)
+ * Extension activation entry point.
+ * Called when the extension is activated (on startup or first command).
+ *
+ * Reason for codemore-ignore-next-line below: VS Code API contract —
+ * `activate` must return Promise<void>. The function fires-and-forgets
+ * `startDaemonAndInitialize` so it returns synchronously today, but the
+ * signature is non-negotiable.
  */
+// codemore-ignore-next-line: core-quality-async-without-await
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     outputChannel = vscode.window.createOutputChannel('CodeMore');
     outputChannel.appendLine('CodeMore extension activating...');
@@ -385,8 +386,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
  * Register event handlers for file changes and workspace updates
  */
 function registerEventHandlers(context: vscode.ExtensionContext): void {
-    // File save handler - trigger analysis
+    // File save handler - trigger analysis.
+    // Reason for codemore-ignore-next-line below: VS Code expects the handler
+    // to optionally return Thenable. `async` enables future awaits; current
+    // path early-returns when autoAnalyze is off.
     context.subscriptions.push(
+        // codemore-ignore-next-line: core-quality-async-without-await
         vscode.workspace.onDidSaveTextDocument(async (document) => {
             const config = getConfiguration();
             if (!config.autoAnalyze || !rpcClient || !isDaemonReady) {

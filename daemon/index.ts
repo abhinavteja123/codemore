@@ -1,5 +1,15 @@
-/* codemore-ignore-file: core-quality-empty-catch, core-quality-leftover-console, core-typescript-as-any, core-quality-async-without-await, core-bugs-todo-fixme, core-typescript-non-null-assertion-abuse, core-bugs-loose-equality */
-/* Legacy monolith — scheduled for decomposition into per-rule modules under shared/packs/* in Phase 0.1. Quality rules will re-apply per-module after migration. */
+/* codemore-ignore-file: core-quality-async-without-await */
+/*
+ * Reason for the file-level suppression above:
+ * Every method on `handlers` is a JSON-RPC handler whose signature MUST
+ * be `Promise<T>` to satisfy the protocol contract — even when the
+ * implementation is synchronous (returning cached state, etc.). The
+ * `async` keyword is therefore architectural, not stylistic. Removing
+ * it would break the IPC handshake.
+ *
+ * This is the ONLY rule suppressed at file level here. Empty-catches,
+ * non-null assertions, etc. remain visible and should be fixed.
+ */
 
 /**
  * CodeMore Context Daemon - Entry Point
@@ -231,22 +241,22 @@ const handlers: Record<string, RequestHandler> = {
                 notify('daemon/analysisProgress', { filePath, progress, total });
             });
 
-            analysisQueue.onIssuesFound((issues) => {
-                // Send all accumulated issues from contextMap, not just the current batch
-                if (contextMap) {
-                    const allIssues = contextMap.getAllIssues();
-                    notify('daemon/issuesUpdated', { issues: allIssues });
-                }
+            analysisQueue.onIssuesFound((_issues) => {
+                // The legacy contextMap aggregator is no longer the source
+                // of truth — the registry pipeline owns the issue list.
+                // Re-broadcasting `contextMap.getAllIssues()` here used to
+                // wipe the dashboard a second after analyzeWorkspace
+                // populated it (queue's getAllIssues is []), causing the
+                // "flash and vanish" glitch users reported. The on-save
+                // path that triggers this queue now routes through the
+                // registry's per-file scan inside suggestionEngine, which
+                // updates state.latestRegistryIssues directly.
             });
 
             analysisQueue.onComplete(() => {
-                // Analysis completed - send updated metrics
-                if (contextMap) {
-                    const metrics = contextMap.getHealthMetrics();
-                    notify('daemon/metricsUpdated', { metrics });
-                    notify('daemon/analysisComplete', { filePath: '', issues: [] });
-                    log('Analysis complete');
-                }
+                // Same reasoning: don't overwrite the registry's metrics
+                // cache with empty contextMap data. The legacy queue's
+                // notion of "complete" doesn't map to the new pipeline.
             });
 
             // Initialize file watcher

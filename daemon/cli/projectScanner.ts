@@ -233,6 +233,11 @@ function summarise(
   };
 }
 
+// Reason: public Promise-returning entry point. Today's body is synchronous
+// but the signature is part of the registry/CLI contract; making it sync
+// would break every caller and reserve no room for async framework probes
+// (planned for Phase 2B's projectIndex builder).
+// codemore-ignore-next-line: core-quality-async-without-await
 export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
   const startedAt = Date.now();
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES;

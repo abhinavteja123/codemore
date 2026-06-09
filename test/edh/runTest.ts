@@ -25,7 +25,13 @@ import { runTests } from '@vscode/test-electron';
  * spaces and is interchangeable for filesystem access on NTFS.
  */
 function shortPath(p: string): string {
+  // Reason for codemore-ignore-next-line below: `p` originates from
+  // `path.resolve(__dirname, ...)` in this same module — not user input,
+  // not network input. The interpolation is safe because this file is a
+  // test bootstrapper, never shipped to end users. We wrap the call in
+  // try/catch + a sanity fallback (return p).
   try {
+    // codemore-ignore-next-line: core-security-shell-injection
     const out = execSync(`cmd /c for %A in ("${p}") do @echo %~sA`, { encoding: 'utf8' });
     return out.trim();
   } catch {
@@ -80,8 +86,14 @@ async function main() {
     process.env.LOCALAPPDATA = path.join(sandboxHome, 'AppData', 'Local');
     process.env.TEMP         = path.join(sandboxHome, 'Temp');
     process.env.TMP          = path.join(sandboxHome, 'Temp');
+    // Reason for codemore-ignore-next-line directives below: we just SET these
+    // env vars on lines 84-87 above; the `!` documents that invariant for
+    // TS without an extra null-check that would be dead code.
+    // codemore-ignore-next-line: core-typescript-non-null-assertion-abuse
     fs.mkdirSync(process.env.APPDATA!,      { recursive: true });
+    // codemore-ignore-next-line: core-typescript-non-null-assertion-abuse
     fs.mkdirSync(process.env.LOCALAPPDATA!, { recursive: true });
+    // codemore-ignore-next-line: core-typescript-non-null-assertion-abuse
     fs.mkdirSync(process.env.TEMP!,         { recursive: true });
 
     const sandboxEnv = {

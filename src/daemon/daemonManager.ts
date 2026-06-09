@@ -1,8 +1,3 @@
-/* codemore-ignore-file: core-quality-empty-catch, core-quality-leftover-console, core-typescript-as-any, core-quality-async-without-await, core-bugs-todo-fixme, core-typescript-non-null-assertion-abuse, core-bugs-loose-equality */
-/* Web dashboard — Phase 3 plan demotes this to a 'scan-by-URL' demo. The
-   page-level empty catches are part of the legacy dashboard slated for
-   replacement; rules will re-apply per-component after the rewrite. */
-
 /**
  * CodeMore Daemon Manager
  *
@@ -216,9 +211,13 @@ export class DaemonManager implements vscode.Disposable {
                 // Send shutdown signal
                 this.process.send({ type: 'shutdown' });
 
-                // Wait for graceful shutdown with timeout
+                // Wait for graceful shutdown with timeout.
+                // Reason for codemore-ignore-next-line below: this branch only runs
+                // after `if (this.process)` (line 208), so the `!` is a documented
+                // invariant, not a guess.
                 await Promise.race([
                     new Promise<void>((resolve) => {
+                        // codemore-ignore-next-line: core-typescript-non-null-assertion-abuse
                         this.process!.once('exit', () => resolve());
                     }),
                     new Promise<void>((resolve) => {
@@ -383,7 +382,9 @@ export class DaemonManager implements vscode.Disposable {
                         resolve();
                     }
                 } catch (error) {
-                    // Ignore parse errors
+                    // codemore-ignore: core-quality-empty-catch
+                    // Reason: parse errors from non-JSON-RPC IPC payloads (shutdown signals,
+                    // pre-init noise) are expected and ignored by design here.
                 }
             };
 
@@ -446,7 +447,10 @@ export class DaemonManager implements vscode.Disposable {
 
         // Check if process is still alive
         try {
-            // Sending signal 0 checks if process exists without killing it
+            // Sending signal 0 checks if process exists without killing it.
+            // Reason for codemore-ignore-next-line below: guarded by
+            // `if (!this.process || …) return` on line 443.
+            // codemore-ignore-next-line: core-typescript-non-null-assertion-abuse
             process.kill(this.process.pid!, 0);
         } catch {
             this.outputChannel.appendLine('Health check failed: daemon process not responding');
@@ -483,7 +487,12 @@ export class DaemonManager implements vscode.Disposable {
      * Force kill a process and its children
      */
     private forceKill(pid: number): Promise<void> {
+        // Reason for codemore-ignore-next-line below: `tree-kill` ships dual
+        // ESM/CJS exports; the runtime shape depends on the bundler. Probing
+        // `.default` then falling through is the documented pattern from the
+        // package's README.
         return new Promise((resolve) => {
+            // codemore-ignore-next-line: core-typescript-as-any
             const kill = (treeKill as any).default || treeKill;
             kill(pid, 'SIGKILL', (error: Error | undefined) => {
                 // Ignore "process not found" errors - process already exited
