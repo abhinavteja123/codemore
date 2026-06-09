@@ -63,12 +63,16 @@ Decide what the gate was meant to do:
 ## Suppressing
 
 ```ts
-// codemore-ignore-next-line: core-quality-dead-conditional
-// Reason: placeholder for an A/B test flag, intentionally always-true today.
-if (true) {
-  showVariantA();
+function pickVariant(): void {
+  // Reason: placeholder for an A/B test flag, intentionally always-true today.
+  // codemore-ignore-next-line: core-quality-dead-conditional
+  if (true) {
+    showVariantA();
+  }
 }
 ```
+
+The directive must be on the line **immediately before** the target. If you put a comment between them, the directive suppresses the comment instead.
 
 ## Implementation
 

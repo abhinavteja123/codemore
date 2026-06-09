@@ -356,6 +356,218 @@ export function findDeadConditionals(sf: ts.SourceFile): DeadConditionalHit[] {
   return hits;
 }
 
+export interface UnusedVariableHit extends AstHit {
+  name: string;
+  kind: 'const' | 'let' | 'var';
+}
+
+function isDeclarationName(id: ts.Identifier): boolean {
+  const p = id.parent as ts.Node | undefined;
+  if (!p) return false;
+  if (ts.isVariableDeclaration(p) && p.name === id) return true;
+  if (ts.isParameter(p) && p.name === id) return true;
+  if (ts.isBindingElement(p) && p.name === id) return true;
+  if (ts.isFunctionDeclaration(p) && p.name === id) return true;
+  if (ts.isClassDeclaration(p) && p.name === id) return true;
+  if (ts.isInterfaceDeclaration(p) && p.name === id) return true;
+  if (ts.isTypeAliasDeclaration(p) && p.name === id) return true;
+  if (ts.isEnumDeclaration(p) && p.name === id) return true;
+  if (ts.isImportClause(p) && p.name === id) return true;
+  if (ts.isNamespaceImport(p) && p.name === id) return true;
+  if (ts.isImportSpecifier(p) && (p.name === id || p.propertyName === id)) return true;
+  if (ts.isPropertyAccessExpression(p) && p.name === id) return true;
+  if (ts.isQualifiedName(p) && p.right === id) return true;
+  if (ts.isPropertyAssignment(p) && p.name === id) return true;
+  if (ts.isMethodDeclaration(p) && p.name === id) return true;
+  if (ts.isPropertyDeclaration(p) && p.name === id) return true;
+  if (ts.isPropertySignature(p) && p.name === id) return true;
+  if (ts.isMethodSignature(p) && p.name === id) return true;
+  return false;
+}
+
+/**
+ * Pre-pass: walk the SourceFile collecting every Identifier "use" — i.e.
+ * an identifier reference that is NOT itself the declaring name of its
+ * parent. Returns a multiset (name -> count).
+ *
+ * Conservative on purpose: shorthand property assignments `{ foo }` count
+ * as a USE of `foo`. Type-position identifiers (e.g. `as Foo`, `Foo[]`)
+ * also count, since their Identifier survives the AST traversal.
+ *
+ * Cross-scope collision: if `const x` appears in two different functions
+ * and one is used, both are considered "used" here. That under-reports
+ * (false negatives) which is the safe direction for an experimental
+ * pivot-debris rule.
+ */
+function collectIdentifierUses(sf: ts.SourceFile): Map<string, number> {
+  const used = new Map<string, number>();
+  const visit = (n: ts.Node): void => {
+    if (ts.isIdentifier(n) && !isDeclarationName(n)) {
+      used.set(n.text, (used.get(n.text) ?? 0) + 1);
+    }
+    if (ts.isShorthandPropertyAssignment(n)) {
+      used.set(n.name.text, (used.get(n.name.text) ?? 0) + 1);
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  return used;
+}
+
+/**
+ * Find locally-declared `const` / `let` / `var` whose name is never read
+ * elsewhere in the same file. Pure pivot debris in vibe-coded apps: the
+ * variable name (`oldServiceRoleKey`, `legacyAuthToken`) often reveals a
+ * removed feature.
+ *
+ * Skip rules (kept generous to stay quiet on false positives):
+ *   - Names prefixed with `_` (TS convention for deliberately unused).
+ *   - Exported declarations (`export const x = …`).
+ *   - Destructuring patterns (`const { a, b } = …`) — too noisy.
+ *   - Declarations inside ambient contexts (.d.ts files don't reach here anyway).
+ *   - Declarations whose initializer has side effects (CallExpression /
+ *     NewExpression / AwaitExpression at the top of the initializer).
+ *     The variable is unused but the call still ran for its side effect.
+ */
+export function findUnusedVariables(sf: ts.SourceFile): UnusedVariableHit[] {
+  const used = collectIdentifierUses(sf);
+  const hits: UnusedVariableHit[] = [];
+
+  const isSideEffectInit = (init: ts.Expression | undefined): boolean => {
+    if (!init) return false;
+    if (ts.isAwaitExpression(init)) return true;
+    if (ts.isCallExpression(init) || ts.isNewExpression(init)) return true;
+    return false;
+  };
+
+  const visit = (n: ts.Node): void => {
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) {
+      const name = n.name.text;
+      if (!name.startsWith('_')) {
+        const list = n.parent as ts.VariableDeclarationList | undefined;
+        const stmt = list?.parent;
+        const isExported = stmt && ts.isVariableStatement(stmt)
+          && (ts.getModifiers(stmt) ?? []).some(m => m.kind === ts.SyntaxKind.ExportKeyword);
+        if (!isExported && !isSideEffectInit(n.initializer)) {
+          const count = used.get(name) ?? 0;
+          if (count === 0) {
+            let kind: UnusedVariableHit['kind'] = 'var';
+            if (list && (list.flags & ts.NodeFlags.Const)) kind = 'const';
+            else if (list && (list.flags & ts.NodeFlags.Let)) kind = 'let';
+            const start = n.name.getStart(sf);
+            const lc = sf.getLineAndCharacterOfPosition(start);
+            hits.push({
+              line: lc.line + 1,
+              column: lc.character + 1,
+              start,
+              end: n.name.getEnd(),
+              name,
+              kind,
+            });
+          }
+        }
+      }
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  return hits;
+}
+
+export interface UnusedImportHit extends AstHit {
+  /** The imported binding name (default name, namespace name, or named-import name). */
+  name: string;
+  /** Form of the unused import. */
+  kind: 'default' | 'named' | 'namespace';
+  /** Module specifier (e.g. `'react'`) for the snippet hint. */
+  moduleSpecifier: string;
+}
+
+/**
+ * Find import bindings that are never referenced in the file. Catches
+ * the classic vibe-coding pattern: a feature was ripped out, but its
+ * imports stayed behind, expanding bundle size and supply-chain surface.
+ *
+ * Coverage:
+ *   - `import Foo from 'x'`        — default binding.
+ *   - `import * as Foo from 'x'`   — namespace binding.
+ *   - `import { Foo, Bar } from 'x'` — each named binding checked
+ *     independently; we emit one hit per unused name.
+ *
+ * Coverage gap (intentional):
+ *   - Side-effect imports (`import 'x'`) have no binding — skipped.
+ *   - Type-only imports are checked the same way; if the type is used
+ *     somewhere, the Identifier survives and is counted.
+ */
+export function findUnusedImports(sf: ts.SourceFile): UnusedImportHit[] {
+  const used = collectIdentifierUses(sf);
+  const hits: UnusedImportHit[] = [];
+
+  for (const stmt of sf.statements) {
+    if (!ts.isImportDeclaration(stmt)) continue;
+    const clause = stmt.importClause;
+    if (!clause) continue;
+    const moduleSpecifier = ts.isStringLiteralLike(stmt.moduleSpecifier)
+      ? stmt.moduleSpecifier.text
+      : '';
+
+    if (clause.name) {
+      const name = clause.name.text;
+      if ((used.get(name) ?? 0) === 0) {
+        const start = clause.name.getStart(sf);
+        const lc = sf.getLineAndCharacterOfPosition(start);
+        hits.push({
+          line: lc.line + 1,
+          column: lc.character + 1,
+          start,
+          end: clause.name.getEnd(),
+          name,
+          kind: 'default',
+          moduleSpecifier,
+        });
+      }
+    }
+
+    const bindings = clause.namedBindings;
+    if (bindings) {
+      if (ts.isNamespaceImport(bindings)) {
+        const name = bindings.name.text;
+        if ((used.get(name) ?? 0) === 0) {
+          const start = bindings.name.getStart(sf);
+          const lc = sf.getLineAndCharacterOfPosition(start);
+          hits.push({
+            line: lc.line + 1,
+            column: lc.character + 1,
+            start,
+            end: bindings.name.getEnd(),
+            name,
+            kind: 'namespace',
+            moduleSpecifier,
+          });
+        }
+      } else {
+        for (const spec of bindings.elements) {
+          const name = spec.name.text;
+          if ((used.get(name) ?? 0) === 0) {
+            const start = spec.name.getStart(sf);
+            const lc = sf.getLineAndCharacterOfPosition(start);
+            hits.push({
+              line: lc.line + 1,
+              column: lc.character + 1,
+              start,
+              end: spec.name.getEnd(),
+              name,
+              kind: 'named',
+              moduleSpecifier,
+            });
+          }
+        }
+      }
+    }
+  }
+  return hits;
+}
+
 export interface ComplexityHit extends AstHit {
   /** Function or method name when known ('' for anonymous). */
   name: string;

@@ -74,11 +74,13 @@ Aim for branches ≤ 10 per function. Anything higher should be the explicit exc
 ## Suppressing
 
 ```ts
-// codemore-ignore-next-line: core-quality-cyclomatic-complexity
 // Reason: state machine intentionally exhaustive over 22 protocol states; splitting
 // would obscure the matching to the spec table at https://example.com/spec.
+// codemore-ignore-next-line: core-quality-cyclomatic-complexity
 function handleMessage(state, msg) { ... }
 ```
+
+The directive must be on the line **immediately before** the target. If you put a comment between them, the directive suppresses the comment instead.
 
 ## Implementation
 

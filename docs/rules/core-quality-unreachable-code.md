@@ -67,11 +67,13 @@ If the line is intentionally kept for context (e.g. a TODO marker before the ret
 ```ts
 function deliberatelyDead(): void {
   return;
-  // codemore-ignore-next-line: core-quality-unreachable-code
   // Reason: kept as documentation for a soon-to-be-restored branch.
+  // codemore-ignore-next-line: core-quality-unreachable-code
   doSomething();
 }
 ```
+
+The directive must be on the line **immediately before** the target. If you put a comment between them, the directive suppresses the comment instead.
 
 ## Implementation
 
