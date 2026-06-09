@@ -15,6 +15,7 @@ import { coreSecurityHardcodedSecretPattern } from './core-security-hardcoded-se
 import { vibeSsrfFetchUserInput } from './vibe-ssrf-fetch-user-input';
 import { vibeDbWriteWithoutWhere } from './vibe-db-write-without-where';
 import { vibeDbSelectStarFromUserTable } from './vibe-db-select-star-from-user-table';
+import { vibeSecretInLog } from './vibe-secret-in-log';
 
 export const PACK_NAME = 'core-security' as const;
 
@@ -26,6 +27,7 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   vibeSsrfFetchUserInput,
   vibeDbWriteWithoutWhere,
   vibeDbSelectStarFromUserTable,
+  vibeSecretInLog,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {
