@@ -26,9 +26,12 @@
  *     to add (the `diff` package is already a project dep).
  */
 
+import * as ts from 'typescript';
 import { globalRegistry } from '../../shared/rules/registry';
 import type { RuleContext } from '../../shared/rules/Rule';
 import type { ReportIssue } from '../../shared/report/types';
+
+const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 
 export interface ValidationOptions {
   enableExperimental?: boolean;
@@ -99,13 +102,24 @@ function buildContext(issue: ReportIssue, newContent: string): RuleContext {
   const slash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
   const extension = dot > slash ? filePath.slice(dot).toLowerCase() : '';
   const language = inferLanguage(filePath, extension);
+  // Parse a sourceFile for TS/JS so AST-based rules can re-evaluate the
+  // patched content. Without this every AST rule silently returns no
+  // findings → passed=true → the loop accepts broken patches.
+  let sourceFile: ts.SourceFile | null = null;
+  if (TS_EXTENSIONS.has(extension)) {
+    try {
+      sourceFile = ts.createSourceFile(filePath, newContent, ts.ScriptTarget.Latest, true);
+    } catch {
+      sourceFile = null;
+    }
+  }
   return {
     filePath,
     extension,
     language,
     content: newContent,
     lines: newContent.split('\n'),
-    sourceFile: null,
+    sourceFile,
     frameworks: [],
   };
 }

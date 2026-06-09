@@ -26,6 +26,7 @@ import { registerAllPacks } from '../cli/registerPacks';
 import { globalRegistry } from '../../shared/rules/registry';
 import type { RuleContext } from '../../shared/rules/Rule';
 import { validateFix } from '../services/validatorHarness';
+import { runAgenticFix } from '../services/agenticFixer';
 import { toolVersion } from '../../shared/toolVersion';
 
 // CJS-friendly imports — the SDK ships both ESM and CJS builds, and our
@@ -273,6 +274,97 @@ export async function runMcpServer(): Promise<void> {
       return textResult(result);
     },
   );
+
+  // ---------------------------------------------------------------------
+  // apply_fix — orchestrates planner → generator → validator → retry.
+  //
+  // The MCP transport speaks to ONE agent at a time over stdio. That agent
+  // IS the generator. So the tool does NOT bundle a generator implementation
+  // — instead it returns the prompt the agent should consume, accepts the
+  // agent's proposed content back through `propose_fix`, and validates.
+  // For one-shot in-process generators (CLI use), the lower-level
+  // `runAgenticFix` import is the right entry point.
+  // ---------------------------------------------------------------------
+  server.tool(
+    'apply_fix',
+    'For a previously discovered issue (by instanceId), returns the prompt + verification ' +
+      'criteria you should use to produce a fix. After you generate proposed file content, call ' +
+      'validate_fix to confirm before writing to disk. Repeat up to 3 attempts if validate_fix ' +
+      'reports FAIL, feeding the validator diagnostic back into your next attempt.',
+    {
+      instanceId: z.string().describe('instanceId from a previous scan.'),
+    },
+    async ({ instanceId }: { instanceId: string }) => {
+      const iss = issueCache.get(instanceId);
+      if (!iss) {
+        return textResult({
+          error: 'unknown-instance-id',
+          message: 'No issue with this instanceId is cached. Re-run scan_project to populate.',
+        });
+      }
+      const fs = require('fs') as typeof import('fs');
+      const path = require('path') as typeof import('path');
+      const absPath = path.isAbsolute(iss.evidence.file)
+        ? iss.evidence.file
+        : path.resolve(process.cwd(), iss.evidence.file);
+      let currentContent = '';
+      try { currentContent = fs.readFileSync(absPath, 'utf8'); } catch { /* let agent know */ }
+      const { buildFixPrompt } = require('../services/agenticFixer') as typeof import('../services/agenticFixer');
+      const prompt = buildFixPrompt({ issue: iss, currentContent, attempt: 1 });
+      return textResult({
+        instanceId,
+        ruleId: iss.id,
+        severity: iss.severity,
+        targetFile: iss.evidence.file,
+        prompt,
+        loopProtocol: [
+          'Generate the proposed full file content from the prompt.',
+          'Call validate_fix(instanceId, newContent) to check.',
+          'On PASS: write the content to disk and move on.',
+          'On FAIL: call apply_fix again with the same instanceId; the prompt will not change but you can use the failure diagnostic from validate_fix in your retry.',
+          'Cap at 3 attempts per issue.',
+        ],
+      });
+    },
+  );
+
+  // ---------------------------------------------------------------------
+  // run_agentic_fix — single-shot in-process fixer for callers that BRING
+  // their own generator (used by the CLI's `codemore apply-fix` command).
+  // The MCP transport itself cannot run this since the generator IS the
+  // remote agent; this tool is for SDK consumers that have a local LLM
+  // client wired up.
+  // ---------------------------------------------------------------------
+  if (process.env.CODEMORE_MCP_IN_PROCESS_GENERATOR === '1') {
+    server.tool(
+      'run_agentic_fix',
+      'In-process fixer: runs the planner → generator → validator → retry loop in one call. ' +
+        'Requires a locally-configured generator (set CODEMORE_MCP_IN_PROCESS_GENERATOR=1). ' +
+        'Most agents should use apply_fix + validate_fix instead.',
+      {
+        instanceId: z.string(),
+        workspaceRoot: z.string(),
+        maxAttempts: z.number().optional(),
+      },
+      async ({ instanceId, workspaceRoot, maxAttempts }: { instanceId: string; workspaceRoot: string; maxAttempts?: number }) => {
+        const iss = issueCache.get(instanceId);
+        if (!iss) {
+          return textResult({ error: 'unknown-instance-id' });
+        }
+        const result = await runAgenticFix({
+          workspaceRoot,
+          issue: iss,
+          generate: async (_prompt: string) => {
+            throw new Error(
+              'No in-process generator wired. Provide one via SDK or use apply_fix + validate_fix.',
+            );
+          },
+          options: { maxAttempts: maxAttempts ?? 3 },
+        });
+        return textResult(result);
+      },
+    );
+  }
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
