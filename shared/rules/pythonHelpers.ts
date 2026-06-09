@@ -359,23 +359,31 @@ export function findHighComplexityFunctions(tree: PythonTree, threshold = 15): C
 export function collectIdentifierUses(tree: PythonTree): Map<string, number> {
   const uses = new Map<string, number>();
 
+  // web-tree-sitter returns a NEW JS wrapper on each call to .child() /
+  // .childForFieldName() / .parent, so reference equality on nodes
+  // fails. Compare by node `id` (stable integer per syntactic node).
+  const sameNode = (a: PythonNode | null, b: PythonNode | null): boolean => {
+    if (!a || !b) return false;
+    return (a as { id: number }).id === (b as { id: number }).id;
+  };
+
   const isDeclarationName = (id: PythonNode): boolean => {
     const p = id.parent as PythonNode | null;
     if (!p) return false;
     if (p.type === 'function_definition') {
       const nameNode = (p as { childForFieldName: (n: string) => PythonNode | null }).childForFieldName('name');
-      if (nameNode === id) return true;
+      if (sameNode(nameNode, id)) return true;
     }
     if (p.type === 'class_definition') {
       const nameNode = (p as { childForFieldName: (n: string) => PythonNode | null }).childForFieldName('name');
-      if (nameNode === id) return true;
+      if (sameNode(nameNode, id)) return true;
     }
     if (p.type === 'parameters' || p.type === 'typed_parameter' || p.type === 'default_parameter') {
       return true;
     }
     if (p.type === 'assignment') {
       const lhs = (p as { childForFieldName: (n: string) => PythonNode | null }).childForFieldName('left');
-      if (lhs === id) return true;
+      if (sameNode(lhs, id)) return true;
     }
     if (p.type === 'aliased_import' || p.type === 'dotted_name' || p.type === 'import_from_statement') {
       return true;
@@ -478,11 +486,14 @@ export function findUnusedImports(tree: PythonTree): UnusedImportHit[] {
     if (n.type === 'import_from_statement') {
       const moduleNode = (n as { childForFieldName: (k: string) => PythonNode | null }).childForFieldName('module_name');
       const moduleText = moduleNode ? (moduleNode as { text: string }).text : '';
+      const moduleId = moduleNode ? (moduleNode as { id: number }).id : -1;
       // After the `import` keyword the children are dotted_name / aliased_import nodes.
+      // Compare against the module child by node id — web-tree-sitter returns
+      // new JS wrappers per call so `c !== moduleNode` always evaluates true.
       for (let i = 0; i < (n.childCount as number); i++) {
         const c = n.child(i) as PythonNode | null;
         if (!c) continue;
-        if (c.type === 'dotted_name' && c !== moduleNode) {
+        if (c.type === 'dotted_name' && (c as { id: number }).id !== moduleId) {
           const firstId = c.child(0) as PythonNode | null;
           if (firstId && firstId.type === 'identifier') {
             const name = (firstId as { text: string }).text;

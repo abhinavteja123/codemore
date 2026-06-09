@@ -18,6 +18,9 @@ import { vibeDbSelectStarFromUserTable } from './vibe-db-select-star-from-user-t
 import { vibeSecretInLog } from './vibe-secret-in-log';
 import { vibePromptInjectionSink } from './vibe-prompt-injection-sink';
 import { vibeSupplyChainHallucinatedImport } from './vibe-supply-chain-hallucinated-import';
+// Phase 7A — Python native pack
+import { coreSecurityPyEval } from './core-security-py-eval';
+import { coreSecurityPyShellInjection } from './core-security-py-shell-injection';
 
 export const PACK_NAME = 'core-security' as const;
 
@@ -32,6 +35,8 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   vibeSecretInLog,
   vibePromptInjectionSink,
   vibeSupplyChainHallucinatedImport,
+  coreSecurityPyEval,
+  coreSecurityPyShellInjection,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {

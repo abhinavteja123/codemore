@@ -26,6 +26,9 @@ import { coreQualityLeftoverPrint } from './core-quality-leftover-print';
 import { coreQualityPyAsyncWithoutAwait } from './core-quality-py-async-without-await';
 import { coreQualityEmptyExcept } from './core-quality-empty-except';
 import { coreQualityPyCyclomaticComplexity } from './core-quality-py-cyclomatic-complexity';
+import { coreQualityPyUnreachableCode } from './core-quality-py-unreachable-code';
+import { coreQualityPyUnusedVariable } from './core-quality-py-unused-variable';
+import { coreQualityPyUnusedImport } from './core-quality-py-unused-import';
 
 export const PACK_NAME = 'core-quality' as const;
 
@@ -48,6 +51,9 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   coreQualityPyAsyncWithoutAwait,
   coreQualityEmptyExcept,
   coreQualityPyCyclomaticComplexity,
+  coreQualityPyUnreachableCode,
+  coreQualityPyUnusedVariable,
+  coreQualityPyUnusedImport,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {
