@@ -85,6 +85,17 @@ export interface RuleContext {
   /** Optional sibling-file lookup for cross-file analysis. */
   readonly resolveFile?: (relativePath: string) => string | null;
   /**
+   * Parsed Python source (tree-sitter-python tree) when language ===
+   * 'python'. Null on every other language, and also null when the
+   * tree-sitter WASM grammar couldn't be loaded (corrupt install /
+   * sandboxed env). Rules MUST early-return on null.
+   *
+   * Typed as `unknown` here to keep `Rule.ts` independent of the
+   * tree-sitter type surface; rule modules cast to `PythonTree` from
+   * `shared/rules/pythonAst`.
+   */
+  readonly pythonAst?: unknown;
+  /**
    * Optional cross-file snapshot (import graph, route inventory, presence
    * of auth/rate-limit/validator libs). Built once per scan by the CLI;
    * absent in single-file callers (legacy daemon analyzer fallback,

@@ -21,6 +21,11 @@ import { coreQualityUnusedVariable } from './core-quality-unused-variable';
 import { coreQualityUnusedImport } from './core-quality-unused-import';
 import { coreQualityUnusedExport } from './core-quality-unused-export';
 import { coreQualityDuplicateString } from './core-quality-duplicate-string';
+// Phase 7A — Python native pack
+import { coreQualityLeftoverPrint } from './core-quality-leftover-print';
+import { coreQualityPyAsyncWithoutAwait } from './core-quality-py-async-without-await';
+import { coreQualityEmptyExcept } from './core-quality-empty-except';
+import { coreQualityPyCyclomaticComplexity } from './core-quality-py-cyclomatic-complexity';
 
 export const PACK_NAME = 'core-quality' as const;
 
@@ -39,6 +44,10 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   coreQualityUnusedImport,
   coreQualityUnusedExport,
   coreQualityDuplicateString,
+  coreQualityLeftoverPrint,
+  coreQualityPyAsyncWithoutAwait,
+  coreQualityEmptyExcept,
+  coreQualityPyCyclomaticComplexity,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {

@@ -35,6 +35,7 @@ import { detectFrameworks } from './frameworkDetect';
 import { loadCodemorerc } from './codemorercLoader';
 import { buildProjectIndex } from './projectIndex';
 import type { ProjectIndex } from '../../shared/rules/Rule';
+import { parsePython } from '../../shared/rules/pythonAst';
 
 // Pinned skip set used as a hard fail-safe even when an external project
 // has no .gitignore. `IgnoreResolver` carries the same set plus the
@@ -166,12 +167,16 @@ function parseIfTypeScript(filePath: string, content: string, ext: string): ts.S
   }
 }
 
-function buildContext(
+async function buildContext(
   discovered: DiscoveredFile,
   content: string,
   frameworks: ReadonlyArray<string>,
   projectIndex: ProjectIndex | undefined,
-): RuleContext {
+): Promise<RuleContext> {
+  let pythonAst: unknown = null;
+  if (discovered.language === 'python') {
+    pythonAst = await parsePython(content);
+  }
   return {
     filePath: discovered.relPath,
     extension: discovered.extension,
@@ -181,6 +186,7 @@ function buildContext(
     sourceFile: parseIfTypeScript(discovered.relPath, content, discovered.extension),
     frameworks,
     projectIndex,
+    pythonAst,
   };
 }
 
@@ -307,7 +313,7 @@ export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
       continue;
     }
 
-    const ctx = buildContext(file, content, frameworks, projectIndex);
+    const ctx = await buildContext(file, content, frameworks, projectIndex);
     const result = globalRegistry.scanFile(ctx, {
       enabledPacks,
       ruleOverrides,
