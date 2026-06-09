@@ -13,6 +13,7 @@ import * as path from 'path';
 
 import { registerAllPacks } from '../registerPacks';
 import { scanProject, reportExceeds } from '../projectScanner';
+import { sendTelemetry } from '../telemetry';
 import type { CodeMoreReport, Severity } from '../../../shared/report/types';
 import { applyBaseline, isBaselineFile, isCountedForFailOn } from '../baselineDiff';
 
@@ -31,6 +32,8 @@ export interface ScanArgs {
   baseline?: string;
   /** External tool adapters to engage. Empty/undefined = native pack only. */
   externalTools?: ExternalToolId[];
+  /** Opt-in: send aggregate findings to telemetry endpoint. Default false. */
+  telemetry: boolean;
 }
 
 const SEVERITIES: ReadonlyArray<Severity> = ['BLOCKER', 'CRITICAL', 'MAJOR', 'MINOR', 'INFO'];
@@ -48,6 +51,7 @@ export function parseScanArgs(argv: string[]): ScanArgs {
   let enableExperimental = false;
   let baseline: string | undefined;
   let externalTools: ExternalToolId[] | undefined;
+  let telemetry = false;
   const frameworks: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -83,6 +87,12 @@ export function parseScanArgs(argv: string[]): ScanArgs {
         if (!baseline) throw new Error('--baseline expects a file path');
         break;
       }
+      case '--telemetry':
+        telemetry = true;
+        break;
+      case '--no-telemetry':
+        telemetry = false;
+        break;
       case '--external-tools': {
         const v = (argv[++i] ?? '').trim();
         if (!v) throw new Error(
@@ -119,6 +129,7 @@ export function parseScanArgs(argv: string[]): ScanArgs {
     frameworks,
     baseline,
     externalTools,
+    telemetry,
   };
 }
 
@@ -182,6 +193,18 @@ export async function runScan(args: ScanArgs): Promise<number> {
     frameworks: args.frameworks,
     externalTools: args.externalTools,
   });
+
+  // Telemetry: opt-in, best-effort. We await with a hard 3s cap so the
+  // CLI exits even if the endpoint is unreachable — but we DO wait so the
+  // fetch completes when the user explicitly asked us to send.
+  if (args.telemetry) {
+    try {
+      const ok = await sendTelemetry(report, 'cli');
+      if (!ok) process.stderr.write('codemore: telemetry not recorded (network or schema error)\n');
+    } catch {
+      /* swallow */
+    }
+  }
 
   let baselineApplied = false;
   if (args.baseline) {
