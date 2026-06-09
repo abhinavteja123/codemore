@@ -57,6 +57,20 @@ const LLM_CREATION_PATHS: ReadonlyArray<RegExp> = [
 
 const CHILD_PROCESS_SINKS = new Set(['exec', 'execSync', 'spawn', 'spawnSync', 'execFile', 'execFileSync']);
 
+const CHILD_PROCESS_ROOTS = new Set([
+  'cp', 'childProcess', 'child_process',
+]);
+
+function fileImportsChildProcess(sf: ts.SourceFile): boolean {
+  for (const stmt of sf.statements) {
+    if (ts.isImportDeclaration(stmt) && ts.isStringLiteralLike(stmt.moduleSpecifier)) {
+      const spec = stmt.moduleSpecifier.text;
+      if (spec === 'child_process' || spec === 'node:child_process') return true;
+    }
+  }
+  return false;
+}
+
 type TaintMap = Map<string, string>;
 
 function chainContainsLlmSegment(expr: ts.Expression): string | null {
@@ -175,16 +189,26 @@ function findSinks(sf: ts.SourceFile): SinkHit[] {
           if (reason) { push(n, 'new-Function', reason); break; }
         }
       }
-      // child_process exec / spawn / execFile / execSync / spawnSync
+      // child_process exec / spawn / execFile / execSync / spawnSync.
+      // Distinguishing this from `regex.exec(content)` is critical — `exec`
+      // is also a string-regex method. We require either the BARE form
+      // (`exec(cmd)` — only valid if the project imports child_process) OR
+      // the method form rooted at a known child_process alias.
       if (ts.isCallExpression(n)) {
         let sinkName: string | null = null;
+        let allow = false;
         if (ts.isIdentifier(n.expression) && CHILD_PROCESS_SINKS.has(n.expression.text)) {
           sinkName = n.expression.text;
+          allow = fileImportsChildProcess(sf);
         } else if (ts.isPropertyAccessExpression(n.expression)
                 && CHILD_PROCESS_SINKS.has(n.expression.name.text)) {
           sinkName = n.expression.name.text;
+          const obj = n.expression.expression;
+          if (ts.isIdentifier(obj) && CHILD_PROCESS_ROOTS.has(obj.text)) {
+            allow = true;
+          }
         }
-        if (sinkName && n.arguments.length > 0) {
+        if (sinkName && allow && n.arguments.length > 0) {
           const reason = classifySinkArg(n.arguments[0], taint, sf);
           if (reason) push(n, sinkName, reason);
         }

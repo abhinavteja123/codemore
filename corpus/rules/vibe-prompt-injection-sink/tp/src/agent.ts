@@ -1,10 +1,10 @@
 // TP fixture: LLM output flowing into dangerous sinks.
 
+import { exec } from 'child_process';
 declare const openai: {
   chat: { completions: { create: (a: unknown) => Promise<{ choices: Array<{ message: { content: string } }> }> } };
 };
 declare const db: { query: (sql: string) => Promise<unknown> };
-declare function exec(cmd: string, cb?: (e: Error | null) => void): void;
 
 export async function runAgent_a(prompt: string) {
   const response = await openai.chat.completions.create({ model: 'gpt-4', messages: [] });
