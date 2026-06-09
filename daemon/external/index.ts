@@ -25,6 +25,9 @@
 
 import type { ReportIssue } from '../../shared/report/types';
 import { runRuff } from './ruff';
+import { runGolangci } from './golangci';
+import { runClippy } from './clippy';
+import { runBiome } from './biome';
 
 export type ExternalToolId = 'ruff' | 'golangci' | 'clippy' | 'biome';
 
@@ -63,14 +66,16 @@ export async function runExternalTools(opts: ExternalToolOptions): Promise<Exter
 
   const tasks: Promise<ExternalToolResult>[] = [];
   for (const tool of opts.tools) {
-    if (tool === 'ruff') {
-      tasks.push(runRuff(opts.root, { timeoutMs }));
-    } else {
-      tasks.push(Promise.resolve({
+    switch (tool) {
+      case 'ruff':     tasks.push(runRuff(opts.root,     { timeoutMs })); break;
+      case 'golangci': tasks.push(runGolangci(opts.root, { timeoutMs })); break;
+      case 'clippy':   tasks.push(runClippy(opts.root,   { timeoutMs })); break;
+      case 'biome':    tasks.push(runBiome(opts.root,    { timeoutMs })); break;
+      default: tasks.push(Promise.resolve({
         issues: [],
         diagnostics: [{
           tool, level: 'info',
-          message: `${tool} adapter not yet implemented in Phase 7B day 1; coming next commit`,
+          message: `unknown external tool ${tool} requested; skipped`,
         }],
       }));
     }
