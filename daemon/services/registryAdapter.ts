@@ -21,10 +21,21 @@ import * as path from 'path';
 import * as ts from 'typescript';
 import { scanProject } from '../cli/projectScanner';
 import { registerAllPacks } from '../cli/registerPacks';
+import { buildProjectIndex } from '../cli/projectIndex';
 import { globalRegistry } from '../../shared/rules/registry';
-import type { RuleContext } from '../../shared/rules/Rule';
+import type { ProjectIndex, RuleContext } from '../../shared/rules/Rule';
 import type { CodeMoreReport, ReportIssue, Severity } from '../../shared/report/types';
 import type { CodeIssue, OldSeverity, IssueCategory } from '../../shared/protocol';
+
+/**
+ * Most-recently-built ProjectIndex per workspace root. The per-file save
+ * hot path can't afford to rebuild the index every keystroke (~200ms on a
+ * 1k-file project), so we cache the one produced by the last full scan
+ * and serve it stale. When the cache is empty (no full scan has run yet
+ * this session), project-level rules simply skip on file-save and fire
+ * on the next workspace scan instead.
+ */
+const projectIndexCache = new Map<string, ProjectIndex>();
 
 const CANONICAL_TO_OLD: Record<Severity, OldSeverity> = {
   BLOCKER: 'error',
@@ -123,6 +134,13 @@ export async function runRegistryScan(
     enabledPacks: opts.enabledPacks,
     frameworks: opts.frameworks ?? [],
   });
+  // Refresh the ProjectIndex cache so subsequent file-save scans benefit.
+  try {
+    projectIndexCache.set(rootAbs, buildProjectIndex(rootAbs));
+  } catch {
+    // Index build failures degrade silently — file-save scans just lose
+    // the project-level rules until the next full scan succeeds.
+  }
   const issues = report.issues.map(i => reportIssueToCodeIssue(i, rootAbs));
   return { issues, report };
 }
@@ -185,6 +203,7 @@ export function scanFileWithRegistry(
     lines: content.split('\n'),
     sourceFile,
     frameworks: opts.frameworks ?? [],
+    projectIndex: projectIndexCache.get(rootAbs),
   };
   const result = globalRegistry.scanFile(ctx, {
     enabledPacks: opts.enabledPacks,
