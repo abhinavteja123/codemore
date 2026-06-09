@@ -30,6 +30,11 @@ export interface ProjectIndex {
   readonly root: string;
   /** Every module specifier imported anywhere in the project. */
   readonly allImports: ReadonlySet<string>;
+  /**
+   * Every imported BINDING NAME (default / namespace / named-import name,
+   * including both alias and original) seen across the project.
+   */
+  readonly allImportedNames: ReadonlySet<string>;
   /** Files identified as API route handlers (Next.js or Express). */
   readonly routeFiles: ReadonlyArray<{
     readonly absPath: string;

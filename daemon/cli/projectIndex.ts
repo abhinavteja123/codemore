@@ -96,6 +96,13 @@ export interface ProjectIndex {
    * is NOT applied — package names are case-sensitive on npm.
    */
   allImports: Set<string>;
+  /**
+   * Every imported BINDING NAME (default / namespace / named-import name)
+   * seen across the project. Used by `unused-export` to ask, conservatively,
+   * "is this exported name referenced anywhere?" without doing path
+   * resolution.
+   */
+  allImportedNames: Set<string>;
   /** Every file recognised as an API route handler. */
   routeFiles: ReadonlyArray<RouteFile>;
   /** True when at least one rate-limit library is imported somewhere. */
@@ -213,13 +220,51 @@ function collectImports(sf: ts.SourceFile): string[] {
   return out;
 }
 
-function scanFileText(sf: ts.SourceFile): { imports: string[]; usesAuthHelper: boolean } {
+/**
+ * Collect every imported BINDING NAME from a file:
+ *   - default binding from `import X from 'pkg'`
+ *   - namespace binding from `import * as X from 'pkg'`
+ *   - each named binding (local alias) from `import { X, Y as Z } from 'pkg'`
+ *
+ * Used by the unused-export rule to ask "is name X referenced anywhere?"
+ * without doing module-path resolution.
+ */
+function collectImportedNames(sf: ts.SourceFile): string[] {
+  const out: string[] = [];
+  for (const stmt of sf.statements) {
+    if (!ts.isImportDeclaration(stmt)) continue;
+    const clause = stmt.importClause;
+    if (!clause) continue;
+    if (clause.name) out.push(clause.name.text);
+    const bindings = clause.namedBindings;
+    if (bindings) {
+      if (ts.isNamespaceImport(bindings)) {
+        out.push(bindings.name.text);
+      } else {
+        for (const spec of bindings.elements) {
+          // `import { foo as bar }`: the local alias is `bar` (spec.name).
+          // We also push the original `foo` (spec.propertyName) so the
+          // export side can match it — the export carries the original name.
+          out.push(spec.name.text);
+          if (spec.propertyName) out.push(spec.propertyName.text);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function scanFileText(sf: ts.SourceFile): {
+  imports: string[];
+  importedNames: string[];
+  usesAuthHelper: boolean;
+} {
   const imports = collectImports(sf);
+  const importedNames = collectImportedNames(sf);
   let usesAuthHelper = false;
   const visit = (n: ts.Node): void => {
     if (usesAuthHelper) return;
     if (ts.isIdentifier(n) && AUTH_CHECK_NAMES.has(n.text)) {
-      // Don't count the declaration site of an auth helper itself.
       const p = n.parent;
       if (p && ts.isFunctionDeclaration(p) && p.name === n) return;
       usesAuthHelper = true;
@@ -228,7 +273,7 @@ function scanFileText(sf: ts.SourceFile): { imports: string[]; usesAuthHelper: b
     ts.forEachChild(n, visit);
   };
   visit(sf);
-  return { imports, usesAuthHelper };
+  return { imports, importedNames, usesAuthHelper };
 }
 
 /** True when a known rate-limit module is in the set. */
@@ -250,6 +295,7 @@ function setHasSupabase(set: Set<string>): boolean {
 export function buildProjectIndex(root: string): ProjectIndex {
   const rootAbs = path.resolve(root);
   const allImports = new Set<string>();
+  const allImportedNames = new Set<string>();
   const routeFiles: RouteFile[] = [];
   let hasAuthHelper = false;
 
@@ -276,8 +322,9 @@ export function buildProjectIndex(root: string): ProjectIndex {
         sf = ts.createSourceFile(entry.name, content, ts.ScriptTarget.Latest, true);
       } catch { continue; }
 
-      const { imports, usesAuthHelper } = scanFileText(sf);
+      const { imports, importedNames, usesAuthHelper } = scanFileText(sf);
       for (const imp of imports) allImports.add(imp);
+      for (const name of importedNames) allImportedNames.add(name);
       if (usesAuthHelper) hasAuthHelper = true;
 
       const relPosix = path.relative(rootAbs, full).replace(/\\/g, '/');
@@ -313,6 +360,7 @@ export function buildProjectIndex(root: string): ProjectIndex {
   return {
     root: rootAbs,
     allImports,
+    allImportedNames,
     routeFiles,
     hasRateLimitLib: setHasRateLimit(allImports),
     hasValidatorLib: setHasValidator(allImports),

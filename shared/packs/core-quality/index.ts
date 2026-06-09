@@ -19,6 +19,7 @@ import { coreQualityDeadConditional } from './core-quality-dead-conditional';
 import { coreQualityCyclomaticComplexity } from './core-quality-cyclomatic-complexity';
 import { coreQualityUnusedVariable } from './core-quality-unused-variable';
 import { coreQualityUnusedImport } from './core-quality-unused-import';
+import { coreQualityUnusedExport } from './core-quality-unused-export';
 
 export const PACK_NAME = 'core-quality' as const;
 
@@ -35,6 +36,7 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   coreQualityCyclomaticComplexity,
   coreQualityUnusedVariable,
   coreQualityUnusedImport,
+  coreQualityUnusedExport,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {
