@@ -59,6 +59,35 @@ const NODE_BUILTINS = new Set([
   'url', 'util', 'v8', 'vm', 'wasi', 'worker_threads', 'zlib',
 ]);
 
+/**
+ * Runtime-provided modules that are NOT npm packages and aren't node
+ * builtins either — they're injected by the hosting environment:
+ *
+ *   - `vscode`            — VS Code extension API, peer at runtime.
+ *   - `bun:*`             — Bun built-ins.
+ *   - `deno`, `Deno`, `npm:*`, `jsr:*` — Deno runtime + its package
+ *                           protocol shapes.
+ *   - `electron`          — Electron API, also runtime-provided.
+ *   - `chrome`, `cypress` — test-runner runtime globals (rare but real).
+ *
+ * Treating them like Node builtins removes a class of false positives
+ * specific to editor-extension and Bun/Deno codebases.
+ */
+const RUNTIME_PROVIDED = new Set([
+  'vscode',
+  'electron',
+  'deno', 'Deno',
+  'chrome', 'cypress',
+]);
+
+function isRuntimeProvided(spec: string): boolean {
+  if (RUNTIME_PROVIDED.has(spec)) return true;
+  if (spec.startsWith('bun:')) return true;
+  if (spec.startsWith('npm:')) return true;  // Deno
+  if (spec.startsWith('jsr:')) return true;  // Deno
+  return false;
+}
+
 function isRelativeOrAbsolute(spec: string): boolean {
   return spec.startsWith('./') || spec.startsWith('../')
       || spec.startsWith('/') || spec.startsWith('.');
@@ -99,23 +128,58 @@ function packageRoot(spec: string): string {
  */
 const declaredDepsCache = new Map<string, Set<string> | null>();
 
-function getDeclaredDeps(rootAbs: string): Set<string> | null {
-  if (declaredDepsCache.has(rootAbs)) return declaredDepsCache.get(rootAbs)!;
-  const pkgPath = path.join(rootAbs, 'package.json');
+function collectDepsFromManifest(manifestPath: string, into: Set<string>): boolean {
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(fs.readFileSync(pkgPath, 'utf8')) as Record<string, unknown>;
+    parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
   } catch {
+    return false;
+  }
+  for (const key of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+    const obj = parsed[key];
+    if (obj && typeof obj === 'object') {
+      for (const dep of Object.keys(obj as Record<string, unknown>)) into.add(dep);
+    }
+  }
+  return true;
+}
+
+/**
+ * Discover every `package.json` reachable from the root (skipping
+ * `node_modules` / `.git` / build-output dirs) and union their declared
+ * dependency sets. This is the v1.1-promised workspace expansion —
+ * shipped early because the rule was producing FPs on this repo's own
+ * `web/` Next.js subfolder, and the same shape (Next.js / Vite app
+ * inside a tooling repo) is common in vibe-coded projects.
+ */
+function discoverWorkspaceManifests(rootAbs: string): string[] {
+  const out: string[] = [];
+  const SKIP = new Set(['node_modules', '.git', 'dist', 'build', 'out', '.next', '.vscode-test', '.samples-cache']);
+  const MAX_DEPTH = 4;          // monorepos rarely nest deeper than this
+  const MAX_MANIFESTS = 64;     // safety cap
+  const recur = (dir: string, depth: number) => {
+    if (out.length >= MAX_MANIFESTS) return;
+    if (depth > MAX_DEPTH) return;
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.isFile() && e.name === 'package.json') out.push(path.join(dir, e.name));
+      else if (e.isDirectory() && !SKIP.has(e.name)) recur(path.join(dir, e.name), depth + 1);
+    }
+  };
+  recur(rootAbs, 0);
+  return out;
+}
+
+function getDeclaredDeps(rootAbs: string): Set<string> | null {
+  if (declaredDepsCache.has(rootAbs)) return declaredDepsCache.get(rootAbs)!;
+  const manifests = discoverWorkspaceManifests(rootAbs);
+  if (manifests.length === 0) {
     declaredDepsCache.set(rootAbs, null);
     return null;
   }
   const set = new Set<string>();
-  for (const key of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
-    const obj = parsed[key];
-    if (obj && typeof obj === 'object') {
-      for (const dep of Object.keys(obj as Record<string, unknown>)) set.add(dep);
-    }
-  }
+  for (const m of manifests) collectDepsFromManifest(m, set);
   declaredDepsCache.set(rootAbs, set);
   return set;
 }
@@ -131,7 +195,8 @@ function findImports(sf: ts.SourceFile): ImportHit[] {
   const out: ImportHit[] = [];
   const pushSpec = (lit: ts.StringLiteralLike, parentForLocation: ts.Node) => {
     const text = lit.text;
-    if (!text || isRelativeOrAbsolute(text) || isNodeBuiltin(text) || isTsPathAlias(text)) return;
+    if (!text || isRelativeOrAbsolute(text) || isNodeBuiltin(text)
+        || isTsPathAlias(text) || isRuntimeProvided(text)) return;
     const pkg = packageRoot(text);
     const start = parentForLocation.getStart(sf);
     const lc = sf.getLineAndCharacterOfPosition(start);
