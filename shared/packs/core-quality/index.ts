@@ -20,6 +20,7 @@ import { coreQualityCyclomaticComplexity } from './core-quality-cyclomatic-compl
 import { coreQualityUnusedVariable } from './core-quality-unused-variable';
 import { coreQualityUnusedImport } from './core-quality-unused-import';
 import { coreQualityUnusedExport } from './core-quality-unused-export';
+import { coreQualityDuplicateString } from './core-quality-duplicate-string';
 
 export const PACK_NAME = 'core-quality' as const;
 
@@ -37,6 +38,7 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   coreQualityUnusedVariable,
   coreQualityUnusedImport,
   coreQualityUnusedExport,
+  coreQualityDuplicateString,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {

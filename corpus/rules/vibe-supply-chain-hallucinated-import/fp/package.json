@@ -1,0 +1,12 @@
+{
+  "name": "vibe-supply-chain-hallucinated-import-fp",
+  "private": true,
+  "description": "Fixture: every imported package IS in package.json, plus node builtins and relative paths.",
+  "dependencies": {
+    "react": "*",
+    "lodash": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "*"
+  }
+}

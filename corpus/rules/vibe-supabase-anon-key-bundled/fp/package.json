@@ -1,0 +1,10 @@
+{
+  "name": "vibe-supabase-anon-key-bundled-fp",
+  "private": true,
+  "description": "Fixtures: env-driven createClient + server-only route. Rule must NOT fire.",
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "*",
+    "@supabase/supabase-js": "^2.0.0"
+  }
+}

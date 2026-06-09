@@ -1,0 +1,10 @@
+{
+  "name": "vibe-auth-inverted-fp",
+  "private": true,
+  "description": "Fixture: correctly-gated route. Rule must NOT fire.",
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "*",
+    "next-auth": "^5.0.0"
+  }
+}

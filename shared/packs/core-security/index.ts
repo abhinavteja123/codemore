@@ -17,6 +17,7 @@ import { vibeDbWriteWithoutWhere } from './vibe-db-write-without-where';
 import { vibeDbSelectStarFromUserTable } from './vibe-db-select-star-from-user-table';
 import { vibeSecretInLog } from './vibe-secret-in-log';
 import { vibePromptInjectionSink } from './vibe-prompt-injection-sink';
+import { vibeSupplyChainHallucinatedImport } from './vibe-supply-chain-hallucinated-import';
 
 export const PACK_NAME = 'core-security' as const;
 
@@ -30,6 +31,7 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   vibeDbSelectStarFromUserTable,
   vibeSecretInLog,
   vibePromptInjectionSink,
+  vibeSupplyChainHallucinatedImport,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {

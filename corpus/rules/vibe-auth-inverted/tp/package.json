@@ -1,0 +1,11 @@
+{
+  "name": "vibe-auth-inverted-tp",
+  "private": true,
+  "description": "Fixture: route returns more data for anon than for authed.",
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "*",
+    "next-auth": "^5.0.0",
+    "@supabase/supabase-js": "^2.0.0"
+  }
+}

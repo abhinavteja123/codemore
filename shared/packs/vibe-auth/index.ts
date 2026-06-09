@@ -17,12 +17,14 @@
 import type { Rule } from '../../rules/Rule';
 import { vibeAuthMissingSessionCheck } from './vibe-auth-missing-session-check';
 import { vibeAuthBola } from './vibe-auth-bola';
+import { vibeAuthInverted } from './vibe-auth-inverted';
 
 export const PACK_NAME = 'vibe-auth' as const;
 
 export const PACK_RULES: ReadonlyArray<Rule> = [
   vibeAuthMissingSessionCheck,
   vibeAuthBola,
+  vibeAuthInverted,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {

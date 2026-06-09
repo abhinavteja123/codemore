@@ -14,12 +14,14 @@
 import type { Rule } from '../../rules/Rule';
 import { vibeSupabaseRlsDisabled } from './vibe-supabase-rls-disabled';
 import { vibeSupabaseRlsPermissive } from './vibe-supabase-rls-permissive';
+import { vibeSupabaseAnonKeyBundled } from './vibe-supabase-anon-key-bundled';
 
 export const PACK_NAME = 'vibe-supabase' as const;
 
 export const PACK_RULES: ReadonlyArray<Rule> = [
   vibeSupabaseRlsDisabled,
   vibeSupabaseRlsPermissive,
+  vibeSupabaseAnonKeyBundled,
 ];
 
 /** Convenience hook for the registry bootstrap. */

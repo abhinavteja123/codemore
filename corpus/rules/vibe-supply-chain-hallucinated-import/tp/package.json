@@ -1,0 +1,8 @@
+{
+  "name": "vibe-supply-chain-hallucinated-import-tp",
+  "private": true,
+  "description": "Fixture: code imports a package NOT in package.json. Rule must fire.",
+  "dependencies": {
+    "react": "*"
+  }
+}

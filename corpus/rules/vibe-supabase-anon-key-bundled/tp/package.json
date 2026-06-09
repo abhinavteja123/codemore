@@ -1,0 +1,10 @@
+{
+  "name": "vibe-supabase-anon-key-bundled-tp",
+  "private": true,
+  "description": "Fixture: client-reachable file calls createClient(URL, '<literal-JWT>'). Rule must fire.",
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "*",
+    "@supabase/supabase-js": "^2.0.0"
+  }
+}
