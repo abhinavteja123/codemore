@@ -1,0 +1,8 @@
+{
+  "name": "vibe-xss-dangerously-set-tp-fixture",
+  "private": true,
+  "description": "Fixture for vibe-xss-dangerously-set. The react dep is required so framework detection sets ctx.frameworks=['react'] and the rule's targetFrameworks gate matches.",
+  "dependencies": {
+    "react": "*"
+  }
+}
