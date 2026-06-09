@@ -1,0 +1,9 @@
+{
+  "name": "vibe-no-input-validation-tp",
+  "private": true,
+  "description": "Fixture: POST handler reads user input but the project ships no validator. Rule must fire.",
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "*"
+  }
+}

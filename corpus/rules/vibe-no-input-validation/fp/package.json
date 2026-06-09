@@ -1,0 +1,10 @@
+{
+  "name": "vibe-no-input-validation-fp",
+  "private": true,
+  "description": "Fixture: routes that DO validate (zod), plus GET-only and route that imports zod. Rule must NOT fire.",
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "*",
+    "zod": "^3.0.0"
+  }
+}
