@@ -1,0 +1,10 @@
+{
+  "name": "vibe-auth-bola-tp",
+  "private": true,
+  "description": "Fixture: authenticated route fetches by params.id with no user scoping. Rule must fire.",
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "*",
+    "next-auth": "^5.0.0"
+  }
+}

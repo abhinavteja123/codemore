@@ -1,0 +1,10 @@
+{
+  "name": "vibe-auth-bola-fp",
+  "private": true,
+  "description": "Fixture: authenticated routes that DO scope by session.user.id, plus public-resource routes. Rule must NOT fire.",
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "*",
+    "next-auth": "^5.0.0"
+  }
+}
