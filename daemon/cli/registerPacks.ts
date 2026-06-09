@@ -14,6 +14,7 @@ import { globalRegistry } from '../../shared/rules/registry';
 import { registerInto as registerVibeSupabase } from '../../shared/packs/vibe-supabase';
 import { registerInto as registerVibeSecrets } from '../../shared/packs/vibe-secrets';
 import { registerInto as registerVibeFrontend } from '../../shared/packs/vibe-frontend';
+import { registerInto as registerVibeAuth } from '../../shared/packs/vibe-auth';
 import { registerInto as registerCoreSecurity } from '../../shared/packs/core-security';
 import { registerInto as registerCoreQuality } from '../../shared/packs/core-quality';
 
@@ -26,10 +27,9 @@ export function registerAllPacks(): void {
   registerVibeSupabase(bind);
   registerVibeSecrets(bind);
   registerVibeFrontend(bind);
+  registerVibeAuth(bind);
   registerCoreSecurity(bind);
   registerCoreQuality(bind);
-  // Future packs go here:
-  // registerVibeAuth(bind);
 
   registered = true;
 }

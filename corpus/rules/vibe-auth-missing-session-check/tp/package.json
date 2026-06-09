@@ -1,0 +1,9 @@
+{
+  "name": "vibe-auth-missing-session-check-tp",
+  "private": true,
+  "description": "Fixture: Next.js POST handler with no auth helper anywhere. Rule must fire.",
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "*"
+  }
+}

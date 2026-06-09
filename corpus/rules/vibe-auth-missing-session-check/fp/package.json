@@ -1,0 +1,12 @@
+{
+  "name": "vibe-auth-missing-session-check-fp",
+  "private": true,
+  "description": "Fixtures: routes that DO check auth (Auth.js, Clerk, Supabase) plus GET-only and webhook patterns. Rule must NOT fire.",
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "*",
+    "next-auth": "^5.0.0",
+    "@clerk/nextjs": "^5.0.0",
+    "@supabase/ssr": "^0.4.0"
+  }
+}
