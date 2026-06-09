@@ -13,6 +13,10 @@ import { coreQualityEmptyCatch } from './core-quality-empty-catch';
 import { coreQualityLeftoverConsole } from './core-quality-leftover-console';
 import { coreBugsTodoFixme } from './core-bugs-todo-fixme';
 import { coreQualityAsyncWithoutAwait } from './core-quality-async-without-await';
+// Phase 2A pivot-debris additions
+import { coreQualityUnreachableCode } from './core-quality-unreachable-code';
+import { coreQualityDeadConditional } from './core-quality-dead-conditional';
+import { coreQualityCyclomaticComplexity } from './core-quality-cyclomatic-complexity';
 
 export const PACK_NAME = 'core-quality' as const;
 
@@ -24,6 +28,9 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   coreQualityLeftoverConsole,
   coreBugsTodoFixme,
   coreQualityAsyncWithoutAwait,
+  coreQualityUnreachableCode,
+  coreQualityDeadConditional,
+  coreQualityCyclomaticComplexity,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {

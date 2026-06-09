@@ -726,7 +726,6 @@ process.on('message', (message: unknown) => {
             log('Received shutdown signal');
             cleanup();
             process.exit(0);
-            return;
         }
 
         // Otherwise handle as JSON-RPC message
