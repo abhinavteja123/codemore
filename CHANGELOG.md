@@ -29,6 +29,7 @@ All notable changes to CodeMore. Semantic Versioning.
 - `core-quality-unused-variable` — local `const` / `let` / `var` declarations never referenced.
 - `core-quality-unused-import` — `import` bindings never referenced.
 - `core-quality-unused-export` — exports never imported anywhere in the project (uses the new `ProjectIndex.allImportedNames` set).
+- `core-quality-duplicate-string` — same string literal repeated ≥ 3 times in the same file.
 
 #### Phase 2B — missing-implementation security rules
 
@@ -37,11 +38,14 @@ All notable changes to CodeMore. Semantic Versioning.
 - `vibe-ssrf-fetch-user-input` (`core-security`) — Tenzai 2025 class: fetch / axios.X with a user-controlled URL.
 - `vibe-db-write-without-where` (`core-security`, **BLOCKER**) — UPDATE / DELETE missing a WHERE clause.
 - `vibe-db-select-star-from-user-table` (`core-security`) — `SELECT *` against user-data tables.
+- `vibe-auth-inverted` (`vibe-auth`, **BLOCKER**) — CVE-2025-48757 class: anonymous branch returns more user data than the authenticated branch.
+- `vibe-supabase-anon-key-bundled` (`vibe-supabase`, **BLOCKER**) — `createClient(URL, '<literal>')` in a client-reachable file. Moltbook-incident class.
 
 #### Phase 2C — supply-chain + emerging rules
 
 - `vibe-secret-in-log` (`core-security`) — logger call references a variable named like a secret without a redaction wrapper.
 - `vibe-prompt-injection-sink` (`core-security`, **BLOCKER**) — LLM response flowing into `eval` / `new Function` / `child_process.*` / `sql\`...\`` / `.query(<template>)`.
+- `vibe-supply-chain-hallucinated-import` (`core-security`) — import of a package not declared in `package.json` (slopsquatting defence). Severity MAJOR pending v1.1 monorepo-workspace support.
 
 ### Changed / Improved
 
@@ -70,7 +74,16 @@ All notable changes to CodeMore. Semantic Versioning.
 
 ### Stats
 
-- **Catalog: 18 → 33 rules.**
+- **Catalog: 18 → 37 rules.**
+- **Phase 2A (pivot-debris): 7/7.** Phase 2B (missing-impl security): 9/9. Phase 2C (supply-chain + emerging): 3/4 (recently-published deferred — needs npm-registry network infrastructure).
+- **Cross-surface smoke verified**:
+  - CLI: schema v1.0.0 + 37 rules + 6 packs.
+  - MCP stdio: tools `apply_fix`, `explain_issue`, `scan_file`, `scan_project`, `suggest_fix`, `validate_fix` registered; `scan_project` returns identical issue counts to CLI.
+  - Daemon adapter (extension path): byte-equivalent reports per `test/parity.test.ts`.
+  - VS Code EDH: 4/4 smoke tests passing.
+  - PR validator: green.
+  - Sample scan: BLOCKERs at 15 (all in intentionally vulnerable synthetic apps); reference apps at scores 97-99 with 0 NEW BLOCKERs.
+  - Self-scan on codemore repo: 0 BLOCKERs.
 - **Self-scan**: 0 BLOCKERs on the codemore repo (85 honest findings on rule-quality / complexity / unused-imports).
 - **Reference apps**: scores 98–100 across all 4 Vercel / Auth.js samples; 0 NEW BLOCKERs introduced by the catalog expansion.
 - **PR validator**: green throughout the sprint.
