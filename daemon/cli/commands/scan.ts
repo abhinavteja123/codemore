@@ -16,6 +16,9 @@ import { scanProject, reportExceeds } from '../projectScanner';
 import type { CodeMoreReport, Severity } from '../../../shared/report/types';
 import { applyBaseline, isBaselineFile, isCountedForFailOn } from '../baselineDiff';
 
+export type ExternalToolId = 'ruff' | 'golangci' | 'clippy' | 'biome';
+const VALID_EXTERNAL_TOOLS: ReadonlyArray<ExternalToolId> = ['ruff', 'golangci', 'clippy', 'biome'];
+
 export interface ScanArgs {
   path: string;
   json: boolean;
@@ -26,6 +29,8 @@ export interface ScanArgs {
   frameworks: string[];
   /** Path to a baseline file produced by `codemore baseline create`. */
   baseline?: string;
+  /** External tool adapters to engage. Empty/undefined = native pack only. */
+  externalTools?: ExternalToolId[];
 }
 
 const SEVERITIES: ReadonlyArray<Severity> = ['BLOCKER', 'CRITICAL', 'MAJOR', 'MINOR', 'INFO'];
@@ -42,6 +47,7 @@ export function parseScanArgs(argv: string[]): ScanArgs {
   let packs: string[] | undefined;
   let enableExperimental = false;
   let baseline: string | undefined;
+  let externalTools: ExternalToolId[] | undefined;
   const frameworks: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -77,6 +83,23 @@ export function parseScanArgs(argv: string[]): ScanArgs {
         if (!baseline) throw new Error('--baseline expects a file path');
         break;
       }
+      case '--external-tools': {
+        const v = (argv[++i] ?? '').trim();
+        if (!v) throw new Error(
+          '--external-tools expects a comma-separated list of tool names ' +
+          `or "all" (one of: ${VALID_EXTERNAL_TOOLS.join(', ')})`);
+        const names = v === 'all'
+          ? [...VALID_EXTERNAL_TOOLS]
+          : v.split(',').map(s => s.trim()).filter(Boolean);
+        for (const name of names) {
+          if (!(VALID_EXTERNAL_TOOLS as ReadonlyArray<string>).includes(name)) {
+            throw new Error(
+              `--external-tools: unknown tool "${name}" (expected one of: ${VALID_EXTERNAL_TOOLS.join(', ')})`);
+          }
+        }
+        externalTools = names as ExternalToolId[];
+        break;
+      }
       default:
         if (arg.startsWith('--')) throw new Error(`Unknown flag: ${arg}`);
         if (positional) throw new Error(`Unexpected positional: ${arg}`);
@@ -95,6 +118,7 @@ export function parseScanArgs(argv: string[]): ScanArgs {
     enableExperimental,
     frameworks,
     baseline,
+    externalTools,
   };
 }
 
@@ -156,6 +180,7 @@ export async function runScan(args: ScanArgs): Promise<number> {
     enabledPacks: args.packs,
     enableExperimental: args.enableExperimental,
     frameworks: args.frameworks,
+    externalTools: args.externalTools,
   });
 
   let baselineApplied = false;

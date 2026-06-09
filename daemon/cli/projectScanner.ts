@@ -36,6 +36,7 @@ import { loadCodemorerc } from './codemorercLoader';
 import { buildProjectIndex } from './projectIndex';
 import type { ProjectIndex } from '../../shared/rules/Rule';
 import { parsePython } from '../../shared/rules/pythonAst';
+import { runExternalTools, type ExternalToolDiagnostic } from '../external';
 
 // Pinned skip set used as a hard fail-safe even when an external project
 // has no .gitignore. `IgnoreResolver` carries the same set plus the
@@ -98,6 +99,15 @@ export interface ScanOptions extends RegistryOptions {
   maxBytes?: number;
   /** Framework hints to attach to every RuleContext. */
   frameworks?: ReadonlyArray<string>;
+  /**
+   * External tool adapters to run alongside the native pack. Each tool's
+   * findings are merged into the final report with rule ids namespaced as
+   * `ext:<tool>:<original-rule-id>`. Off by default — the CLI's
+   * `--external-tools` flag is what populates this.
+   *
+   * Recognised values: 'ruff' | 'golangci' | 'clippy' | 'biome'.
+   */
+  externalTools?: ReadonlyArray<'ruff' | 'golangci' | 'clippy' | 'biome'>;
 }
 
 interface DiscoveredFile {
@@ -293,6 +303,14 @@ export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
   // on the same import-graph / route-inventory snapshot.
   const projectIndex = buildProjectIndex(opts.root);
 
+  // Kick off external tools in parallel with the native walk. They run
+  // against the same project root on disk, so they don't need the AST
+  // we're about to build. Awaited only at the merge point.
+  const externalToolsList = opts.externalTools ?? [];
+  const externalPromise = externalToolsList.length > 0
+    ? runExternalTools({ root: opts.root, tools: externalToolsList })
+    : Promise.resolve({ issues: [], diagnostics: [] as ExternalToolDiagnostic[] });
+
   const issues: ReportIssue[] = [];
   let linesOfCode = 0;
   let filesAnalyzed = 0;
@@ -323,6 +341,13 @@ export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
     issues.push(...result.issues);
     linesOfCode += countMeaningfulLines(content);
     filesAnalyzed++;
+  }
+
+  // Merge external-tool findings.
+  const externalResult = await externalPromise;
+  issues.push(...externalResult.issues);
+  for (const d of externalResult.diagnostics) {
+    process.stderr.write(`codemore: [${d.tool}] ${d.message}\n`);
   }
 
   const summary = summarise(issues, filesAnalyzed, linesOfCode);
