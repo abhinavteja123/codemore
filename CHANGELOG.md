@@ -2,9 +2,18 @@
 
 All notable changes to CodeMore. Semantic Versioning.
 
-## [Unreleased] — Phase 2 catalog expansion
+## [Unreleased] — Phase 2 catalog expansion + Phase 3 agentic loop
 
 ### Added
+
+#### Agentic fixer loop (Phase 3)
+
+- **`daemon/services/agenticFixer.ts`** — the planner → generator → validator → retry orchestrator. Provider-agnostic by design: takes a `FixGenerator` function as input so OpenAI / Anthropic / Gemini / local-LLM / stub-for-tests all slot in without touching the loop.
+- **`buildFixPrompt`** assembles the canonical prompt: rule citation, evidence, line-numbered file content, suggested-fix instructions, verification criteria, and on retry the previous validator diagnostic.
+- **`stripCodeFences`** defensively strips markdown fences only when the WHOLE generator output is one fenced block (preserves markdown fixtures).
+- **MCP server gains `apply_fix(instanceId)` tool** — returns the planner prompt + loop-protocol instructions so the remote agent (which IS the generator over stdio) can run the loop itself.
+- **`rejectOnNewFindings`** (default true) — attempts that fix the targeted rule but introduce a new finding elsewhere are rejected.
+- **`test/agentic-fixer.test.ts`** — 8 tests covering happy path, retry, exhaustion, maxAttempts respect, generator-error short-circuit, code-fence stripping, and prompt assembly. All passing.
 
 #### Rule packs
 
@@ -19,6 +28,7 @@ All notable changes to CodeMore. Semantic Versioning.
 - `core-quality-cyclomatic-complexity` — function-likes exceeding McCabe 15.
 - `core-quality-unused-variable` — local `const` / `let` / `var` declarations never referenced.
 - `core-quality-unused-import` — `import` bindings never referenced.
+- `core-quality-unused-export` — exports never imported anywhere in the project (uses the new `ProjectIndex.allImportedNames` set).
 
 #### Phase 2B — missing-implementation security rules
 
@@ -37,8 +47,10 @@ All notable changes to CodeMore. Semantic Versioning.
 
 - **`ProjectIndex`** — new cross-file snapshot at `daemon/cli/projectIndex.ts`. Built once per scan and reused by every rule via `RuleContext.projectIndex`. Provides:
   - Union of every module specifier imported anywhere in the project.
+  - Union of every imported BINDING NAME across the project (used by `unused-export`).
   - Inventory of API route files (Next.js App Router, Pages Router, Express).
   - Booleans for `hasRateLimitLib`, `hasValidatorLib`, `hasAuthHelper`, `hasSupabase`.
+- **`validatorHarness` parses TS sources** — fix for an issue caught by the new agentic-fixer tests: `validateFix` previously left `ctx.sourceFile` null, so every AST-based rule silently passed on the patched content. Now parses `ts.SourceFile` for `.ts/.tsx/.js/.jsx/.mjs/.cjs` files.
 - **Extension / CLI / MCP parity** — `registryAdapter` now caches the most recent `ProjectIndex` per workspace root and reuses it on the per-file save hot path. Without this fix, Phase 2B rules silently no-op'd in the VS Code extension after file saves.
 - **Suppression hygiene** — all `/* codemore-ignore-file: ... */` blanket headers in our own source were lifted and replaced with per-line `// codemore-ignore-next-line: rule-id` + a written reason on the line ABOVE. Self-scan baseline restored to 0 BLOCKERs on the codemore repo itself.
 - **VSIX packaging** — `.vscodeignore` shrinks the published extension from ~113 MB to ~2.66 MB.
@@ -53,11 +65,12 @@ All notable changes to CodeMore. Semantic Versioning.
 ### Tests
 
 - `test/parity.test.ts` — locks the CLI ↔ MCP-equivalent ↔ daemon-adapter parity property. 4 tests, all green on `realistic-vibe-app`.
+- `test/agentic-fixer.test.ts` — 8 tests covering the planner → generator → validator → retry loop end-to-end with stub generators.
 - `test/edh/` — end-to-end smoke test running in a real VS Code Extension Development Host.
 
 ### Stats
 
-- **Catalog: 18 → 32 rules.**
+- **Catalog: 18 → 33 rules.**
 - **Self-scan**: 0 BLOCKERs on the codemore repo (85 honest findings on rule-quality / complexity / unused-imports).
 - **Reference apps**: scores 98–100 across all 4 Vercel / Auth.js samples; 0 NEW BLOCKERs introduced by the catalog expansion.
 - **PR validator**: green throughout the sprint.

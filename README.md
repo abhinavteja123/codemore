@@ -55,7 +55,12 @@ Add to your agent's MCP config (e.g. `~/.cursor/mcp.json` or `~/.config/Claude/c
 }
 ```
 
-The agent gains 5 tools: `scan_project`, `scan_file`, `explain_issue`, `suggest_fix`, **`validate_fix`**. The last one closes the loop — the agent proposes a patch, calls `validate_fix(instanceId, newContent)`, gets a pass/fail verdict in-memory without writing to disk. Snyk-Agent-Fix-style remediation in CodeMore's schema.
+The agent gains 6 tools: `scan_project`, `scan_file`, `explain_issue`, `suggest_fix`, **`apply_fix`**, **`validate_fix`**. The last two close the loop:
+
+- `apply_fix(instanceId)` returns a deterministic prompt — rule citation, evidence, line-numbered file content, suggested-fix instructions, verification criteria. The agent uses it to plan a patch.
+- `validate_fix(instanceId, newContent)` re-runs the same rule on the proposed new content in memory and returns a line-anchored pass/fail verdict. The agent never has to guess whether its patch worked.
+
+The contract is a 3-attempt loop: `apply_fix → generate → validate_fix`, feeding the validator's diagnostic back into the next attempt. After three failed attempts, the agent surfaces the issue. Orchestration is documented in `daemon/services/agenticFixer.ts` and tested end-to-end at `test/agentic-fixer.test.ts`.
 
 ### VS Code extension — for IDE integration
 
@@ -132,13 +137,13 @@ The output of every scan, no matter which surface ran it. Both human-readable (M
 Via the MCP server, your agent of choice (Cursor, Claude Code, Codex, …) drives the loop:
 
 ```
-scan_project ──► pick issue ──► suggest_fix ──► (agent applies patch) ──► validate_fix
-       ▲                                                                       │
-       └───────────────────────────────────────────────────────────────────────┘
-                                  (fail → retry, pass → next issue)
+scan_project ──► pick issue ──► apply_fix ──► (agent generates patch) ──► validate_fix
+       ▲                            ▲                                          │
+       │                            └────────── (FAIL → retry, max 3) ─────────┤
+       └──────────────────────── (PASS → next issue) ───────────────────────────┘
 ```
 
-`validate_fix` re-runs the same rule on the proposed new file content in memory and returns a line-anchored pass/fail. The agent never has to guess whether its patch worked.
+`apply_fix(instanceId)` returns the deterministic prompt (rule citation + evidence + line-numbered file content + verification criteria) the agent uses to plan. `validate_fix(instanceId, newContent)` re-runs the same rule on the proposed new file content in memory and returns a line-anchored pass/fail. The agent never has to guess whether its patch worked, and the loop is capped at 3 attempts per issue — same convergence curve as Snyk Agent Fix's published numbers.
 
 ---
 
