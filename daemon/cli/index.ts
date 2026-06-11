@@ -32,7 +32,10 @@ function printUsage(): void {
     `  --baseline <file>            Compare against a baseline; only NEW issues count toward --fail-on.\n` +
     `  --packs <a,b,...>            Run only these packs (default: all).\n` +
     `  --enable-experimental        Include rules with lifecycle: experimental.\n` +
-    `  --framework <name>           Hint a framework (repeatable; comma-separated).\n\n` +
+    `  --framework <name>           Hint a framework (repeatable; comma-separated).\n` +
+    `  --external-tools <list|all>  Run external linters and merge their findings (e.g. ruff,biome,golangci,clippy).\n` +
+    `  --telemetry / --no-telemetry Opt in/out of sending an anonymous, hashed scan ping to codemore.dev.\n` +
+    `  --verbose                    Print external-tool diagnostics (skipped tools, parse errors) to stderr.\n\n` +
     `  --help, -h                   Show this help.\n` +
     `  --version, -v                Show CLI version.\n`,
   );

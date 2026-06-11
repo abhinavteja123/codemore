@@ -9,6 +9,7 @@ import { useSession, signIn } from "next-auth/react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import { SpotlightCard } from "@/components/ui/SpotlightCard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "sonner";
 import { waitForScanJobCompletion } from "@/lib/scanJobClient";
@@ -369,63 +370,66 @@ export default function DashboardPage() {
 
       <ErrorBoundary>
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          {/* Subtle background grid pattern */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff02_1px,transparent_1px),linear-gradient(to_bottom,#ffffff02_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none z-0" />
+
           {/* ── Greeting ── */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white">
+          <div className="mb-8 relative z-10">
+            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
               Hey, {session.user?.name?.split(" ")[0] || "there"}
             </h1>
             <p className="mt-1 text-sm text-surface-500">
-              Upload code or pick a repo to scan.
+              Select a repository or upload source files to start scanning.
             </p>
           </div>
 
           {/* ── User Stats ── */}
           {userStats && (
-            <div className="mb-8 grid grid-cols-3 gap-3">
-              <div className="flex items-center gap-3 rounded-xl border border-surface-800 bg-surface-900/40 p-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#f59e0b]/10">
-                  <FolderKanban size={18} className="text-[#f59e0b]" />
+            <div className="mb-8 relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <SpotlightCard glow="amber" innerClassName="flex items-center gap-4 p-5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10">
+                  <FolderKanban size={20} className="text-[#f59e0b]" />
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-white">
+                  <p className="text-2xl font-bold text-white tracking-tight">
                     {userStats.totalProjects}
                   </p>
-                  <p className="text-xs text-surface-500">Projects</p>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-surface-500">Projects</p>
                 </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-xl border border-surface-800 bg-surface-900/40 p-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#06b6d4]/10">
-                  <BarChart3 size={18} className="text-[#06b6d4]" />
+              </SpotlightCard>
+              
+              <SpotlightCard glow="brand" innerClassName="flex items-center gap-4 p-5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10">
+                  <BarChart3 size={20} className="text-brand-400" />
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-white">
+                  <p className="text-2xl font-bold text-white tracking-tight">
                     {userStats.totalScans}
                   </p>
-                  <p className="text-xs text-surface-500">Total Scans</p>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-surface-500">Total Scans</p>
                 </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-xl border border-surface-800 bg-surface-900/40 p-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
-                  <TrendingUp size={18} className="text-emerald-400" />
+              </SpotlightCard>
+
+              <SpotlightCard glow="teal" innerClassName="flex items-center gap-4 p-5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-500/10">
+                  <TrendingUp size={20} className="text-teal-400" />
                 </div>
                 <div>
-                  <p
-                    className={`text-lg font-bold ${getScoreColor(userStats.avgScore)}`}
-                  >
+                  <p className={`text-2xl font-bold tracking-tight ${getScoreColor(userStats.avgScore)}`}>
                     {Math.round(userStats.avgScore)}
                   </p>
-                  <p className="text-xs text-surface-500">Avg Score</p>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-surface-500">Avg Score</p>
                 </div>
-              </div>
+              </SpotlightCard>
             </div>
           )}
 
           {/* ── Upload Zone ── */}
           <div
-            className={`group relative mb-10 overflow-hidden rounded-2xl border-2 border-dashed transition-all ${
+            className={`group relative mb-10 overflow-hidden rounded-2xl border border-dashed transition-all duration-300 z-10 ${
               dragActive
-                ? "border-[#f59e0b] bg-[#f59e0b]/5"
-                : "border-surface-700 hover:border-surface-500"
+                ? "border-brand-500 bg-brand-500/5 shadow-glow-brand-sm"
+                : "border-white/[0.08] bg-surface-900/20 hover:border-white/[0.15] hover:bg-surface-900/35"
             }`}
             onDragOver={(e) => {
               e.preventDefault();
@@ -435,28 +439,27 @@ export default function DashboardPage() {
             onDrop={handleDrop}
           >
             {/* Glow accent */}
-            <div className="pointer-events-none absolute -right-20 -top-20 h-40 w-40 rounded-full bg-[#f59e0b]/5 blur-3xl transition-opacity group-hover:opacity-100 opacity-0" />
+            <div className="pointer-events-none absolute -right-20 -top-20 h-40 w-40 rounded-full bg-brand-500/5 blur-3xl transition-opacity group-hover:opacity-100 opacity-0" />
 
             <div className="relative flex flex-col items-center px-6 py-12 sm:flex-row sm:justify-between sm:px-10">
               <div className="mb-6 flex flex-col items-center text-center sm:mb-0 sm:items-start sm:text-left">
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#f59e0b]/10">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#f59e0b]/10 border border-[#f59e0b]/20">
                   <FolderArchive size={24} className="text-[#f59e0b]" />
                 </div>
                 <h2 className="text-lg font-semibold text-white">
                   Drop files or a .zip here
                 </h2>
-                <p className="mt-1 max-w-sm text-sm text-surface-400">
+                <p className="mt-1.5 max-w-sm text-xs text-surface-450 leading-relaxed">
                   Drag source files, folders, or a ZIP archive. We support
-                  TypeScript, JavaScript, Python, Go, Rust, Java, C/C++, and
-                  more.
+                  TypeScript, JavaScript, Python, Go, Rust, Java, SQL, and more.
                 </p>
               </div>
 
               <div className="flex flex-col items-center gap-3">
                 {analyzing === "upload" ? (
-                  <div className="flex items-center gap-3 text-[#f59e0b]">
-                    <Loader2 size={20} className="animate-spin" />
-                    <span className="text-sm font-medium">
+                  <div className="flex items-center gap-3 text-[#f59e0b] bg-[#f59e0b]/10 px-4 py-2.5 rounded-lg border border-[#f59e0b]/20">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span className="text-xs font-mono font-medium">
                       {uploadProgress}
                     </span>
                   </div>
@@ -464,11 +467,11 @@ export default function DashboardPage() {
                   <>
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="rounded-lg bg-[#f59e0b] px-5 py-2.5 text-sm font-semibold text-surface-950 transition hover:bg-[#fbbf24]"
+                      className="rounded-lg bg-white text-surface-950 hover:bg-white/90 px-5 py-2.5 text-sm font-semibold tracking-tight transition active:scale-[0.98]"
                     >
                       Choose Files
                     </button>
-                    <span className="text-xs text-surface-500">
+                    <span className="text-xs text-surface-500 font-mono">
                       or drag & drop anywhere
                     </span>
                   </>
@@ -490,84 +493,92 @@ export default function DashboardPage() {
 
           {/* ── Recent Projects ── */}
           {projects.length > 0 && (
-            <div className="mb-10">
+            <div className="mb-10 relative z-10">
               <div className="mb-4 flex items-center gap-2">
-                <Clock size={16} className="text-surface-500" />
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-400">
+                <Clock size={15} className="text-surface-500" />
+                <h2 className="text-xs font-semibold font-mono uppercase tracking-wider text-surface-400">
                   Recent Scans
                 </h2>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {projects.map((project) => (
                   <button
                     key={project.id}
                     onClick={() => router.push(`/project/${project.id}`)}
-                    className="group flex flex-col rounded-xl border border-surface-800 bg-surface-900/40 p-4 text-left transition hover:border-surface-600 hover:bg-surface-900/70"
+                    className="group text-left block h-full focus:outline-none"
                   >
-                    {/* Top row */}
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {project.source === "github" ? (
-                          <Github size={14} className="text-[#06b6d4]" />
-                        ) : (
-                          <Upload size={14} className="text-[#f59e0b]" />
-                        )}
-                        <span className="text-sm font-semibold text-white">
-                          {project.name}
-                        </span>
-                      </div>
-                      <ArrowRight
-                        size={14}
-                        className="text-surface-600 transition group-hover:text-white"
-                      />
-                    </div>
-
-                    {/* Metrics strip */}
-                    {project.metrics && (
-                      <div className="flex items-center gap-3">
-                        {/* Score dot */}
-                        <div className="flex items-center gap-1.5">
-                          <div
-                            className={`h-2 w-2 rounded-full ${getScoreDot(project.metrics.overallScore)}`}
-                          />
-                          <span
-                            className={`text-sm font-bold ${getScoreColor(project.metrics.overallScore)}`}
-                          >
-                            {Math.round(project.metrics.overallScore)}
+                    <SpotlightCard
+                      glow={project.source === "github" ? "brand" : "amber"}
+                      innerClassName="p-5 flex flex-col justify-between h-full"
+                      className="h-full"
+                    >
+                      {/* Top row */}
+                      <div className="mb-4 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {project.source === "github" ? (
+                            <Github size={15} className="text-brand-400 shrink-0" />
+                          ) : (
+                            <Upload size={15} className="text-[#f59e0b] shrink-0" />
+                          )}
+                          <span className="text-sm font-semibold text-white group-hover:text-brand-300 transition-colors truncate">
+                            {project.name}
                           </span>
                         </div>
-
-                        <span className="h-3 w-px bg-surface-700" />
-
-                        {/* Issue count */}
-                        <span className="flex items-center gap-1 text-xs text-surface-500">
-                          <Bug size={11} />
-                          {project.issues?.length || 0}
-                        </span>
-
-                        {/* File count */}
-                        <span className="flex items-center gap-1 text-xs text-surface-500">
-                          <FileText size={11} />
-                          {project.metrics.filesAnalyzed}
-                        </span>
+                        <ArrowRight
+                          size={14}
+                          className="text-surface-500 transition-all group-hover:translate-x-1 group-hover:text-white shrink-0"
+                        />
                       </div>
-                    )}
 
-                    {/* Timestamp */}
-                    {project.analyzedAt && (
-                      <p className="mt-2 text-[11px] text-surface-600">
-                        {new Date(project.analyzedAt).toLocaleDateString(
-                          undefined,
-                          {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )}
-                      </p>
-                    )}
+                      {/* Metrics strip */}
+                      {project.metrics && (
+                        <div className="flex items-center gap-3">
+                          {/* Score dot */}
+                          <div className="flex items-center gap-1.5">
+                            <div
+                              className={`h-1.5 w-1.5 rounded-full ${getScoreDot(project.metrics.overallScore)}`}
+                            />
+                            <span
+                              className={`text-xs font-bold ${getScoreColor(project.metrics.overallScore)}`}
+                            >
+                              {Math.round(project.metrics.overallScore)}
+                            </span>
+                          </div>
+
+                          <span className="h-3 w-px bg-white/[0.06]" />
+
+                          {/* Issue count */}
+                          <span className="flex items-center gap-1 text-[11px] font-mono text-surface-400">
+                            <Bug size={11} />
+                            {project.issues?.length || 0}
+                          </span>
+
+                          <span className="h-3 w-px bg-white/[0.06]" />
+
+                          {/* File count */}
+                          <span className="flex items-center gap-1 text-[11px] font-mono text-surface-400">
+                            <FileText size={11} />
+                            {project.metrics.filesAnalyzed}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Timestamp */}
+                      {project.analyzedAt && (
+                        <p className="mt-4 text-[10px] font-mono text-surface-500 border-t border-white/[0.03] pt-2">
+                          {new Date(project.analyzedAt).toLocaleDateString(
+                            undefined,
+                            {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )}
+                        </p>
+                      )}
+                    </SpotlightCard>
                   </button>
                 ))}
               </div>
@@ -576,22 +587,22 @@ export default function DashboardPage() {
 
           {/* ── GitHub Repos ── */}
           {isGitHub ? (
-            <div>
+            <div className="relative z-10">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
-                  <Github size={16} className="text-[#06b6d4]" />
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-400">
+                  <Github size={15} className="text-brand-400" />
+                  <h2 className="text-xs font-semibold font-mono uppercase tracking-wider text-surface-400">
                     Your Repositories
                   </h2>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-surface-800 bg-surface-900/60 px-3 py-1.5">
+                <div className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-surface-900/60 px-3 py-1.5">
                   <Search size={14} className="text-surface-500" />
                   <input
                     type="text"
                     placeholder="Filter repos..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-44 bg-transparent text-sm text-white outline-none placeholder:text-surface-600"
+                    className="w-44 bg-transparent text-xs text-white outline-none placeholder:text-surface-650"
                   />
                   {searchQuery && (
                     <button onClick={() => setSearchQuery("")}>
@@ -602,112 +613,116 @@ export default function DashboardPage() {
               </div>
 
               {loadingRepos ? (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2
-                    size={20}
-                    className="animate-spin text-[#06b6d4]"
-                  />
-                  <span className="ml-3 text-sm text-surface-500">
-                    Loading...
-                  </span>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} className="h-32 rounded-xl border border-white/[0.04] bg-surface-900/20 p-5 animate-pulse flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="h-4 w-1/3 bg-white/10 rounded" />
+                        <div className="h-3 w-2/3 bg-white/5 rounded" />
+                      </div>
+                      <div className="h-8 w-full bg-white/5 rounded" />
+                    </div>
+                  ))}
                 </div>
               ) : filteredRepos.length === 0 ? (
-                <div className="rounded-xl border border-surface-800 py-16 text-center">
+                <div className="rounded-xl border border-white/[0.06] bg-surface-900/10 py-16 text-center">
                   <FolderOpen
-                    size={40}
-                    className="mx-auto mb-3 text-surface-700"
+                    size={36}
+                    className="mx-auto mb-3 text-surface-600"
                   />
-                  <p className="text-sm text-surface-500">
+                  <p className="text-xs text-surface-500 font-mono">
                     {searchQuery
                       ? "No repos match."
                       : "No repositories found."}
                   </p>
                 </div>
               ) : (
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredRepos.map((repo) => (
-                    <div
+                    <SpotlightCard
                       key={repo.id}
-                      className="group rounded-xl border border-surface-800 bg-surface-900/30 p-4 transition hover:border-surface-600"
+                      glow="brand"
+                      innerClassName="p-5 flex flex-col justify-between h-full"
+                      className="h-full"
                     >
-                      <div className="mb-2 flex items-start justify-between">
-                        <div className="min-w-0 flex-1">
+                      <div>
+                        <div className="mb-2 flex items-start justify-between gap-2">
                           <h3 className="truncate text-sm font-semibold text-white">
                             {repo.name}
                           </h3>
-                          {repo.description && (
-                            <p className="mt-0.5 line-clamp-1 text-xs text-surface-500">
-                              {repo.description}
-                            </p>
+                          {repo.private ? (
+                            <Lock
+                              size={12}
+                              className="text-surface-500 shrink-0 mt-1"
+                            />
+                          ) : (
+                            <Globe
+                              size={12}
+                              className="text-surface-500 shrink-0 mt-1"
+                            />
                           )}
                         </div>
-                        {repo.private ? (
-                          <Lock
-                            size={12}
-                            className="ml-2 mt-1 text-surface-600"
-                          />
-                        ) : (
-                          <Globe
-                            size={12}
-                            className="ml-2 mt-1 text-surface-600"
-                          />
+                        {repo.description && (
+                          <p className="line-clamp-1 text-xs text-surface-450 leading-relaxed mb-3">
+                            {repo.description}
+                          </p>
                         )}
                       </div>
 
-                      <div className="mb-3 flex items-center gap-3 text-xs text-surface-600">
-                        {repo.language && (
-                          <span className="flex items-center gap-1">
-                            <span className="h-1.5 w-1.5 rounded-full bg-[#06b6d4]" />
-                            {repo.language}
-                          </span>
-                        )}
-                        {repo.stargazers_count > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Star size={11} />
-                            {repo.stargazers_count}
-                          </span>
-                        )}
-                      </div>
+                      <div className="mt-auto">
+                        <div className="mb-4 flex items-center gap-3 text-[10.5px] font-mono text-surface-500">
+                          {repo.language && (
+                            <span className="flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-brand-450" />
+                              {repo.language}
+                            </span>
+                          )}
+                          {repo.stargazers_count > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Star size={11} />
+                              {repo.stargazers_count}
+                            </span>
+                          )}
+                        </div>
 
-                      <button
-                        onClick={() => analyzeRepo(repo)}
-                        disabled={!!analyzing}
-                        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#06b6d4]/10 py-2 text-xs font-medium text-[#06b6d4] transition hover:bg-[#06b6d4]/20 disabled:opacity-40"
-                      >
-                        {analyzing === repo.full_name ? (
-                          <>
-                            <Loader2 size={12} className="animate-spin" />
-                            Scanning...
-                          </>
-                        ) : (
-                          <>
-                            <Zap size={12} />
-                            Scan
-                          </>
-                        )}
-                      </button>
-                    </div>
+                        <button
+                          onClick={() => analyzeRepo(repo)}
+                          disabled={!!analyzing}
+                          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-brand-500/20 bg-brand-500/10 py-2 text-xs font-semibold text-brand-300 transition-all hover:bg-brand-500/20 disabled:opacity-40"
+                        >
+                          {analyzing === repo.full_name ? (
+                            <>
+                              <Loader2 size={12} className="animate-spin" />
+                              Scanning...
+                            </>
+                          ) : (
+                            <>
+                              <Zap size={12} />
+                              Scan Repo
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </SpotlightCard>
                   ))}
                 </div>
               )}
             </div>
           ) : (
             /* Non-GitHub user: show GitHub connect prompt */
-            <div className="rounded-2xl border border-surface-800 bg-surface-900/30 p-8 text-center">
-              <Github size={32} className="mx-auto mb-3 text-surface-600" />
-              <h3 className="text-lg font-semibold text-white">
-                Want to scan a GitHub repo?
+            <div className="relative z-10 rounded-2xl border border-white/[0.06] bg-surface-900/10 p-8 text-center max-w-2xl mx-auto mt-6">
+              <Github size={32} className="mx-auto mb-3 text-surface-500" />
+              <h3 className="text-base font-semibold text-white">
+                Connect GitHub to scan repositories
               </h3>
-              <p className="mx-auto mt-2 max-w-md text-sm text-surface-500">
-                Connect your GitHub account to browse and analyze your
-                repositories directly. Your current session is via{" "}
-                {session?.provider || "email"}.
+              <p className="mx-auto mt-2 max-w-md text-xs text-surface-450 leading-relaxed">
+                Analyze your remote codebases directly without manually copying code. Connect securely in one click.
               </p>
               <button
                 onClick={() => signIn("github")}
-                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#06b6d4] px-5 py-2.5 text-sm font-semibold text-surface-950 transition hover:bg-[#22d3ee]"
+                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-xs font-semibold text-surface-950 transition hover:bg-white/90"
               >
-                <Github size={16} />
+                <Github size={14} />
                 Connect GitHub
               </button>
             </div>

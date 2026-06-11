@@ -111,7 +111,7 @@ export const coreSecurityHardcodedSecretPattern: Rule = {
   id: 'core-security-hardcoded-secret-pattern',
   version: '1.1.0',
   pack: 'core-security',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   // Apply broadly — provider tokens are plain strings and can leak into
   // any text-shaped file. Python + shell added in Phase 7A.
   languages: ['typescript', 'javascript', 'json', 'yaml', 'env', 'markdown', 'python', 'shell'],

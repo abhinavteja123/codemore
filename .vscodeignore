@@ -71,6 +71,9 @@ analyze.mjs
 webaccuracy.mjs
 accuracy*.mjs
 *.vsix
+research_guide.docx
+temp.MD
+package.json.bak
 
 # ---- repo hygiene -----------------------------------------------------
 .git/**

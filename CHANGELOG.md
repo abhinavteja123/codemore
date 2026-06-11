@@ -2,6 +2,66 @@
 
 All notable changes to CodeMore. Semantic Versioning.
 
+## [0.2.0] — 2026-06-11 — Phase 8 + Part 5 production hardening
+
+### Added — 10 new security rules (default-on as of this release)
+
+- **`core-security-sql-injection-concat`** (BLOCKER) — classical SQLi via string concatenation or template-literal interpolation feeding `db.query` / `cursor.execute` / `client.raw`. Covers TS / JS / Python.
+- **`core-security-path-traversal`** (BLOCKER) — `open(prefix + user_input)` / `fs.readFile(req.params.x)` / `send_file(name)` without a `abspath + startswith` guard. CWE-22.
+- **`core-security-weak-hash`** (MAJOR) — MD5 / SHA-1 used in auth-context (password / token / secret hashing).
+- **`core-security-insecure-deserialization`** (BLOCKER) — `pickle.loads` on request bytes, `yaml.load` without `SafeLoader`, `marshal.loads(user)`, `shelve.open(user)`. OWASP A08.
+- **`vibe-file-upload-no-validation`** (MAJOR) — file save without extension allowlist / MIME check / `secure_filename`. Catches multer-without-fileFilter, Flask raw saves, plain `writeFileSync(req.file.originalname)`.
+- **`vibe-cookie-missing-flags`** (MAJOR) — session middleware / `res.cookie` config missing `httpOnly: true`, `secure: true`, or `sameSite`. Covers express-session, iron-session, cookie-session, NextAuth.
+- **`vibe-llm-output-to-sink`** (BLOCKER) — LLM response (OpenAI / Anthropic / LangChain) flows into `eval` / `exec` / `Function` / `os.system` / `subprocess` / SQL template, with one-level taint propagation through intermediate assignments. OWASP LLM02.
+- **`vibe-agent-tool-no-confirm`** (MAJOR) — agent tool with a destructive verb name (`delete_*`, `send_*`, `transfer_*`, `deploy_*`, ...) registered without a `requires_confirmation` / `approval` / `human_in_the_loop` hint. OWASP LLM07 + LLM08.
+- **`vibe-cicd-secret-in-yaml`** (BLOCKER) — literal secret in `.github/workflows/*.yml`, `echo ${{ secrets.X }}` to the job log, or `Authorization: ...` header with a bare templated token.
+- **`core-security-tls-disabled`** (MAJOR) — `rejectUnauthorized: false`, `verify=False`, `urllib3.disable_warnings`, `NODE_TLS_REJECT_UNAUTHORIZED=0`, `ssl._create_unverified_context`.
+
+### Added — 4 new external-tool adapters (opt-in via `--external-tools <name>`)
+
+- **`bandit`** — Python SAST. Severity map: HIGH → BLOCKER, MEDIUM → MAJOR, LOW → MINOR.
+- **`gitleaks`** — git secret scanner. Always BLOCKER on findings. Secret values redacted before being put into report.
+- **`npm-audit`** — JS/TS CVE coverage. Reads `package-lock.json`; silent-skips on missing lockfile.
+- **`pip-audit`** — Python CVE coverage. Reads `requirements.txt` if present, else `pip-audit --strict` against the active env.
+
+### Added — CI security gate template
+
+- **`templates/.github/workflows/codemore-security-gate.yml`** — copy-paste GitHub Action chaining CodeMore SAST + Ruff + Biome + Bandit + Gitleaks + npm-audit + pip-audit + Checkov.
+- **`docs/security-gate.md`** — install + customise guide.
+- **`docs/limitations.md`** — honest "what we don't catch" page.
+
+### Added — CLI flags
+
+- **`--external-tools <list|all>`** — engage the external adapter family (8 supported tools).
+- **`--telemetry`** / **`--no-telemetry`** — opt-in anonymous fingerprint ping to `codemore.dev/api/telemetry`. Schema-validated, content-redacted.
+- **`--verbose`** — surface per-adapter diagnostics to stderr.
+
+### Added — Web
+
+- **Docs site** at `/docs` with 48 statically-generated rule pages.
+- **Opt-in telemetry endpoint** at `/api/telemetry` with strict Zod schema + 10-minute per-fingerprint rate limit + 64 KB cap.
+- **Supabase migration `005_telemetry.sql`** with RLS denying all reads.
+
+### Fixed
+
+- **`core-quality-leftover-print`** (v1.2.0) — exempts stderr/stdout kwargs, scripts/, .github/, main.py entry points, `if __name__ == "__main__":`. Eliminated 83 FPs on a representative CLI project.
+- **`core-quality-py-unused-import`** (v1.1.0) — honors `if TYPE_CHECKING:` blocks and `__all__` re-exports. Matches ruff F401 parity.
+- **`vibe-py-secret-in-log`** (v1.1.0) — exempts count-prefix identifiers (`input_tokens`, `output_tokens`, `total_tokens`, ...) so LLM token counts no longer trigger.
+- **Bundled biome** bumped to **1.9.4** (from 1.5.3 which lacked `--reporter=json`). SHA-256 pinned in `scripts/binary-hashes.json`.
+- **External-tool diagnostic double-fire** — adapter error handler now uses an `errored` flag so only one message per skipped tool.
+
+### Changed
+
+- **All 58 rules now ship at `lifecycle: 'beta'`** — default scan fires every rule. Promotion bar (`<5% FP on corpus + 0% FP on Vercel reference apps`) verified by `node scripts/measure-accuracy.js` reporting **58/58 recall + 58/58 precision** across all corpus fixtures.
+
+### Verification snapshot
+
+- **vibe-bad-app** (synthetic): default scan reports 150 issues / 51 BLOCKERs / 58 distinct rules.
+- **claw-code** (real Anthropic ref repo, 215 files, 19 K LOC): 100/100 score, 7 findings, 0 BLOCKERs.
+- **CLI ↔ MCP parity**: byte-equivalent reports for the same scan target.
+
+---
+
 ## [Unreleased] — Phase 2 catalog expansion + Phase 3 agentic loop
 
 ### Added

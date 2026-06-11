@@ -21,13 +21,24 @@
     "**/*.test.ts",
     "**/*.spec.ts",
     "CODEBASE_DEEP_DIVE.md",
-    "CODEMORE_AUDIT.md"
+    "CODEMORE_AUDIT.md",
+    "analyze.mjs",
+    "accuracy*.mjs",
+    "webaccuracy.mjs",
+    "verify*.mjs",
+    "codemore-*.json",
+    "ai mentor bugs.json"
   ],
   "overrides": [
     {
       "files": ["daemon/services/**"],
       "maxFunctionLength": 100,
-      "maxComplexity": 20
+      "maxComplexity": 20,
+      "maxLineLength": 160
+    },
+    {
+      "files": ["**/*.tsx", "webview/**", "web/src/app/**"],
+      "maxLineLength": 160
     },
     {
       "files": ["**/*.test.ts", "**/*.spec.ts"],

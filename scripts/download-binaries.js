@@ -138,12 +138,15 @@ function getCurrentPlatform() {
 // Note: Semgrep doesn't provide standalone binaries anymore - install via pip or system package manager
 const TOOLS = {
     biome: {
-        version: 'v1.5.3',
+        // Bumped from 1.5.3 to 1.9.4 in Phase 8A F2 — 1.5.x didn't expose
+        // a JSON reporter, which our adapter (`daemon/external/biome.ts`)
+        // requires via `biome check --reporter=json`. See PART 4 §1 D2.
+        version: 'v1.9.4',
         platforms: {
-            'darwin-arm64': 'https://github.com/biomejs/biome/releases/download/cli%2Fv1.5.3/biome-darwin-arm64',
-            'darwin-x64': 'https://github.com/biomejs/biome/releases/download/cli%2Fv1.5.3/biome-darwin-x64',
-            'linux-x64': 'https://github.com/biomejs/biome/releases/download/cli%2Fv1.5.3/biome-linux-x64',
-            'win32-x64': 'https://github.com/biomejs/biome/releases/download/cli%2Fv1.5.3/biome-win32-x64.exe',
+            'darwin-arm64': 'https://github.com/biomejs/biome/releases/download/cli%2Fv1.9.4/biome-darwin-arm64',
+            'darwin-x64': 'https://github.com/biomejs/biome/releases/download/cli%2Fv1.9.4/biome-darwin-x64',
+            'linux-x64': 'https://github.com/biomejs/biome/releases/download/cli%2Fv1.9.4/biome-linux-x64',
+            'win32-x64': 'https://github.com/biomejs/biome/releases/download/cli%2Fv1.9.4/biome-win32-x64.exe',
         },
         binaryName: 'biome',
         isDirect: true, // Direct binary download, no extraction

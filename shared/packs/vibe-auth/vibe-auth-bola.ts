@@ -216,7 +216,7 @@ export const vibeAuthBola: Rule = {
   id: 'vibe-auth-bola',
   version: '1.0.0',
   pack: 'vibe-auth',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   category: 'security',
   defaultSeverity: 'MAJOR',

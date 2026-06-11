@@ -20,9 +20,6 @@
 import type { ReactNode } from 'react';
 import React from 'react';
 
-interface RenderedSpan {
-  out: ReactNode[];
-}
 
 function renderInline(text: string): ReactNode {
   const out: ReactNode[] = [];

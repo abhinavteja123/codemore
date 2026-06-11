@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="wedgeStroke" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.55"/>
+    </linearGradient>
+    <radialGradient id="wedgeDot" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#36aaf8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="wedgeFill" x1="0" y1="0" x2="0" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#36aaf8"/>
+      <stop offset="100%" stop-color="#0c8ee9"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="48" height="48" rx="11" fill="url(#wedgeFill)"/>
+  <path d="M11 11 L29 29" stroke="url(#wedgeStroke)" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+  <path d="M16 33 L20 37 L37 20" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.9"/>
+  <circle cx="37" cy="11" r="4" fill="url(#wedgeDot)"/>
+  <circle cx="37" cy="11" r="2.2" fill="#ffffff"/>
+</svg>

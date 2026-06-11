@@ -2,7 +2,7 @@
   "name": "codemore",
   "displayName": "CodeMore",
   "description": "The static analyzer your AI agent reads — finds production-blocking bugs in vibe-coded apps (CLI, GitHub Action, MCP server).",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "publisher": "codemore",
   "engines": {
@@ -19,7 +19,12 @@
     "ai",
     "refactoring",
     "code analysis",
-    "technical debt"
+    "technical debt",
+    "sast",
+    "vibe-coding",
+    "mcp",
+    "agentic-fixer",
+    "security"
   ],
   "icon": "resources/icon.png",
   "repository": {

@@ -22,7 +22,7 @@ export const coreQualityPyAsyncWithoutAwait: Rule = {
   id: 'core-quality-py-async-without-await',
   version: '1.0.0',
   pack: 'core-quality',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['python'],
   category: 'bug',
   defaultSeverity: 'MAJOR',

@@ -107,7 +107,17 @@ export interface ScanOptions extends RegistryOptions {
    *
    * Recognised values: 'ruff' | 'golangci' | 'clippy' | 'biome'.
    */
-  externalTools?: ReadonlyArray<'ruff' | 'golangci' | 'clippy' | 'biome'>;
+  externalTools?: ReadonlyArray<
+    'ruff' | 'golangci' | 'clippy' | 'biome'
+    | 'bandit' | 'gitleaks' | 'npm-audit' | 'pip-audit'
+  >;
+  /**
+   * When true, print every external-tool diagnostic (including chatty
+   * info-level ones like "ran ok — 0 findings"). Otherwise only warn and
+   * error diagnostics surface, plus the per-tool summary if the tool
+   * silent-skipped. Threaded from the CLI's `--verbose` flag.
+   */
+  verbose?: boolean;
 }
 
 interface DiscoveredFile {
@@ -346,7 +356,14 @@ export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
   // Merge external-tool findings.
   const externalResult = await externalPromise;
   issues.push(...externalResult.issues);
+  // Show warn/error diagnostics by default so users know when biome /
+  // ruff / etc. fell over. Hide chatty info ('ran ok — N findings')
+  // behind --verbose unless the tool silent-skipped, in which case the
+  // info IS the signal and we still print it.
+  const verbose = opts.verbose === true;
   for (const d of externalResult.diagnostics) {
+    const isRanOk = d.level === 'info' && /^ran ok/.test(d.message);
+    if (!verbose && isRanOk) continue;
     process.stderr.write(`codemore: [${d.tool}] ${d.message}\n`);
   }
 

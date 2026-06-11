@@ -278,7 +278,7 @@ export const vibePromptInjectionSink: Rule = {
   id: 'vibe-prompt-injection-sink',
   version: '1.0.0',
   pack: 'core-security',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   category: 'security',
   defaultSeverity: 'BLOCKER',

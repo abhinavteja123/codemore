@@ -235,7 +235,7 @@ export const vibeSupplyChainHallucinatedImport: Rule = {
   id: 'vibe-supply-chain-hallucinated-import',
   version: '1.0.0',
   pack: 'core-security',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   category: 'security',
   defaultSeverity: 'MAJOR',

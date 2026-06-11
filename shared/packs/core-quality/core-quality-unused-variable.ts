@@ -35,7 +35,7 @@ export const coreQualityUnusedVariable: Rule = {
   id: 'core-quality-unused-variable',
   version: '1.0.0',
   pack: 'core-quality',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   category: 'bug',
   defaultSeverity: 'MAJOR',

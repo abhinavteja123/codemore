@@ -1,0 +1,92 @@
+#
+# CodeMore security gate — copy this file to .github/workflows/codemore-security-gate.yml
+# in your repo to run a layered scan on every push / PR:
+#
+#   1. CodeMore native rules (TS / JS / SQL / Python)         — SAST
+#   2. External-tool adapters (ruff, biome, bandit, gitleaks) — SAST + secrets
+#   3. Dependency CVE scan (npm audit + pip-audit)            — SCA
+#   4. IaC scan (checkov)                                     — config drift
+#
+# The job FAILS if any BLOCKER-severity finding lands on the PR. All
+# outputs are uploaded as workflow artifacts for PR-comment bots to
+# consume.
+#
+# Customise: comment out steps you don't need; tune severity gates per
+# step.
+#
+
+name: codemore-security-gate
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+jobs:
+  codemore:
+    name: CodeMore SAST + SCA + secrets + IaC
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Gitleaks needs full history to scan commit content.
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install external scanners
+        run: |
+          pip install --quiet ruff bandit pip-audit
+          # gitleaks is a single Go binary
+          GITLEAKS_VERSION=8.18.4
+          curl -sSL -o gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          tar -xzf gitleaks.tgz
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+
+      # ── 1. CodeMore native SAST + external tool merge ────────────────
+      - name: CodeMore scan
+        id: codemore
+        run: |
+          npx --yes codemore@latest scan . \
+            --external-tools ruff,biome,bandit,gitleaks,npm-audit,pip-audit \
+            --fail-on BLOCKER \
+            --json --out codemore-report.json
+
+      - name: Upload CodeMore report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codemore-report
+          path: codemore-report.json
+
+      # ── 2. Checkov for IaC ───────────────────────────────────────────
+      - name: Checkov (IaC)
+        if: hashFiles('**/Dockerfile', '**/*.tf', '**/k8s/**', '**/.github/workflows/*.yml') != ''
+        uses: bridgecrewio/checkov-action@master
+        with:
+          quiet: true
+          soft_fail: false   # set to true if checkov FPs noise on your repo
+          output_format: json
+          output_file_path: checkov-report.json
+
+      - name: Upload checkov report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-report
+          path: checkov-report.json
+          if-no-files-found: ignore

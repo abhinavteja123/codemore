@@ -63,7 +63,7 @@ export const coreSecurityInnerhtmlAssignment: Rule = {
   id: 'core-security-innerhtml-assignment',
   version: '1.0.0',
   pack: 'core-security',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   category: 'security',
   defaultSeverity: 'BLOCKER',

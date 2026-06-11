@@ -39,7 +39,7 @@ export const coreQualityUnreachableCode: Rule = {
   id: 'core-quality-unreachable-code',
   version: '1.0.0',
   pack: 'core-quality',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   category: 'bug',
   defaultSeverity: 'MAJOR',

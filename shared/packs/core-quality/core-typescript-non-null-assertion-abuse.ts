@@ -55,7 +55,7 @@ export const coreTypescriptNonNullAssertionAbuse: Rule = {
   id: 'core-typescript-non-null-assertion-abuse',
   version: '1.0.0',
   pack: 'core-quality',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript'],
   category: 'bug',
   defaultSeverity: 'MINOR',

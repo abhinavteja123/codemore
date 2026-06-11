@@ -93,7 +93,7 @@ export const vibeNoInputValidation: Rule = {
   id: 'vibe-no-input-validation',
   version: '1.0.0',
   pack: 'vibe-frontend',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   category: 'security',
   defaultSeverity: 'MAJOR',

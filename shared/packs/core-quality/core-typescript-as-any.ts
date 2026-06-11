@@ -62,7 +62,7 @@ export const coreTypescriptAsAny: Rule = {
   id: 'core-typescript-as-any',
   version: '1.0.0',
   pack: 'core-quality',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript'],
   category: 'maintainability',
   defaultSeverity: 'MAJOR',

@@ -3,7 +3,7 @@ import { StaticAnalyzer } from "../../../daemon/services/staticAnalyzer";
 import { SeverityRemapper } from "../../../daemon/services/severityRemapper";
 import type { FileContext as SharedFileContext } from "../../../shared/protocol";
 import { calculateHealthScore, calculateTechnicalDebt, type IssueSeverityCounts } from "../../../shared/scoring";
-import { identifyHotSpots, HotSpot, getTopHotSpots } from "../../../shared/hotspotDetector";
+import { identifyHotSpots, HotSpot } from "../../../shared/hotspotDetector";
 import {
   CodeHealthMetrics,
   CodeIssue,

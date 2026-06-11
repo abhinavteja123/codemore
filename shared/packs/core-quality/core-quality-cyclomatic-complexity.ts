@@ -33,7 +33,7 @@ export const coreQualityCyclomaticComplexity: Rule = {
   id: 'core-quality-cyclomatic-complexity',
   version: '1.0.0',
   pack: 'core-quality',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   category: 'maintainability',
   defaultSeverity: 'MAJOR',

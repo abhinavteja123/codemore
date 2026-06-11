@@ -95,7 +95,7 @@ export const coreSecurityPyShellInjection: Rule = {
   id: 'core-security-py-shell-injection',
   version: '1.0.0',
   pack: 'core-security',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['python'],
   category: 'security',
   defaultSeverity: 'BLOCKER',

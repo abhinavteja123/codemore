@@ -1,0 +1,6 @@
+{
+  "name": "CodeMore",
+  "description": "CodeMore: The static analyzer your AI agent reads. Detect production-blocking bugs and hand a fix-ready report to Cursor, Claude, or Copilot.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

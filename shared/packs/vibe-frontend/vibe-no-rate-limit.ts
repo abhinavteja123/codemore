@@ -55,7 +55,7 @@ export const vibeNoRateLimit: Rule = {
   id: 'vibe-no-rate-limit',
   version: '1.0.0',
   pack: 'vibe-frontend',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   category: 'security',
   defaultSeverity: 'MAJOR',

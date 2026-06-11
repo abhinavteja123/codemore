@@ -48,7 +48,7 @@ export const coreBugsTodoFixme: Rule = {
   id: 'core-bugs-todo-fixme',
   version: '1.0.0',
   pack: 'core-quality',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript', 'python', 'shell', 'yaml', 'sql', 'env', 'markdown', 'json'],
   category: 'maintainability',
   defaultSeverity: 'INFO',

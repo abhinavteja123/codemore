@@ -7,7 +7,9 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
+import { SpotlightCard } from "@/components/ui/SpotlightCard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import HealthScore from "@/components/HealthScore";
 import HealthHistoryChart from "@/components/HealthHistoryChart";
@@ -110,11 +112,11 @@ export default function ProjectPage() {
   const [selectedIssue, setSelectedIssue] = useState<CodeIssue | null>(null);
   const [suggestionsByIssue, setSuggestionsByIssue] = useState<Record<string, CodeSuggestion[]>>({});
   const [generatingFixIssueId, setGeneratingFixIssueId] = useState<string | null>(null);
-  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
   const [reanalyzing, setReanalyzing] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [scanHistory, setScanHistory] = useState<ScanHistoryEntry[]>([]);
   const [showBadgeModal, setShowBadgeModal] = useState(false);
+  const [activeFilePath, setActiveFilePath] = useState<string | null>(null);
 
   // AI Settings state (matches extension pattern)
   const [aiSettings, setAiSettings] = useState<AiSettings>({
@@ -516,11 +518,7 @@ export default function ProjectPage() {
     setSelectedCategories(next);
   };
 
-  const toggleFile = (path: string) => {
-    const next = new Set(expandedFiles);
-    if (next.has(path)) { next.delete(path); } else { next.add(path); }
-    setExpandedFiles(next);
-  };
+
 
   const formatDebt = (minutes: number): string => {
     if (minutes < 60) return `${minutes}m`;
@@ -625,7 +623,7 @@ export default function ProjectPage() {
         </div>
 
         {/* Tabs */}
-        <div className="mb-6 flex gap-1 rounded-xl bg-surface-900 p-1">
+        <div className="mb-6 flex gap-1 rounded-xl bg-surface-900 p-1 relative z-10 select-none">
           {(
             [
               { id: "overview", label: "Overview", icon: <BarChart3 size={14} /> },
@@ -645,20 +643,30 @@ export default function ProjectPage() {
                 icon: <History size={14} />,
               },
             ] as const
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium transition ${
-                activeTab === tab.id
-                  ? "bg-surface-800 text-white shadow"
-                  : "text-surface-400 hover:text-surface-200"
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
+          ).map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative flex flex-1 items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors duration-200 ${
+                  isActive ? "text-white animate-pulse-once" : "text-surface-400 hover:text-surface-200"
+                }`}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="project-tab-active"
+                    className="absolute inset-0 rounded-lg bg-surface-800 shadow-sm"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-1.5">
+                  {tab.icon}
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* ============================================================ */}
@@ -1222,94 +1230,302 @@ export default function ProjectPage() {
         )}
 
         {/* ============================================================ */}
-        {/* FILES TAB */}
+        {/* FILES TAB (IDE DIAGNOSTIC WORKSPACE) */}
         {/* ============================================================ */}
         {activeTab === "files" && (
-          <div className="space-y-2 animate-slide-in">
+          <div className="animate-slide-in relative z-10">
             {project.files && project.files.length > 0 ? (
-              project.files.map((file) => {
-                const fileIssues = issuesByFile.get(file.path) || [];
-                const isExpanded = expandedFiles.has(file.path);
+              (() => {
+                const activeFile = project.files.find((f) => f.path === activeFilePath);
 
                 return (
-                  <div
-                    key={file.path}
-                    className="rounded-xl border border-surface-800 bg-surface-900/50"
-                  >
-                    <button
-                      onClick={() => toggleFile(file.path)}
-                      className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-surface-800/30"
-                    >
-                      {isExpanded ? (
-                        <ChevronDown size={16} className="text-surface-500" />
-                      ) : (
-                        <ChevronRight size={16} className="text-surface-500" />
-                      )}
-                      <FileText size={16} className="text-surface-400" />
-                      <span className="flex-1 text-sm font-medium text-surface-200">
-                        {file.path}
-                      </span>
-                      <span className="rounded bg-surface-800 px-2 py-0.5 text-xs text-surface-400">
-                        {file.language.toUpperCase()}
-                      </span>
-                      {fileIssues.length > 0 && (
-                        <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-xs font-medium text-orange-400">
-                          {fileIssues.length} issues
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                    
+                    {/* Left Sidebar: File Explorer */}
+                    <div className={`${activeFile ? "lg:col-span-3" : "lg:col-span-4"} space-y-3`}>
+                      <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
+                        <span className="text-xs font-mono font-semibold uppercase tracking-wider text-surface-400">
+                          Workspace files
                         </span>
-                      )}
-                    </button>
+                        <span className="text-[10px] font-mono text-surface-500">
+                          {project.files.length} items
+                        </span>
+                      </div>
+                      <div className="max-h-[600px] overflow-y-auto space-y-1.5 pr-1">
+                        {project.files.map((file) => {
+                          const fileIssues = issuesByFile.get(file.path) || [];
+                          const isActive = file.path === activeFilePath;
 
-                    {isExpanded && (
-                      <div className="border-t border-surface-800 p-4">
-                        <div className="mb-3 flex items-center gap-4 text-xs text-surface-500">
-                          <span>
-                            {file.content.split("\n").length} lines
-                          </span>
-                          <span>
-                            {(file.size / 1024).toFixed(1)} KB
-                          </span>
-                        </div>
+                          return (
+                            <button
+                              key={file.path}
+                              onClick={() => {
+                                setActiveFilePath(file.path);
+                                if (fileIssues.length > 0) {
+                                  setSelectedIssue(fileIssues[0]);
+                                } else {
+                                  setSelectedIssue(null);
+                                }
+                              }}
+                              className={`flex w-full items-center gap-2.5 rounded-lg p-3 text-left border transition-all ${
+                                isActive
+                                  ? "border-brand-500/30 bg-brand-500/5 text-white"
+                                  : "border-white/[0.04] bg-surface-900/30 text-surface-400 hover:text-surface-200 hover:border-white/[0.08]"
+                              }`}
+                            >
+                              <FileText size={14} className={`${isActive ? "text-brand-400" : "text-surface-500"}`} />
+                              <span className="flex-1 truncate text-xs font-mono">
+                                {file.path.split(/[/\\]/).pop()}
+                              </span>
+                              {fileIssues.length > 0 && (
+                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                                  isActive ? "bg-brand-500/20 text-brand-300" : "bg-orange-500/10 text-orange-400 border border-orange-500/20"
+                                }`}>
+                                  {fileIssues.length}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
 
-                        {fileIssues.length > 0 ? (
-                          <div className="space-y-2">
-                            {fileIssues.map((issue) => (
-                              <div
-                                key={issue.id}
-                                className="flex items-start gap-2 rounded-lg bg-surface-800/50 p-3"
-                              >
-                                <SeverityBadge
-                                  severity={issue.severity}
-                                  small
-                                />
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-medium text-surface-200">
-                                    {issue.title}
-                                  </p>
-                                  <p className="text-xs text-surface-500">
-                                    Line{" "}
-                                    {issue.location.range.start.line + 1}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
+                    {/* Middle: Code Editor & Inline Diagnostics */}
+                    <div className={`${activeFile ? "lg:col-span-6" : "lg:col-span-8"} min-w-0`}>
+                      {activeFile ? (
+                        <div className="rounded-xl border border-white/[0.06] bg-[#030712] overflow-hidden shadow-2xl flex flex-col h-[600px]">
+                          {/* File path header */}
+                          <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.04] bg-black/35 select-none">
+                            <div className="flex items-center gap-2">
+                              <Code2 size={14} className="text-brand-400" />
+                              <span className="font-mono text-xs font-semibold text-surface-300 truncate">
+                                {activeFile.path}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 text-[10px] font-mono text-surface-500">
+                              <span>{(activeFile.size / 1024).toFixed(1)} KB</span>
+                              <span>{activeFile.language.toUpperCase()}</span>
+                            </div>
                           </div>
-                        ) : (
-                          <p className="text-sm text-surface-500">
-                            No issues found in this file.
+
+                          {/* Interactive file lines */}
+                          <div className="flex-1 overflow-y-auto p-4 font-mono text-[11px] leading-[1.8] text-surface-200 select-text">
+                            {activeFile.content.split("\n").map((line, idx) => {
+                              const lineNum = idx + 1;
+                              const lineIssues = issues.filter(
+                                (i) => i.location.filePath === activeFile.path && i.location.range.start.line === idx
+                              );
+                              const hasIssues = lineIssues.length > 0;
+
+                              return (
+                                <div key={idx} className="flex flex-col w-full">
+                                  {/* Line container */}
+                                  <div className={`flex items-start w-full transition-colors ${
+                                    hasIssues
+                                      ? "bg-rose-500/10 border-l-2 border-rose-500 -ml-4 pl-[14px]"
+                                      : "hover:bg-white/[0.02]"
+                                  }`}>
+                                    <span className="w-8 text-right text-surface-600 text-[10px] pr-3 select-none">
+                                      {lineNum}
+                                    </span>
+                                    <span className="flex-1 whitespace-pre">{line || " "}</span>
+                                  </div>
+
+                                  {/* Inline Issue Diagnostic Banner */}
+                                  {lineIssues.map((issue) => (
+                                    <div
+                                      key={issue.id}
+                                      onClick={() => setSelectedIssue(issue)}
+                                      className={`my-1.5 mr-4 ml-6 p-3 rounded-lg border text-xs cursor-pointer transition-all duration-200 ${
+                                        selectedIssue?.id === issue.id
+                                          ? "border-rose-500 bg-rose-950/30 text-white shadow-lg shadow-rose-950/20"
+                                          : "border-rose-500/25 bg-rose-950/15 text-rose-300 hover:bg-rose-950/25"
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2">
+                                          <SeverityBadge severity={issue.severity} small />
+                                          <span className="font-semibold text-white font-sans">{issue.title}</span>
+                                        </div>
+                                        <span className="text-[10px] font-mono font-bold text-brand-400 bg-brand-500/10 px-1.5 py-0.5 rounded border border-brand-500/20">
+                                          Review Fix
+                                        </span>
+                                      </div>
+                                      <p className="mt-1.5 font-sans leading-relaxed text-surface-300">
+                                        {issue.description}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-white/[0.08] bg-surface-900/10 py-32 text-center select-none flex flex-col justify-center items-center">
+                          <Code2 size={40} className="text-surface-600 mb-3 animate-pulse" />
+                          <h3 className="text-sm font-semibold text-white">Select a file to inspect diagnostics</h3>
+                          <p className="max-w-xs text-xs text-surface-500 mt-1.5 leading-relaxed">
+                            Browse project files in the sidebar explorer to review inline security warnings and run patches.
                           </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right Sidebar: Diagnostic Issue Inspector */}
+                    {activeFile && (
+                      <div className="lg:col-span-3 space-y-4">
+                        {selectedIssue ? (
+                          <SpotlightCard glow="brand" innerClassName="p-4 space-y-4 flex flex-col" className="shadow-xl">
+                            
+                            {/* Header */}
+                            <div>
+                              <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-surface-500">
+                                inspected issue
+                              </p>
+                              <h3 className="mt-1 text-sm font-bold text-white tracking-tight leading-tight">
+                                {selectedIssue.title}
+                              </h3>
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                <SeverityBadge severity={selectedIssue.severity} small />
+                                <CategoryBadge category={selectedIssue.category} />
+                              </div>
+                            </div>
+
+                            {/* Confidence indicators */}
+                            <div className="grid grid-cols-2 gap-2 border-y border-white/[0.04] py-3">
+                              <div className="text-center bg-white/[0.02] p-2 rounded">
+                                <span className="text-[10px] font-mono text-surface-500 uppercase tracking-wide">confidence</span>
+                                <p className="text-sm font-bold text-white mt-0.5">{selectedIssue.confidence}%</p>
+                              </div>
+                              <div className="text-center bg-white/[0.02] p-2 rounded">
+                                <span className="text-[10px] font-mono text-surface-500 uppercase tracking-wide">impact</span>
+                                <p className="text-sm font-bold text-white mt-0.5">{selectedIssue.impact}%</p>
+                              </div>
+                            </div>
+
+                            {/* Fix Generator */}
+                            <div className="space-y-3">
+                              <button
+                                onClick={() => handleGenerateFix(selectedIssue)}
+                                disabled={generatingFixIssueId === selectedIssue.id}
+                                className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-500 hover:bg-brand-400 py-2.5 text-xs font-semibold text-surface-950 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {generatingFixIssueId === selectedIssue.id ? (
+                                  <>
+                                    <Loader2 size={12} className="animate-spin" />
+                                    Generating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Lightbulb size={12} />
+                                    Generate Fix
+                                  </>
+                                )}
+                              </button>
+
+                              {/* Settings toggle */}
+                              <button
+                                onClick={() => setShowAiSettings(!showAiSettings)}
+                                className="w-full text-center text-[10px] font-mono text-surface-500 hover:text-surface-300 transition"
+                              >
+                                {showAiSettings ? "Close AI Settings" : "Configure AI Provider"}
+                              </button>
+
+                              {/* AI Settings Form overlay */}
+                              {showAiSettings && (
+                                <div className="rounded-lg border border-white/[0.08] bg-surface-950/80 p-3 text-left space-y-3">
+                                  <div>
+                                    <label className="text-[10px] font-mono text-surface-400">Provider</label>
+                                    <select
+                                      value={aiSettings.aiProvider}
+                                      onChange={(e) =>
+                                        setAiSettings({
+                                          ...aiSettings,
+                                          aiProvider: e.target.value as AiProvider,
+                                        })
+                                      }
+                                      className="w-full bg-[#030712] border border-white/[0.08] text-xs text-white rounded p-1.5 mt-1 outline-none"
+                                    >
+                                      <option value="openai">OpenAI (GPT-4)</option>
+                                      <option value="anthropic">Anthropic (Claude)</option>
+                                      <option value="gemini">Google Gemini</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] font-mono text-surface-400">API Key</label>
+                                    <input
+                                      type="password"
+                                      value={aiSettings.apiKey}
+                                      onChange={(e) =>
+                                        setAiSettings({
+                                          ...aiSettings,
+                                          apiKey: e.target.value,
+                                        })
+                                      }
+                                      placeholder="API Key"
+                                      className="w-full bg-[#030712] border border-white/[0.08] text-xs text-white rounded p-1.5 mt-1 outline-none font-mono"
+                                    />
+                                  </div>
+                                  <button
+                                    onClick={saveAiSettings}
+                                    className="w-full bg-white text-surface-950 rounded py-1.5 text-xs font-semibold"
+                                  >
+                                    Save Config
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Suggestions List */}
+                            {selectedIssueSuggestions.length > 0 && (
+                              <div className="space-y-3 pt-3 border-t border-white/[0.04]">
+                                <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-surface-500 block">
+                                  suggested patch
+                                </span>
+                                {selectedIssueSuggestions.map((suggestion) => (
+                                  <div key={suggestion.id} className="space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-[10px] font-semibold text-white">
+                                        {suggestion.title}
+                                      </span>
+                                      <button
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(suggestion.suggestedCode);
+                                          toast.success("Fix copied to clipboard");
+                                        }}
+                                        className="inline-flex items-center gap-1 rounded bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.04] px-2 py-0.5 text-[9px] text-surface-300 transition"
+                                      >
+                                        <Copy size={9} /> Copy
+                                      </button>
+                                    </div>
+                                    <pre className="code-snippet font-mono text-[9.5px] p-2 bg-black/40 border border-white/[0.03] rounded max-h-[220px] overflow-y-auto leading-[1.6]">
+                                      <code>{suggestion.suggestedCode}</code>
+                                    </pre>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                          </SpotlightCard>
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-white/[0.06] p-4 text-center select-none text-xs text-surface-500">
+                            Select an inline warning to review suggested fixes.
+                          </div>
                         )}
                       </div>
                     )}
+
                   </div>
                 );
-              })
+              })()
             ) : (
-              <div className="rounded-xl border border-surface-800 py-16 text-center">
+              <div className="rounded-xl border border-white/[0.06] bg-surface-900/10 py-16 text-center select-none">
                 <FolderTree
-                  size={48}
+                  size={36}
                   className="mx-auto mb-3 text-surface-600"
                 />
-                <p className="text-surface-400">No files available.</p>
+                <p className="text-xs text-surface-500 font-mono">No workspace files found.</p>
               </div>
             )}
           </div>

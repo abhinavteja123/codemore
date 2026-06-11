@@ -73,7 +73,7 @@ export const vibeXssDangerouslySet: Rule = {
   id: 'vibe-xss-dangerously-set',
   version: '1.0.0',
   pack: 'vibe-frontend',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   // React-family only. `frameworkDetect` collapses `next` -> 'nextjs' (and
   // drops the bare `react` label), so we list both — apps that import React

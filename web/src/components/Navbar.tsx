@@ -1,7 +1,8 @@
 "use client";
 
 import { useSession, signIn, signOut } from "next-auth/react";
-import { Zap, LogOut, User, Github, ChevronDown } from "lucide-react";
+import { LogOut, User, Github, ChevronDown } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -10,18 +11,21 @@ export default function Navbar() {
   const [showMenu, setShowMenu] = useState(false);
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-surface-800 bg-surface-950/80 backdrop-blur-xl">
+    <nav className="sticky top-0 z-50 border-b border-white/[0.04] bg-surface-950/65 backdrop-blur-md">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#f59e0b] to-[#06b6d4]">
-              <Zap size={16} className="text-surface-950" />
-            </div>
-            <span className="text-lg font-bold tracking-tight text-white">
-              Code<span className="text-[#f59e0b]">More</span>
+          {/* Logo + Web Scanner pill */}
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-2" aria-label="CodeMore home">
+              <Image src="/icon.svg" alt="" width={28} height={28} priority />
+              <span className="text-lg font-bold tracking-tight text-surface-50">
+                Code<span className="text-brand-400">More</span>
+              </span>
+            </Link>
+            <span className="hidden rounded-full border border-brand-500/20 bg-brand-500/10 px-2.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-brand-300 sm:inline-block">
+              Web Scanner
             </span>
-          </Link>
+          </div>
 
           {/* Right side */}
           <div className="flex items-center gap-3">
@@ -29,7 +33,7 @@ export default function Navbar() {
               <>
                 <Link
                   href="/dashboard"
-                  className="rounded-md px-3 py-1.5 text-sm text-surface-400 transition hover:bg-surface-800 hover:text-white"
+                  className="rounded-md px-3 py-1.5 text-sm text-surface-400 transition hover:bg-white/[0.03] hover:text-white"
                 >
                   Dashboard
                 </Link>
@@ -38,7 +42,7 @@ export default function Navbar() {
                 <div className="relative">
                   <button
                     onClick={() => setShowMenu(!showMenu)}
-                    className="flex items-center gap-2 rounded-lg border border-surface-800 px-2.5 py-1.5 transition hover:border-surface-600"
+                    className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-surface-900/40 px-2.5 py-1.5 transition hover:border-white/[0.12] hover:bg-surface-900/60"
                   >
                     {session.user?.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -52,7 +56,7 @@ export default function Navbar() {
                         <User size={14} className="text-surface-300" />
                       </div>
                     )}
-                    <span className="hidden text-sm text-surface-300 sm:block">
+                    <span className="hidden text-sm text-surface-300 sm:block font-medium">
                       {session.user?.name || session.user?.email?.split("@")[0]}
                     </span>
                     <ChevronDown size={14} className="text-surface-500" />
@@ -61,7 +65,7 @@ export default function Navbar() {
                   {showMenu && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                      <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-surface-700 bg-surface-900 py-1 shadow-xl">
+                      <div className="absolute right-0 top-full z-50 mt-2 w-48 rounded-lg border border-white/[0.08] bg-surface-900/90 backdrop-blur-md py-1 shadow-2xl animate-slide-in">
                         <div className="border-b border-surface-800 px-3 py-2">
                           <p className="text-sm font-medium text-white">
                             {session.user?.name}

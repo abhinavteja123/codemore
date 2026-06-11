@@ -19,7 +19,7 @@ export const coreQualityEmptyExcept: Rule = {
   id: 'core-quality-empty-except',
   version: '1.0.0',
   pack: 'core-quality',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['python'],
   category: 'bug',
   defaultSeverity: 'MAJOR',

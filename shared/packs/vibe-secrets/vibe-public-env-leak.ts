@@ -127,7 +127,7 @@ export const vibePublicEnvLeak: Rule = {
   id: 'vibe-public-env-leak',
   version: '1.0.0',
   pack: 'vibe-secrets',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['env'],
   category: 'security',
   defaultSeverity: 'BLOCKER',

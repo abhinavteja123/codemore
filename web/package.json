@@ -9,10 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@supabase/supabase-js": "^2.39.0",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
+    "framer-motion": "^11.18.2",
     "jszip": "^3.10.1",
     "lucide-react": "^0.563.0",
     "next": "^14.2.0",

@@ -102,7 +102,7 @@ export const vibeMcpConfigSecret: Rule = {
   id: 'vibe-mcp-config-secret',
   version: '1.0.0',
   pack: 'vibe-secrets',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['json'],
   category: 'security',
   defaultSeverity: 'BLOCKER',

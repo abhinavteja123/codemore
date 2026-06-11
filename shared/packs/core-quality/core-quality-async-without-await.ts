@@ -126,7 +126,7 @@ export const coreQualityAsyncWithoutAwait: Rule = {
   id: 'core-quality-async-without-await',
   version: '1.0.0',
   pack: 'core-quality',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   category: 'code-smell',
   defaultSeverity: 'MINOR',

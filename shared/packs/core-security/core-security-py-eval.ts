@@ -17,7 +17,7 @@ export const coreSecurityPyEval: Rule = {
   id: 'core-security-py-eval',
   version: '1.0.0',
   pack: 'core-security',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['python'],
   category: 'security',
   defaultSeverity: 'BLOCKER',

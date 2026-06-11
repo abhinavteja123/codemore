@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 96" fill="none">
+  <defs>
+    <linearGradient id="stkStroke" x1="36" y1="0" x2="84" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.55"/>
+    </linearGradient>
+    <linearGradient id="stkFill" x1="60" y1="0" x2="60" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#36aaf8"/>
+      <stop offset="100%" stop-color="#0c8ee9"/>
+    </linearGradient>
+  </defs>
+  <rect x="36" y="0" width="48" height="48" rx="11" fill="url(#stkFill)"/>
+  <path d="M47 11 L65 29" stroke="url(#stkStroke)" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+  <path d="M52 33 L56 37 L73 20" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.9"/>
+  <circle cx="73" cy="11" r="3.2" fill="#ffffff"/>
+  <text x="60" y="75" text-anchor="middle" font-family="'Inter Display', Inter, sans-serif" font-size="18" font-weight="700" letter-spacing="-0.4" fill="#f1f5f9">
+    Code<tspan fill="#36aaf8">More</tspan>
+  </text>
+  <text x="60" y="90" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="400" letter-spacing="0.6" fill="#64748b">
+    SAST · MCP · MIT
+  </text>
+</svg>

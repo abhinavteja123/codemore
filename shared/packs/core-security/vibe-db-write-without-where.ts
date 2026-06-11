@@ -160,7 +160,7 @@ export const vibeDbWriteWithoutWhere: Rule = {
   id: 'vibe-db-write-without-where',
   version: '1.0.0',
   pack: 'core-security',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['sql', 'typescript', 'javascript'],
   category: 'security',
   defaultSeverity: 'BLOCKER',

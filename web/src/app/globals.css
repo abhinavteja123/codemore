@@ -1,6 +1,28 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Page-load choreography (used as a fallback when JS is hydrating).
+   framer-motion takes over once mounted; this keeps the first paint
+   from janking content into view via a class swap. */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal-on-load {
+    animation: reveal-up 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+@keyframes reveal-up {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* Selection — brand-tinted across the whole site. */
+::selection {
+  background: rgba(12, 142, 233, 0.35);
+  color: #f1f5f9;
+}
 
 :root {
   --color-blocker: #d32f2f;
@@ -94,6 +116,12 @@ body {
 
 /* Landing page marquee */
 @keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+
+/* Dot grid background pattern */
+.bg-dot-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
 }

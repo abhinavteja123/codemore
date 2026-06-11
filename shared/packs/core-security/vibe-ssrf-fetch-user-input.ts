@@ -327,7 +327,7 @@ export const vibeSsrfFetchUserInput: Rule = {
   id: 'vibe-ssrf-fetch-user-input',
   version: '1.0.0',
   pack: 'core-security',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   category: 'security',
   defaultSeverity: 'MAJOR',

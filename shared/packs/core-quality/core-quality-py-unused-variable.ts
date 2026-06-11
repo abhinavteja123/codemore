@@ -16,7 +16,7 @@ export const coreQualityPyUnusedVariable: Rule = {
   id: 'core-quality-py-unused-variable',
   version: '1.0.0',
   pack: 'core-quality',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['python'],
   category: 'bug',
   defaultSeverity: 'MAJOR',

@@ -28,8 +28,14 @@ import { runRuff } from './ruff';
 import { runGolangci } from './golangci';
 import { runClippy } from './clippy';
 import { runBiome } from './biome';
+import { runBandit } from './bandit';
+import { runGitleaks } from './gitleaks';
+import { runNpmAudit } from './npm-audit';
+import { runPipAudit } from './pip-audit';
 
-export type ExternalToolId = 'ruff' | 'golangci' | 'clippy' | 'biome';
+export type ExternalToolId =
+  | 'ruff' | 'golangci' | 'clippy' | 'biome'
+  | 'bandit' | 'gitleaks' | 'npm-audit' | 'pip-audit';
 
 export interface ExternalToolOptions {
   /** Subset of tools to run. Empty/undefined = run nothing (gate at the
@@ -67,10 +73,14 @@ export async function runExternalTools(opts: ExternalToolOptions): Promise<Exter
   const tasks: Promise<ExternalToolResult>[] = [];
   for (const tool of opts.tools) {
     switch (tool) {
-      case 'ruff':     tasks.push(runRuff(opts.root,     { timeoutMs })); break;
-      case 'golangci': tasks.push(runGolangci(opts.root, { timeoutMs })); break;
-      case 'clippy':   tasks.push(runClippy(opts.root,   { timeoutMs })); break;
-      case 'biome':    tasks.push(runBiome(opts.root,    { timeoutMs })); break;
+      case 'ruff':      tasks.push(runRuff(opts.root,      { timeoutMs })); break;
+      case 'golangci':  tasks.push(runGolangci(opts.root,  { timeoutMs })); break;
+      case 'clippy':    tasks.push(runClippy(opts.root,    { timeoutMs })); break;
+      case 'biome':     tasks.push(runBiome(opts.root,     { timeoutMs })); break;
+      case 'bandit':    tasks.push(runBandit(opts.root,    { timeoutMs })); break;
+      case 'gitleaks':  tasks.push(runGitleaks(opts.root,  { timeoutMs })); break;
+      case 'npm-audit': tasks.push(runNpmAudit(opts.root,  { timeoutMs })); break;
+      case 'pip-audit': tasks.push(runPipAudit(opts.root,  { timeoutMs })); break;
       default: tasks.push(Promise.resolve({
         issues: [],
         diagnostics: [{
@@ -82,9 +92,25 @@ export async function runExternalTools(opts: ExternalToolOptions): Promise<Exter
   }
   const results = await Promise.all(tasks);
   const merged: ExternalToolResult = { issues: [], diagnostics: [] };
-  for (const r of results) {
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    const tool = opts.tools[i];
     merged.issues.push(...r.issues);
     merged.diagnostics.push(...r.diagnostics);
+    // Always emit a one-line "ran ok" summary so the user sees that the
+    // tool was actually invoked. Without this, a tool that finds zero
+    // issues is indistinguishable from a tool that silently skipped.
+    // Adapters that already emit an 'info' diagnostic with the word
+    // 'skipped' or 'timeout' speak for themselves — don't double-report.
+    const alreadySpoken = r.diagnostics.some(d =>
+      d.tool === tool && /skipped|skipping|timeout|not on PATH|spawn failed|exited/i.test(d.message));
+    if (!alreadySpoken) {
+      merged.diagnostics.push({
+        tool,
+        level: 'info',
+        message: `ran ok — ${r.issues.length} ${r.issues.length === 1 ? 'finding' : 'findings'}`,
+      });
+    }
   }
   return merged;
 }

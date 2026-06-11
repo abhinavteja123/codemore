@@ -180,7 +180,7 @@ export const vibePySsrfFetchUserInput: Rule = {
   id: 'vibe-py-ssrf-fetch-user-input',
   version: '1.0.0',
   pack: 'core-security',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['python'],
   category: 'security',
   defaultSeverity: 'MAJOR',

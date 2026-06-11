@@ -17,8 +17,13 @@ import { sendTelemetry } from '../telemetry';
 import type { CodeMoreReport, Severity } from '../../../shared/report/types';
 import { applyBaseline, isBaselineFile, isCountedForFailOn } from '../baselineDiff';
 
-export type ExternalToolId = 'ruff' | 'golangci' | 'clippy' | 'biome';
-const VALID_EXTERNAL_TOOLS: ReadonlyArray<ExternalToolId> = ['ruff', 'golangci', 'clippy', 'biome'];
+export type ExternalToolId =
+  | 'ruff' | 'golangci' | 'clippy' | 'biome'
+  | 'bandit' | 'gitleaks' | 'npm-audit' | 'pip-audit';
+const VALID_EXTERNAL_TOOLS: ReadonlyArray<ExternalToolId> = [
+  'ruff', 'golangci', 'clippy', 'biome',
+  'bandit', 'gitleaks', 'npm-audit', 'pip-audit',
+];
 
 export interface ScanArgs {
   path: string;
@@ -34,6 +39,8 @@ export interface ScanArgs {
   externalTools?: ExternalToolId[];
   /** Opt-in: send aggregate findings to telemetry endpoint. Default false. */
   telemetry: boolean;
+  /** Print every external-tool diagnostic (including "ran ok" info lines). */
+  verbose: boolean;
 }
 
 const SEVERITIES: ReadonlyArray<Severity> = ['BLOCKER', 'CRITICAL', 'MAJOR', 'MINOR', 'INFO'];
@@ -52,6 +59,7 @@ export function parseScanArgs(argv: string[]): ScanArgs {
   let baseline: string | undefined;
   let externalTools: ExternalToolId[] | undefined;
   let telemetry = false;
+  let verbose = false;
   const frameworks: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -93,6 +101,9 @@ export function parseScanArgs(argv: string[]): ScanArgs {
       case '--no-telemetry':
         telemetry = false;
         break;
+      case '--verbose':
+        verbose = true;
+        break;
       case '--external-tools': {
         const v = (argv[++i] ?? '').trim();
         if (!v) throw new Error(
@@ -130,6 +141,7 @@ export function parseScanArgs(argv: string[]): ScanArgs {
     baseline,
     externalTools,
     telemetry,
+    verbose,
   };
 }
 
@@ -192,6 +204,7 @@ export async function runScan(args: ScanArgs): Promise<number> {
     enableExperimental: args.enableExperimental,
     frameworks: args.frameworks,
     externalTools: args.externalTools,
+    verbose: args.verbose,
   });
 
   // Telemetry: opt-in, best-effort. We await with a hard 3s cap so the

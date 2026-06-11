@@ -124,7 +124,7 @@ export const vibeSupabaseAnonKeyBundled: Rule = {
   id: 'vibe-supabase-anon-key-bundled',
   version: '1.0.0',
   pack: 'vibe-supabase',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   targetFrameworks: ['supabase'],
   category: 'security',

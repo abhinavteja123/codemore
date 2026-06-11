@@ -160,7 +160,7 @@ export const vibeAuthInverted: Rule = {
   id: 'vibe-auth-inverted',
   version: '1.0.0',
   pack: 'vibe-auth',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   category: 'security',
   defaultSeverity: 'BLOCKER',

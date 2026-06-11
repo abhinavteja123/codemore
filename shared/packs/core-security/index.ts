@@ -23,6 +23,16 @@ import { coreSecurityPyEval } from './core-security-py-eval';
 import { coreSecurityPyShellInjection } from './core-security-py-shell-injection';
 import { vibePySsrfFetchUserInput } from './vibe-py-ssrf-fetch-user-input';
 import { vibePySecretInLog } from './vibe-py-secret-in-log';
+// Phase 8C Tier 1 — critical injection / data-exposure rules
+import { coreSecuritySqlInjectionConcat } from './core-security-sql-injection-concat';
+import { coreSecurityPathTraversal } from './core-security-path-traversal';
+import { coreSecurityWeakHash } from './core-security-weak-hash';
+import { coreSecurityInsecureDeserialization } from './core-security-insecure-deserialization';
+// Phase 8C Tier 2 — LLM safety + agent governance
+import { vibeLlmOutputToSink } from './vibe-llm-output-to-sink';
+import { vibeAgentToolNoConfirm } from './vibe-agent-tool-no-confirm';
+// Phase 8C Tier 3 — TLS verification
+import { coreSecurityTlsDisabled } from './core-security-tls-disabled';
 
 export const PACK_NAME = 'core-security' as const;
 
@@ -41,6 +51,13 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   coreSecurityPyShellInjection,
   vibePySsrfFetchUserInput,
   vibePySecretInLog,
+  coreSecuritySqlInjectionConcat,
+  coreSecurityPathTraversal,
+  coreSecurityWeakHash,
+  coreSecurityInsecureDeserialization,
+  vibeLlmOutputToSink,
+  vibeAgentToolNoConfirm,
+  coreSecurityTlsDisabled,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {

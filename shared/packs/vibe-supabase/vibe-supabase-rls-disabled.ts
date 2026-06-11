@@ -55,7 +55,7 @@ export const vibeSupabaseRlsDisabled: Rule = {
   id: 'vibe-supabase-rls-disabled',
   version: '1.0.0',
   pack: 'vibe-supabase',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['sql'],
   // Restored in Phase 1.5: framework detection now populates ctx.frameworks
   // from package.json deps + structural signals (supabase/migrations dir).

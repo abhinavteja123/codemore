@@ -28,6 +28,13 @@ import type { PythonTree, PythonNode } from '../../rules/pythonAst';
 const SECRET_NAME_RE = /(?:^|_)(?:secret|token|password|passwd|credential|private[_-]?key|bearer|jwt|api[_-]?key|access[_-]?key|session[_-]?id|client[_-]?secret|service[_-]?role)/i;
 const SECRET_NAME_RE_END = /(?:secret|token|password|passwd|credential|key|bearer|jwt)$/i;
 
+// Counting / measurement prefixes — when a name starts with these, the
+// trailing "token/key/secret" word is a quantity, not the secret itself.
+// Eliminates the dominant FP class on real Python apps (LLM token
+// counts: input_tokens, output_tokens, total_tokens, n_tokens, etc.).
+// See PART 5 §2 — borderline FP on claw-code's src/main.py:169.
+const COUNT_PREFIX_RE = /^(?:input|output|total|num|n|count|len|size|max|min|prev|next|new|old|first|last|cur|current)_/i;
+
 const REDACTION_FNS = new Set([
   'redact', 'mask', 'sanitize', 'sanitise', 'obfuscate', 'hash', 'truncate',
 ]);
@@ -41,6 +48,7 @@ const LOGGER_ROOTS = new Set([
 ]);
 
 function looksLikeSecret(name: string): boolean {
+  if (COUNT_PREFIX_RE.test(name)) return false;
   return SECRET_NAME_RE.test(name) || SECRET_NAME_RE_END.test(name);
 }
 
@@ -163,9 +171,9 @@ function classifyArg(arg: PythonNode): SecretHit | null {
 
 export const vibePySecretInLog: Rule = {
   id: 'vibe-py-secret-in-log',
-  version: '1.0.0',
+  version: '1.1.0',
   pack: 'core-security',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['python'],
   category: 'security',
   defaultSeverity: 'MAJOR',

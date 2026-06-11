@@ -61,7 +61,7 @@ export const vibeHardcodedJwt: Rule = {
   id: 'vibe-hardcoded-jwt',
   version: '1.0.0',
   pack: 'vibe-secrets',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   // Scan source code AND structured config — most leaks live in one of these.
   languages: ['typescript', 'javascript', 'json', 'yaml'],
   category: 'security',

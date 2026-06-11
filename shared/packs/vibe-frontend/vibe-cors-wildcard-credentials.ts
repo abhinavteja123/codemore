@@ -49,7 +49,7 @@ export const vibeCorsWildcardCredentials: Rule = {
   id: 'vibe-cors-wildcard-credentials',
   version: '1.0.0',
   pack: 'vibe-frontend',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
   category: 'security',
   defaultSeverity: 'BLOCKER',

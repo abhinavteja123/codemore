@@ -143,7 +143,7 @@ export const vibeDbSelectStarFromUserTable: Rule = {
   id: 'vibe-db-select-star-from-user-table',
   version: '1.0.0',
   pack: 'core-security',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['sql', 'typescript', 'javascript'],
   category: 'security',
   defaultSeverity: 'MAJOR',

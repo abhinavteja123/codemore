@@ -11,6 +11,10 @@ import { vibeCorsWildcardCredentials } from './vibe-cors-wildcard-credentials';
 import { vibeXssDangerouslySet } from './vibe-xss-dangerously-set';
 import { vibeNoRateLimit } from './vibe-no-rate-limit';
 import { vibeNoInputValidation } from './vibe-no-input-validation';
+// Phase 8C Tier 1 — file-upload validation
+import { vibeFileUploadNoValidation } from './vibe-file-upload-no-validation';
+// Phase 8C Tier 2 — cookie flags
+import { vibeCookieMissingFlags } from './vibe-cookie-missing-flags';
 
 export const PACK_NAME = 'vibe-frontend' as const;
 
@@ -19,6 +23,8 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   vibeXssDangerouslySet,
   vibeNoRateLimit,
   vibeNoInputValidation,
+  vibeFileUploadNoValidation,
+  vibeCookieMissingFlags,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {

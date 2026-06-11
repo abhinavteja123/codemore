@@ -51,7 +51,7 @@ export const vibeSupabaseRlsPermissive: Rule = {
   id: 'vibe-supabase-rls-permissive',
   version: '1.0.0',
   pack: 'vibe-supabase',
-  lifecycle: 'experimental',
+  lifecycle: 'beta',
   languages: ['sql'],
   // Phase 1.5: scoped to supabase projects (package.json deps or
   // supabase/migrations/ dir present). Non-Supabase SQL won't trigger.
