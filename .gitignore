@@ -50,3 +50,6 @@ ai mentor bugs.json
 # regenerable from source, not needed in the repo.
 graphify-out/
 .graphify_*
+
+# Triage results — local-only audit output. Must never be committed.
+triage-results/
