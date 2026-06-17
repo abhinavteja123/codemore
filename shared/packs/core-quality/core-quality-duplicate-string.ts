@@ -84,9 +84,14 @@ interface DuplicateHit {
 
 export const coreQualityDuplicateString: Rule = {
   id: 'core-quality-duplicate-string',
-  version: '1.0.0',
+  // Demoted from 'beta' → 'experimental' in Part 7 §11B Fix 2:
+  // real-codebase precision was ~10% (framework labels, severity strings,
+  // file extensions are intended-repeated). Threshold of ≥3 occurrences is
+  // too aggressive for TypeScript; needs threshold-by-language tuning before
+  // promotion. See docs/limitations.md for the full explanation.
+  version: '1.1.0',
   pack: 'core-quality',
-  lifecycle: 'beta',
+  lifecycle: 'experimental',
   languages: ['typescript', 'javascript'],
   category: 'code-smell',
   defaultSeverity: 'MINOR',

@@ -2,6 +2,70 @@
 
 All notable changes to CodeMore. Semantic Versioning.
 
+## [0.2.1] — 2026-06-12 — Part 7 accuracy audit + calibration
+
+### Added — walker hardening from multi-project testing (11 codebases)
+
+- **`venv/` family added to universal-skip patterns** — was a critical gap. Tested project `shopsec` scanned 22,088 files inside `venv/Lib/site-packages/` before this fix. Now also skipped: `.venv/`, `__pycache__/`, `.mypy_cache/`, `.ruff_cache/`, `.pytest_cache/`, `.tox/`, `.eggs/`, `*.egg-info/`, `site-packages/`, `env/`. After fix: shopsec drops from 22,201 findings → 113 (-99.5%).
+- **`triage-results/` added to universal-skip** — Part 7 audit harness writes per-project triage markdown that contains redacted-secret snippets. Without this skip, the codemore self-scan was re-flagging its own audit report as 5 BLOCKERs.
+
+### Fixed — `core-security-hardcoded-secret-pattern` (v1.2.0)
+
+- **Template / example env files are now exempt.** Patterns: `.env.example`, `.env.sample`, `.env.template`, `.env.dist`, `env.example`, `env.sample`. These files exist to show the format with placeholder values; flagging them was noise (Senti's `.env.example` triggered on `xoxb-your-sl…` — a placeholder).
+
+### Re-tested on 11 real codebases (v0.2.1 final numbers)
+
+| Project | Findings | BLOCKERs | Real-bug rate on BLOCKERs |
+|---|---:|---:|---:|
+| EchoVault | 122 | 10 | **100%** (real Supabase RLS-permissive policies) |
+| ProofSnap | 134 | 4 | **100%** |
+| AImentor | 224 | 5 | **100%** (real OpenAI keys in .env + research code) |
+| Hackathonnn | 129 | 3 | **100%** (real Google API keys) |
+| shopsec | 113 (was 22,201) | 5 | **100%** |
+| Senti | 155 | 8 (was 9 — placeholder gone) | **100%** |
+| open-design | 8,615 | 101 | **~80%** (large monorepo) |
+| Gen ai | 63 | 4 | **75%** |
+| NLP | 13 | 0 | n/a |
+| claw-code | 5 | 0 | n/a |
+| codemore (own) | 282 (was 593) | 6 | 17% (demo data in sandbox/landing) |
+| **Aggregate (excl. own)** | **9,673 → 9,573** | **140** | **~85%** |
+
+**Across 10 external codebases: ~85% TP rate on BLOCKERs.** Above the ≥ 75% production-ready bar.
+
+### Added — walker bypass for secret-shaped filenames (the impactful one)
+
+- **Walker now SCANS files matching well-known secret-carrier patterns even when `.gitignore` excludes them.** Patterns: `.env*`, `*.pem`, `*.key`, `firebase-adminsdk*.json`, `*service-account*.json`, `credentials.json`, `serviceAccountKey.json`, `.npmrc`, `.pypirc`. Mirrors what gitleaks / GitGuardian do.
+- **`--respect-gitignore-fully`** CLI flag to opt out (default: bypass enabled).
+- **Why this matters:** real-world testing on the user's `Gen ai` project found a Firebase admin SDK JSON with a live `private_key` block — sitting in the repo root with a `.gitignore` entry saying "ROTATE THESE KEYS." CodeMore v0.2.0 silently missed it. v0.2.1 catches it.
+
+### Fixed — 5 rule calibrations from the real-world accuracy audit
+
+- **`core-quality-duplicate-string`** demoted to `lifecycle: 'experimental'` — real-world precision was ~10% (framework labels, severity strings, file extensions are intended-repeated). Behind `--enable-experimental` until threshold-by-language tuned.
+- **`core-quality-py-unused-import`** (v1.2.0) — now skips files that `from __future__ import annotations` (typing imports look unused but are runtime-string annotations), and skips imports inside `try: ... except ImportError:` (optional deps). NLP precision: ~25% → ~85%.
+- **`core-quality-leftover-print`** (v1.3.0) — exempts diagnostic scripts (`inspect_*.py`, `check_*.py`, `debug_*.py`, `dump_*.py`, …) and ML scripts (`train_*.py`, `predict_*.py`, `*_pipeline.py`, OR any file importing `torch`/`tensorflow`/`tqdm`/`wandb`/`transformers`/`pytorch_lightning`/etc.). Gen ai precision: ~5% → ~88%.
+- **`core-security-path-traversal`** (v1.2.0) + **`core-security-shell-injection`** (v1.1.0) — both now strip string literals + comments before matching, and classify the captured argument against the ORIGINAL content (so pure string literals still classify as `pure-literal`). Eliminates the rules' self-detection inside their own JSDoc examples. Path-traversal's user-input hint dropped bare `\bargs\b` (CLI args ≠ HTTP `req.params`).
+
+### Added — `shared/rules/stripContent.ts`
+
+Shared helper for `stripJsCommentsAndStrings` + `stripPyCommentsAndStrings`. Replaces the local helper that used to live inside `core-security-eval.ts`.
+
+### Verification — real-world numbers across 5 projects
+
+| Project | Before | After | Delta |
+|---|---:|---:|---:|
+| AImentor (FastAPI + React, 59K LOC) | 410 / 1 BLOCKER | **224 / 5 BLOCKERs** | -45% noise, +4 real secrets surfaced |
+| Gen ai (Firebase + RAG, 16K LOC) | 116 / 0 BLOCKERs | **63 / 4 BLOCKERs** | -46% noise, **+4 real `.env` secrets** |
+| NLP (Streamlit, 38K LOC) | 31 | **13** | -58% |
+| codemore (self-scan, 60K LOC) | 593 / 12 BLOCKERs | **293 / 11 BLOCKERs** | -51% (self-detection fixed) |
+| claw-code (clean ref, 19K LOC) | 7 | **5** | 0 BLOCKERs (unchanged) |
+| **Total** | **1,157** | **598 (-48%)** | **+7 real BLOCKERs surfaced** |
+
+- Corpus accuracy script: 58/58 recall + 58/58 precision (no regression)
+- Per-rule precision on real codebases: ≥75% on every rule that fired
+- Full report: `accuracy-report-2026-06-12.md`
+
+---
+
 ## [0.2.0] — 2026-06-11 — Phase 8 + Part 5 production hardening
 
 ### Added — 10 new security rules (default-on as of this release)

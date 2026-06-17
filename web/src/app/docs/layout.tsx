@@ -1,42 +1,55 @@
 /**
- * Docs layout — sidebar + content.
+ * Docs layout — 3-column on lg+ (sidebar L, prose centre, sticky TOC R).
  *
- * Routes:
+ * Sources of truth:
+ *   - Sidebar entries: hardcoded SECTIONS array below + dynamic rule list.
+ *   - Right-rail TOC: <StickyTOC> reads h2/h3 from the prose container at runtime.
+ *   - Ambient backdrop: the same WebGLASTConnectionMesh the landing uses, at 5% opacity.
+ *
+ * Routes covered:
  *   /docs                       → landing
- *   /docs/install               → install matrix
- *   /docs/rules                 → rule index
- *   /docs/rules/<rule-id>       → per-rule page (markdown auto-rendered)
- *   /docs/schema                → report schema reference
- *   /docs/contributing          → links to CONTRIBUTING / CONTRIBUTING-RULES
- *   /docs/external-tools        → external-tool adapter reference
- *
- * The pages-source layer reads from `docs/rules/*.md` at build time via
- * scripts/build-rule-pages.js (Phase 5 plan); v1 here renders any
- * `docs/rules/*.md` that exists in the repo without requiring a build step.
+ *   /docs/install               → install matrix (surface-tabs)
+ *   /docs/rules                 → rule index (card grid)
+ *   /docs/rules/<rule-id>       → per-rule page (markdown renderer)
+ *   /docs/schema                → report schema
+ *   /docs/contributing          → contribution paths
+ *   /docs/external-tools        → external-tool adapters
+ *   /docs/github-action         → CI integration
+ *   /docs/security-gate         → layered scan template
+ *   /docs/limitations           → honest exclusions
  */
 
-import Link from 'next/link';
-import Image from 'next/image';
-import { listRuleIds } from '@/lib/docs';
-import type { ReactNode } from 'react';
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import type { ReactNode } from "react";
+
+import { listRuleIds } from "@/lib/docs";
+import Breadcrumb from "@/components/docs/Breadcrumb";
+import StickyTOC from "@/components/docs/StickyTOC";
+import NavInstallDropdown from "@/components/landing/NavInstallDropdown";
+
+const WebGLASTConnectionMesh = dynamic(
+  () => import("@/components/landing/designed/WebGLASTConnectionMesh"),
+  { ssr: false },
+);
 
 const SECTIONS: Array<{ heading: string; items: Array<{ href: string; label: string }> }> = [
   {
-    heading: 'Getting started',
+    heading: "Getting started",
     items: [
-      { href: '/docs',                  label: 'Overview' },
-      { href: '/docs/install',          label: 'Install' },
-      { href: '/docs/schema',           label: 'Report schema' },
-      { href: '/docs/external-tools',   label: 'External tools' },
-      { href: '/docs/github-action',    label: 'GitHub Action' },
+      { href: "/docs",                label: "Overview" },
+      { href: "/docs/install",        label: "Install" },
+      { href: "/docs/schema",         label: "Report schema" },
+      { href: "/docs/external-tools", label: "External tools" },
+      { href: "/docs/github-action",  label: "GitHub Action" },
     ],
   },
   {
-    heading: 'Operations',
+    heading: "Operations",
     items: [
-      { href: '/docs/security-gate',    label: 'CI security gate' },
-      { href: '/docs/limitations',      label: 'Limitations' },
-      { href: '/docs/contributing',     label: 'Contributing' },
+      { href: "/docs/security-gate",  label: "CI security gate" },
+      { href: "/docs/limitations",    label: "Limitations" },
+      { href: "/docs/contributing",   label: "Contributing" },
     ],
   },
 ];
@@ -44,29 +57,48 @@ const SECTIONS: Array<{ heading: string; items: Array<{ href: string; label: str
 export default function DocsLayout({ children }: { children: ReactNode }) {
   const ruleIds = listRuleIds();
   return (
-    <div className="min-h-screen bg-surface-950 text-surface-100">
-      <header className="sticky top-0 z-30 border-b border-white/[0.04] bg-surface-950/65 backdrop-blur-md">
+    <div className="docs-shell min-h-screen bg-[var(--ink)] text-[var(--fg)]">
+      <div className="docs-shell__ambient" aria-hidden>
+        <WebGLASTConnectionMesh />
+      </div>
+
+      <header className="sticky top-0 z-30 border-b border-white/[0.04] bg-[#04040a]/65 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-3.5">
           <Link href="/" aria-label="CodeMore home" className="flex items-center gap-2.5">
-            <Image src="/icon.svg" alt="" width={28} height={28} priority />
-            <span className="font-display text-[16px] font-bold tracking-tight text-surface-50">
-              Code<span className="text-brand-400">More</span>
-              <span className="ml-2 font-mono text-[11px] font-normal tracking-[0.18em] text-surface-500 uppercase">docs</span>
+            <span
+              className="relative inline-block h-6 w-6 rounded-full"
+              style={{
+                background:
+                  "conic-gradient(from 220deg, rgba(78,242,202,0.25), rgba(131,110,243,0.25), rgba(235,126,179,0.25), #4ef2ca, rgba(78,242,202,0.25))",
+                boxShadow: "0 0 12px rgba(78, 242, 202, 0.3)",
+              }}
+            >
+              <span className="absolute inset-1.5 rounded-full bg-[#04040a]" />
+            </span>
+            <span className="font-display text-[15px] font-bold tracking-[0.2em] text-white">
+              CODEMORE
+              <span className="ml-2 font-mono text-[11px] font-normal tracking-[0.18em] text-zinc-500 uppercase">
+                docs
+              </span>
             </span>
           </Link>
-          <nav className="ml-auto flex items-center gap-5 font-mono text-[12px] text-surface-400">
-            <Link href="/docs/rules" className="hover:text-surface-100">rules ({ruleIds.length})</Link>
-            <Link href="/" className="hover:text-surface-100">↗ home</Link>
-            <a className="hover:text-surface-100" href="https://github.com/codemore-dev/codemore" target="_blank" rel="noreferrer">github</a>
+          <nav className="ml-auto flex items-center gap-5 font-mono text-[12px] text-zinc-400">
+            <Link href="/docs/rules" className="hover:text-white">rules ({ruleIds.length})</Link>
+            <NavInstallDropdown />
+            <Link href="/" className="hover:text-white">↗ home</Link>
+            <a className="hover:text-white" href="https://github.com/codemore-dev/codemore" target="_blank" rel="noreferrer">
+              github
+            </a>
           </nav>
         </div>
       </header>
-      <div className="mx-auto flex max-w-6xl gap-10 px-6 py-10">
-        <aside className="hidden w-64 shrink-0 lg:block">
+
+      <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-10 px-6 py-10 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
+        <aside className="hidden lg:block">
           <nav className="sticky top-24 space-y-7 text-sm">
             {SECTIONS.map(s => (
               <div key={s.heading}>
-                <div className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-400/70">
+                <div className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--gold-soft)]">
                   {s.heading}
                 </div>
                 <ul className="space-y-0.5">
@@ -74,7 +106,7 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
                     <li key={i.href}>
                       <Link
                         href={i.href}
-                        className="block rounded-md px-2 py-1.5 text-[13.5px] text-surface-300 transition hover:bg-white/[0.03] hover:text-surface-50"
+                        className="block rounded-md px-2 py-1.5 text-[13px] text-zinc-400 transition hover:bg-white/[0.04] hover:text-white"
                       >
                         {i.label}
                       </Link>
@@ -84,15 +116,15 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
               </div>
             ))}
             <div>
-              <div className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-400/70">
-                Rules
+              <div className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--gold-soft)]">
+                Rules ({ruleIds.length})
               </div>
-              <ul className="space-y-0.5">
+              <ul className="space-y-0.5 max-h-[40vh] overflow-y-auto pr-1">
                 {ruleIds.map(id => (
                   <li key={id}>
                     <Link
                       href={`/docs/rules/${id}`}
-                      className="block truncate rounded-md px-2 py-1 font-mono text-[11.5px] text-surface-400 transition hover:bg-white/[0.03] hover:text-surface-100"
+                      className="block truncate rounded-md px-2 py-1 font-mono text-[11px] text-zinc-500 transition hover:bg-white/[0.04] hover:text-zinc-100"
                     >
                       {id}
                     </Link>
@@ -102,9 +134,15 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
             </div>
           </nav>
         </aside>
-        <main id="main" className="prose prose-invert prose-zinc min-w-0 flex-1 max-w-none">
+
+        <main id="main" className="docs-prose prose prose-invert prose-zinc min-w-0 max-w-none">
+          <Breadcrumb />
           {children}
         </main>
+
+        <aside className="hidden lg:block">
+          <StickyTOC />
+        </aside>
       </div>
     </div>
   );

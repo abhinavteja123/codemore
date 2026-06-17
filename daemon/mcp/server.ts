@@ -107,7 +107,7 @@ export async function runMcpServer(): Promise<void> {
       enableExperimental: z
         .boolean()
         .optional()
-        .describe('Include rules in lifecycle=experimental. Default true while the catalog is young.'),
+        .describe('Include rules in lifecycle=experimental. Default false (matches the CLI) — set to true if you want noisier coverage. As of v0.2.1 the calibrated catalog is beta-tier; experimental contains rules pending precision tuning (e.g. core-quality-duplicate-string).'),
       packs: z
         .array(z.string())
         .optional()
@@ -125,7 +125,7 @@ export async function runMcpServer(): Promise<void> {
     }) => {
       const report = await scanProject({
         root: rootPath,
-        enableExperimental: enableExperimental ?? true,
+        enableExperimental: enableExperimental ?? false,
         enabledPacks: packs,
         frameworks: frameworks ?? [],
       });
@@ -161,7 +161,7 @@ export async function runMcpServer(): Promise<void> {
       const ctx = buildSingleFileContext(filePath, content, language);
       const result = globalRegistry.scanFile(ctx, {
         enabledPacks: packs,
-        enableExperimental: enableExperimental ?? true,
+        enableExperimental: enableExperimental ?? false,
       });
       cacheIssues(result.issues);
       return textResult({ issues: result.issues, diagnostics: result.diagnostics, rulesEvaluated: result.rulesEvaluated });

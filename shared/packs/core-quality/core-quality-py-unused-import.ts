@@ -54,9 +54,52 @@ function parseAllNames(source: string): Set<string> {
   return out;
 }
 
+/**
+ * True if the file declares `from __future__ import annotations`. When that
+ * directive is in effect, ALL annotations become strings at runtime, so
+ * type-only imports (typing.*, dataclasses.field, custom types) that only
+ * appear in annotations look "unused" to the AST identifier-use pass. Ruff
+ * and Pyright treat them as used. We match that bar.
+ *
+ * Caught by Part 7 §11B Fix 3 — the NLP project triage showed ~25% real-world
+ * precision for this rule, almost entirely from `__future__ annotations` files.
+ */
+function hasFutureAnnotations(source: string): boolean {
+  return /^\s*from\s+__future__\s+import\s+[^#\n]*\bannotations\b/m.test(source);
+}
+
+/**
+ * True if the import sits inside a `try: ... except ImportError:` block —
+ * the typical pattern for OPTIONAL dependencies. The author wants the
+ * import to exist so the code can fall back when the package isn't
+ * installed; flagging it as unused defeats the purpose.
+ */
+function isUnderTryImportError(lines: ReadonlyArray<string>, lineIdx: number): boolean {
+  const target = lines[lineIdx - 1] ?? '';
+  const targetIndent = target.match(/^[\t ]*/)?.[0].length ?? 0;
+  if (targetIndent === 0) return false;
+  // Walk up looking for `try:`; if we find one, scan FORWARD from there for
+  // `except ImportError`. Bound at 100 lines so a deeply-nested try-import
+  // doesn't loop forever.
+  for (let i = lineIdx - 2; i >= Math.max(0, lineIdx - 30); i--) {
+    const ln = lines[i];
+    const lnIndent = ln.match(/^[\t ]*/)?.[0].length ?? 0;
+    if (/^\s*try\s*:/.test(ln) && lnIndent < targetIndent) {
+      // Scan forward for the matching except.
+      for (let j = lineIdx; j < Math.min(lines.length, lineIdx + 100); j++) {
+        const ex = lines[j];
+        if (/^\s*except\s+(?:\w+\.)?(?:ImportError|ModuleNotFoundError)\b/.test(ex)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 export const coreQualityPyUnusedImport: Rule = {
   id: 'core-quality-py-unused-import',
-  version: '1.1.0',
+  version: '1.2.0',
   pack: 'core-quality',
   lifecycle: 'beta',
   languages: ['python'],
@@ -74,12 +117,19 @@ export const coreQualityPyUnusedImport: Rule = {
     if (!ctx.pythonAst) return [];
     const tree = ctx.pythonAst as PythonTree;
     const reExported = parseAllNames(ctx.content);
+    // `from __future__ import annotations` makes ALL annotations strings at
+    // runtime. Imports that only appear in annotations look unused to the
+    // identifier-use pass. Skipping the rule entirely for these files is the
+    // simplest correct behaviour and matches ruff's policy.
+    if (hasFutureAnnotations(ctx.content)) return [];
     const findings: RuleFinding[] = [];
     for (const hit of findUnusedImports(tree)) {
       // Skip type-only imports (inside `if TYPE_CHECKING:`).
       if (isUnderTypeChecking(ctx.lines, hit.line)) continue;
       // Skip imports that are listed in __all__ (re-export pattern).
       if (reExported.has(hit.name)) continue;
+      // Skip optional imports inside try/except ImportError.
+      if (isUnderTryImportError(ctx.lines, hit.line)) continue;
       findings.push({
         evidence: {
           file: ctx.filePath,

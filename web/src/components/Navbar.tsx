@@ -16,13 +16,21 @@ export default function Navbar() {
         <div className="flex h-14 items-center justify-between">
           {/* Logo + Web Scanner pill */}
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2" aria-label="CodeMore home">
-              <Image src="/icon.svg" alt="" width={28} height={28} priority />
-              <span className="text-lg font-bold tracking-tight text-surface-50">
-                Code<span className="text-brand-400">More</span>
+            <Link href="/" className="flex items-center gap-2.5" aria-label="CodeMore home">
+              <span
+                className="relative inline-block h-6 w-6 rounded-full"
+                style={{
+                  background: "conic-gradient(from 220deg, rgba(78,242,202,0.25), rgba(131,110,243,0.25), rgba(235,126,179,0.25), #4ef2ca, rgba(78,242,202,0.25))",
+                  boxShadow: "0 0 12px rgba(78, 242, 202, 0.3)",
+                }}
+              >
+                <span className="absolute inset-1.5 rounded-full bg-[#04040a]" />
+              </span>
+              <span className="font-display text-base font-bold tracking-[0.2em] text-white">
+                CODEMORE
               </span>
             </Link>
-            <span className="hidden rounded-full border border-brand-500/20 bg-brand-500/10 px-2.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-brand-300 sm:inline-block">
+            <span className="hidden rounded-full border border-[#4ef2ca]/30 bg-[#4ef2ca]/10 px-2.5 py-0.5 font-mono text-[9.5px] font-medium uppercase tracking-[0.18em] text-[#6effda] sm:inline-block">
               Web Scanner
             </span>
           </div>

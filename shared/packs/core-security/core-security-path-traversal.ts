@@ -26,6 +26,7 @@
  */
 
 import type { Rule, RuleContext, RuleFinding } from '../../rules/Rule';
+import { stripJsCommentsAndStrings, stripPyCommentsAndStrings } from '../../rules/stripContent';
 
 const JS_OPEN_RE = /\b(?:fs|fsPromises|fs\.promises)\.(?:readFile|readFileSync|createReadStream|writeFile|writeFileSync|createWriteStream)\s*\(([^;)]+)\)/g;
 const JS_SENDFILE_RE = /\b(?:res|response)\.(?:sendFile|download)\s*\(([^;)]+)\)/g;
@@ -33,8 +34,12 @@ const PY_OPEN_RE = /\bopen\s*\(([^)]+)\)/g;
 const PY_SENDFILE_RE = /\bsend_file\s*\(([^)]+)\)/g;
 
 // User-input ident hints — any of these inside the captured arg means we
-// take the call seriously.
-const USER_INPUT_HINT_RE = /\b(?:req|request|params|query|body|payload|args)\b\.|filename|file_name|\bname\b|user_input/;
+// take the call seriously. Part 7 §11B Fix 5: dropped bare `\bargs\b` (CLI
+// argument parsers like `args.file` were being confused with HTTP request
+// data). Keeps `\bname\b` (common user-input variable in web handlers) at
+// the cost of some FP risk on `record.name`/`user.name`-style accesses;
+// the `hasNearbyGuard` check filters most of those.
+const USER_INPUT_HINT_RE = /\b(?:req|request)\b\.|\.(?:params|query|body|formData|json)\b|\bfilename\b|\bfile_name\b|\buser_input\b|\bname\b/;
 
 // Same-file guard hints; presence of either (within ~6 lines) suppresses
 // the finding because the developer is doing the right thing.
@@ -59,7 +64,10 @@ function hasNearbyGuard(lines: ReadonlyArray<string>, line: number): boolean {
 
 export const coreSecurityPathTraversal: Rule = {
   id: 'core-security-path-traversal',
-  version: '1.1.0',
+  // Part 7 §11B Fix 5: strip strings + comments before matching (eliminates
+  // self-detection in this file's own JSDoc) AND tightened user-input hint
+  // to drop bare `args` (eliminates CLI-arg confusion with HTTP `req.params`).
+  version: '1.2.0',
   pack: 'core-security',
   lifecycle: 'beta',
   languages: ['typescript', 'javascript', 'python'],
@@ -76,13 +84,26 @@ export const coreSecurityPathTraversal: Rule = {
 
   detect(ctx: RuleContext): RuleFinding[] {
     const isPy = ctx.language === 'python';
+    // Strip strings + comments so we don't match the rule's own JSDoc
+    // examples (the file you're reading shows `fs.readFile(req.params.name, ...)`
+    // inside its OWN JSDoc and used to flag itself as a BLOCKER).
+    // We use `sanitized` to FIND the call site (regex match position) and
+    // then extract the actual argument from the ORIGINAL content — so the
+    // user-input hint check sees real identifiers like `name`, `filename`,
+    // and f-string interpolations, not blanked-out spaces.
+    const sanitized = isPy ? stripPyCommentsAndStrings(ctx.content) : stripJsCommentsAndStrings(ctx.content);
     const regexes = isPy ? [PY_OPEN_RE, PY_SENDFILE_RE] : [JS_OPEN_RE, JS_SENDFILE_RE];
     const findings: RuleFinding[] = [];
     for (const re of regexes) {
       re.lastIndex = 0;
       let m: RegExpExecArray | null;
-      while ((m = re.exec(ctx.content)) !== null) {
-        const arg = m[1] ?? '';
+      while ((m = re.exec(sanitized)) !== null) {
+        // Extract the argument from the ORIGINAL content at the same offset.
+        // Strip-stripped content has the same byte positions, so the
+        // capture group bounds in the original = m.index + match offset.
+        const argStart = m.index + m[0].indexOf('(') + 1;
+        const argEnd = m.index + m[0].lastIndexOf(')');
+        const arg = ctx.content.slice(argStart, argEnd);
         if (!USER_INPUT_HINT_RE.test(arg)) continue;
         const line = lineForOffset(ctx.content, m.index);
         if (hasNearbyGuard(ctx.lines, line)) continue;

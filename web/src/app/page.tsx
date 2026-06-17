@@ -1,57 +1,89 @@
 "use client";
 
-import { useEffect } from "react";
+/**
+ * Landing — Part 8 revision.
+ *
+ * Changes vs Part 7:
+ *  - Arc carousel cardIdx now binds to scroll progress within .scene2's
+ *    350vh track (was click-only — cards stayed frozen as you scrolled past).
+ *  - Centre card reveals a detail panel (severity, score, fix template, snippet).
+ *  - Top-nav "Install" replaced with a NavInstallDropdown (5 surfaces inline).
+ *  - Three new scroll-driven sections:
+ *      Threat-class taxonomy (WebGL rings)
+ *      3-surface byte-equality demo (typed report + hash)
+ *      Agentic fix-loop replay (4-stage Detect → Plan → Patch → Validated)
+ *  - Manifesto rewritten as a 3-act editorial — drop the awkward dropped "4".
+ */
+
+import { useEffect, useRef, useState, useMemo } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Github, Terminal, Boxes, Code2, ArrowRight, Sparkles } from "lucide-react";
+import {
+  ShieldAlert,
+  KeyRound,
+  Terminal,
+  Github,
+  ChevronLeft,
+  ChevronRight,
+  ArrowRight,
+  Eye,
+  Lock,
+  Layers,
+  Boxes,
+  Code2,
+} from "lucide-react";
 
-import { AuroraBackground }    from "@/components/landing/AuroraBackground";
-import { SpotlightHero }       from "@/components/landing/SpotlightHero";
-import { HeroLogo }            from "@/components/landing/HeroLogo";
-import { TerminalDemoPro }     from "@/components/landing/TerminalDemoPro";
-import { BentoStats }          from "@/components/landing/BentoStats";
-import { HowItWorks }          from "@/components/landing/HowItWorks";
-import { CommandTabs }         from "@/components/landing/CommandTabs";
-import { PackBento }           from "@/components/landing/PackBento";
-import { LimitationsTerminal } from "@/components/landing/LimitationsTerminal";
-import { MagneticButton }      from "@/components/landing/MagneticButton";
-import { MarqueeLogos }        from "@/components/landing/MarqueeLogos";
-import { InteractiveDiff }     from "@/components/landing/InteractiveDiff";
+import WebGLPortalBg          from "@/components/landing/designed/WebGLPortalBg";
+import WebGLBrandLetter       from "@/components/landing/designed/WebGLBrandLetter";
+import WebGLASTConnectionMesh from "@/components/landing/designed/WebGLASTConnectionMesh";
+import SidebarHUDBars         from "@/components/landing/designed/SidebarHUDBars";
+import PageTransitionIndicator from "@/components/landing/designed/PageTransitionIndicator";
+import CodeMoreLinterSandbox  from "@/components/landing/designed/CodeMoreLinterSandbox";
 
-/* ─── nav ───────────────────────────────────────────────────────────── */
+import NavInstallDropdown     from "@/components/landing/NavInstallDropdown";
+import WebGLThreatRings       from "@/components/landing/WebGLThreatRings";
+import SurfaceParityDemo      from "@/components/landing/SurfaceParityDemo";
+import AgenticFixLoopReplay   from "@/components/landing/AgenticFixLoopReplay";
 
-function TopNav({ onSignIn }: { onSignIn: () => void }) {
-  return (
-    <header className="sticky top-0 z-30 border-b border-white/[0.04] bg-surface-950/65 backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
-        <Link href="/" aria-label="CodeMore home" className="flex items-center gap-2.5">
-          <HeroLogo size={28} />
-          <span className="font-display text-[17px] font-bold tracking-tight text-surface-50">
-            Code<span className="text-brand-400">More</span>
-          </span>
-        </Link>
-        <nav className="hidden gap-7 font-mono text-[12px] text-surface-400 md:flex">
-          <Link href="/docs"          className="hover:text-surface-100 transition-colors">docs</Link>
-          <Link href="/docs/rules"    className="hover:text-surface-100 transition-colors">rules</Link>
-          <Link href="/docs/install"  className="hover:text-surface-100 transition-colors">install</Link>
-          <a href="https://github.com/codemore-dev/codemore" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-surface-100 transition-colors">
-            <Github className="h-3.5 w-3.5" /> github
-          </a>
-        </nav>
-        <button
-          onClick={onSignIn}
-          className="rounded-lg border border-white/[0.08] bg-surface-900/80 px-4 py-1.5 text-[12.5px] font-semibold tracking-tight text-surface-100 transition-all hover:border-brand-500/50 hover:bg-surface-800/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400"
-        >
-          Sign in
-        </button>
-      </div>
-    </header>
-  );
+/* ─── product data — wired to real v0.2.1 numbers ─────────────────── */
+
+const HUD_SECTIONS = [
+  { id: "passage",           label: "Overview Portal"   },
+  { id: "scan",              label: "Findings Feed"     },
+  { id: "threats",           label: "Threat Taxonomy"   },
+  { id: "playground-linter", label: "Interactive Linter" },
+  { id: "parity",            label: "Surface Parity"    },
+  { id: "fix-loop",          label: "Agentic Fix Loop"  },
+  { id: "docs",              label: "Manifesto Core"    },
+  { id: "dashboard",         label: "Safety Figures"    },
+] as const;
+
+interface CardItem {
+  id: number;
+  idx: string;
+  name: string;
+  desc: string;
+  tag: string;
+  h1: number; h2: number; h3: number;
+  icon: React.ReactNode;
+  severity: "BLOCKER" | "MAJOR";
+  score: string;
+  remediation: string;
+  codeSnippet: string;
 }
 
-/* ─── page ──────────────────────────────────────────────────────────── */
+const THREATS = [
+  { id: "injection",  label: "Injection",        count: 8, blurb: "SQL-concat, shell-injection, eval, command-injection. Two-pass detectors confirm user-input reach.", rules: ["core-security-sql-injection-concat", "core-security-shell-injection", "core-security-eval"], cite: "OWASP A03:2021 · caught SQL-concat in 4 / 10 audited apps" },
+  { id: "auth",       label: "Broken Auth",       count: 6, blurb: "BOLA, missing session checks, inverted-auth. Routes that authenticate the user but query foreign objects.", rules: ["vibe-auth-bola", "vibe-auth-missing-session-check", "vibe-auth-inverted"], cite: "OWASP A07 · 24% of vibe apps have inverted auth (DEV audit)" },
+  { id: "crypto",     label: "Weak Crypto",       count: 4, blurb: "MD5 / SHA-1 / DES near password fields. Cookie-flag misuse. TLS verification disabled in production paths.", rules: ["core-security-weak-hash", "vibe-cookie-missing-flags", "core-security-tls-disabled"], cite: "OWASP A02 · MD5/SHA1 in password code in 3 / 10 apps" },
+  { id: "secrets",    label: "Secrets",           count: 7, blurb: "Provider-token shapes (OpenAI, AWS, Stripe). Scans even .gitignored files like .env*, *.pem, firebase-adminsdk*.json.", rules: ["core-security-hardcoded-secret-pattern", "vibe-public-env-leak", "vibe-mcp-config-secret"], cite: "GitGuardian SOSS 2026 · we caught 7 production keys in audit" },
+  { id: "llm",        label: "LLM-output sinks",   count: 4, blurb: "Agent / completion responses concatenated into eval, exec, SQL templates, Function() — without schema validation.", rules: ["vibe-llm-output-to-sink", "vibe-prompt-injection-sink", "vibe-agent-tool-no-confirm"], cite: "OWASP LLM02:2025 · emerging class — agent-call sinks" },
+  { id: "supabase",   label: "Supabase RLS",      count: 3, blurb: "RLS disabled, USING (true) permissive, anon-key reachable from client bundle. The #1 Lovable footgun.", rules: ["vibe-supabase-rls-disabled", "vibe-supabase-rls-permissive", "vibe-supabase-anon-key-bundled"], cite: "DEV audit · 70% of Lovable apps with RLS off" },
+  { id: "supply",     label: "Supply chain",       count: 4, blurb: "Hallucinated package names, recently-published low-download deps, dangerous deserialization, CI/CD secret echoes.", rules: ["vibe-supply-chain-hallucinated-import", "vibe-supply-chain-recently-published", "vibe-cicd-secret-in-yaml", "core-security-insecure-deserialization"], cite: "Slopsquatting · 20% of AI code references hallucinated pkgs" },
+] as const;
+
+/* ─── page ────────────────────────────────────────────────────────── */
 
 export default function Landing() {
   const { status } = useSession();
@@ -59,289 +91,628 @@ export default function Landing() {
   useEffect(() => {
     if (status === "authenticated") router.replace("/dashboard");
   }, [status, router]);
+
+  // ── Curtain entrance ─────────────────────────────────────────────
+  const [isLoaded, setIsLoaded] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setIsLoaded(true), 2400);
+    return () => clearTimeout(t);
+  }, []);
+
+  // ── Scroll-driven portal animations ──────────────────────────────
+  const passageRef  = useRef<HTMLElement>(null);
+  const portalRef   = useRef<HTMLDivElement>(null);
+  const heroCopyRef = useRef<HTMLDivElement>(null);
+  const heroHintRef = useRef<HTMLDivElement>(null);
+  const navRef      = useRef<HTMLElement>(null);
+  const scanRef     = useRef<HTMLElement>(null);
+  const threatsRef  = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const smooth = (e0: number, e1: number, v: number) => {
+      const t = Math.min(Math.max((v - e0) / (e1 - e0), 0), 1);
+      return t * t * (3 - 2 * t);
+    };
+    let rafId: number | null = null;
+    const apply = () => {
+      rafId = null;
+      if (navRef.current) {
+        navRef.current.classList.toggle("is-scrolled", window.scrollY > 50);
+      }
+      if (!passageRef.current || !portalRef.current || !heroCopyRef.current || !heroHintRef.current) return;
+      const rect = passageRef.current.getBoundingClientRect();
+      const len  = Math.max(passageRef.current.offsetHeight - window.innerHeight, 1);
+      const p    = Math.min(Math.max(-rect.top / len, 0), 1);
+
+      const zoom      = 1 + Math.pow(p, 2.4) * 24;       // 1 → 25× — disc swells into a dive
+      const coreB     = 1 + p * 1.6;                     // core brightens as we dive
+      const ringO     = 1 - smooth(0.72, 0.96, p);       // ring fades just before the dive ends
+      const copyO     = 1 - smooth(0.18, 0.52, p);
+      const copyShift = p * -160;
+      const copyScale = 1 + p * 0.12;
+      const hintO     = 1 - smooth(0.02, 0.12, p);
+
+      portalRef.current.style.setProperty("--pz",     zoom.toFixed(3));
+      portalRef.current.style.setProperty("--core-b", coreB.toFixed(3));
+      portalRef.current.style.setProperty("--ring-o", ringO.toFixed(3));
+      heroCopyRef.current.style.opacity   = copyO.toFixed(3);
+      heroCopyRef.current.style.transform = `translateY(${copyShift.toFixed(1)}px) scale(${copyScale.toFixed(3)})`;
+      heroHintRef.current.style.opacity   = hintO.toFixed(3);
+    };
+    const onScroll = () => {
+      if (rafId === null) rafId = requestAnimationFrame(apply);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    apply();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  // ── Nav hide on scroll-down ──────────────────────────────────────
+  const [isNavHidden, setIsNavHidden] = useState(false);
+  const lastY = useRef(0);
+  useEffect(() => {
+    let raf: number | null = null;
+    const onScroll = () => {
+      if (raf !== null) return;
+      raf = requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const hide = y > 120 && y > lastY.current;
+        // setState only on actual transition — saves dozens of renders on fast
+        // scroll-up bursts which otherwise cascade into WebGL flicker.
+        setIsNavHidden(prev => (prev === hide ? prev : hide));
+        lastY.current = y;
+        raf = null;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf !== null) cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  // ── Arc carousel — REAL CodeMore rule findings ──────────────────
+  const CARDS: CardItem[] = useMemo(() => [
+    {
+      id: 0, idx: "Critical / Security", name: "SQL Injection",
+      desc: "String-concat user input into db.query.\ncore-security-sql-injection-concat",
+      tag: "View Rule →",
+      h1: 205, h2: 222, h3: 248,
+      icon: <ShieldAlert className="w-5 h-5 text-red-400" />,
+      severity: "BLOCKER", score: "9.8 / 10",
+      remediation: "Use parameterised queries — every driver supports ? / $1 / %s placeholders.",
+      codeSnippet: `// ❌ flagged at line 42\nconst q = \`SELECT * FROM users WHERE id = '\${id}'\`;\ndb.query(q);`,
+    },
+    {
+      id: 1, idx: "Critical / Secrets", name: "Hardcoded Provider Key",
+      desc: "Real provider token shape (OpenAI / AWS / Stripe / Google).\ncore-security-hardcoded-secret-pattern",
+      tag: "View Rule →",
+      h1: 255, h2: 272, h3: 292,
+      icon: <KeyRound className="w-5 h-5 text-amber-400" />,
+      severity: "BLOCKER", score: "9.5 / 10",
+      remediation: "Move to env vars or a Key Vault. Audit caught 7 real keys across 5 codebases.",
+      codeSnippet: `// ❌ caught even when .gitignored\nconst KEY = "sk-proj-abcdefghij…";`,
+    },
+    {
+      id: 2, idx: "Critical / Supabase", name: "RLS Permissive Policy",
+      desc: 'CREATE POLICY ... USING (true).\nvibe-supabase-rls-permissive',
+      tag: "View Rule →",
+      h1: 145, h2: 165, h3: 188,
+      icon: <Lock className="w-5 h-5 text-emerald-300" />,
+      severity: "BLOCKER", score: "9.3 / 10",
+      remediation: "Anyone-can-read-anything is the #1 Lovable bug. Add WHERE owner = auth.uid().",
+      codeSnippet: `-- ❌ in EchoVault — 10 of these found\nCREATE POLICY "Users viewable"\n  ON users FOR SELECT USING (true);`,
+    },
+    {
+      id: 3, idx: "Critical / LLM", name: "LLM Output → Sink",
+      desc: "Agent response flows into eval / exec / SQL template.\nvibe-llm-output-to-sink",
+      tag: "View Rule →",
+      h1: 280, h2: 300, h3: 18,
+      icon: <Eye className="w-5 h-5 text-purple-300" />,
+      severity: "BLOCKER", score: "9.6 / 10",
+      remediation: "Schema-validate every model response before consuming it. OWASP LLM02.",
+      codeSnippet: `// ❌ taint propagates one level\nconst code = completion.choices[0].message.content;\neval(code);`,
+    },
+    {
+      id: 4, idx: "High / Crypto", name: "Weak Hash",
+      desc: "MD5 / SHA-1 in auth context.\ncore-security-weak-hash",
+      tag: "View Rule →",
+      h1: 35, h2: 50, h3: 75,
+      icon: <Layers className="w-5 h-5 text-orange-300" />,
+      severity: "MAJOR", score: "7.8 / 10",
+      remediation: "bcrypt / argon2id / scrypt — per-row salt, configurable work factor.",
+      codeSnippet: `// ❌ password near MD5 → BLOCKER\nconst hash = crypto\n  .createHash('md5')\n  .update(password)\n  .digest('hex');`,
+    },
+  ], []);
+
+  const [cardIdx, setCardIdx] = useState(0);
+
+  // ── PHASE 8A — Scroll-bind cardIdx to scene2 track progress ─────
+  useEffect(() => {
+    const el = scanRef.current;
+    if (!el) return;
+    let raf: number | null = null;
+    const onScroll = () => {
+      if (raf !== null) return;
+      raf = requestAnimationFrame(() => {
+        const rect = el.getBoundingClientRect();
+        const trackLen = Math.max(el.offsetHeight - window.innerHeight, 1);
+        const progress = Math.min(Math.max(-rect.top / trackLen, 0), 1);
+        const continuous = progress * (CARDS.length - 1);
+        const nextIdx = Math.min(CARDS.length - 1, Math.round(continuous));
+        setCardIdx(prev => (prev === nextIdx ? prev : nextIdx));
+        el.style.setProperty("--scene2-prog", continuous.toFixed(3));
+        raf = null;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf !== null) cancelAnimationFrame(raf);
+    };
+  }, [CARDS.length]);
+
+  const goToCard = (newIdx: number) => {
+    const el = scanRef.current;
+    if (!el) return;
+    const trackLen = Math.max(el.offsetHeight - window.innerHeight, 1);
+    const targetProgress = newIdx / Math.max(CARDS.length - 1, 1);
+    const targetTop = el.offsetTop + targetProgress * trackLen;
+    window.scrollTo({ top: targetTop, behavior: "smooth" });
+  };
+
+  // ── PHASE 8B2 — Threat taxonomy scroll-bound active idx ─────────
+  const [threatIdx, setThreatIdx] = useState(0);
+  useEffect(() => {
+    const el = threatsRef.current;
+    if (!el) return;
+    let raf: number | null = null;
+    const onScroll = () => {
+      if (raf !== null) return;
+      raf = requestAnimationFrame(() => {
+        const rect = el.getBoundingClientRect();
+        const trackLen = Math.max(el.offsetHeight - window.innerHeight, 1);
+        const progress = Math.min(Math.max(-rect.top / trackLen, 0), 1);
+        const continuous = progress * (THREATS.length - 1);
+        const next = Math.min(THREATS.length - 1, Math.round(continuous));
+        setThreatIdx(prev => (prev === next ? prev : next));
+        raf = null;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf !== null) cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  const goToThreat = (newIdx: number) => {
+    const el = threatsRef.current;
+    if (!el) return;
+    const trackLen = Math.max(el.offsetHeight - window.innerHeight, 1);
+    const targetProgress = newIdx / Math.max(THREATS.length - 1, 1);
+    window.scrollTo({ top: el.offsetTop + targetProgress * trackLen, behavior: "smooth" });
+  };
+
+  // ── Section reveal animations ────────────────────────────────────
+  useEffect(() => {
+    if (!isLoaded) return;
+    const observer = new IntersectionObserver(
+      entries => entries.forEach(e => {
+        if (e.isIntersecting) e.target.classList.add("in");
+      }),
+      { threshold: 0.18 }
+    );
+    document.querySelectorAll(".reveal").forEach(el => observer.observe(el));
+    return () => observer.disconnect();
+  }, [isLoaded]);
+
+  const onSignIn = () => signIn("github", { callbackUrl: "/dashboard" });
+
   if (status === "authenticated") return null;
 
-  const handleSignIn = () => signIn("github", { callbackUrl: "/dashboard" });
+  const activeThreat = THREATS[threatIdx];
 
   return (
-    <div className="min-h-screen bg-surface-950 text-surface-100">
-      <TopNav onSignIn={handleSignIn} />
+    <>
+      <PageTransitionIndicator sections={HUD_SECTIONS.map(s => s.label)} />
 
-      {/* ───── HERO ───── */}
-      <section className="relative overflow-hidden">
-        {/* Subtle grid overlay */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff02_1px,transparent_1px),linear-gradient(to_bottom,#ffffff02_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none z-0" />
-        <AuroraBackground />
-        <SpotlightHero>
-          <div className="relative z-10 mx-auto grid max-w-6xl gap-12 px-6 py-20 lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:py-28">
-            <div id="main" className="flex flex-col items-start justify-center">
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.45 }}
-                className="inline-flex items-center gap-2 rounded-full border border-acid-500/30 bg-acid-500/10 px-3 py-1 font-mono text-[11px] tracking-[0.06em] text-acid-400"
-              >
-                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-acid-500 animate-live-pulse" />
-                v0.2.0 · 58 rules · 8 adapters
-              </motion.div>
+      {/* ───── CURTAIN ENTRANCE ───── */}
+      {!isLoaded && (
+        <>
+          <div className="curtain">
+            <div className="curtain__panel curtain__panel--l">
+              <span className="curtain__text-half curtain__text-half--l">CODE</span>
+            </div>
+            <div className="curtain__panel curtain__panel--r">
+              <span className="curtain__text-half curtain__text-half--r">MORE</span>
+            </div>
+          </div>
+          <div className="curtain__seal"><span>VERIFY · SCAN · TRUST</span></div>
+        </>
+      )}
 
-              <h1 className="mt-6 font-display text-[44px] font-bold leading-[1.04] tracking-[-0.035em] text-surface-50 sm:text-[56px] lg:text-[68px]">
-                {["The", "static", "analyzer", "your"].map((w, i) => (
-                  <motion.span
-                    key={i}
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.15 + i * 0.04 }}
-                    className="inline-block"
-                  >
-                    {w}&nbsp;
-                  </motion.span>
-                ))}
-                <br />
-                <motion.span
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.34 }}
-                  className="inline-block"
+      {/* ───── TOP NAV ───── */}
+      <header ref={navRef} className={"nav " + (isNavHidden ? "is-hidden" : "")}>
+        <Link href="/" aria-label="CodeMore home" className="brand">
+          <div className="brand__mark" />
+          <span className="brand__name">CODEMORE</span>
+        </Link>
+        <nav className="nav__links">
+          <Link href="/docs">Docs</Link>
+          <Link href="/docs/rules">Rules</Link>
+          <NavInstallDropdown onWebScanner={onSignIn} />
+          <a href="https://github.com/codemore-dev/codemore" target="_blank" rel="noreferrer">GitHub</a>
+        </nav>
+        <button onClick={onSignIn} className="nav__cta">Sign in</button>
+      </header>
+
+      {/* ───── PORTAL HERO ───── */}
+      <section ref={passageRef} id="passage" className="portal-scene" aria-label="The scan portal">
+        <div className="portal-sticky">
+          <div className="starfield" />
+          <div ref={portalRef} className="portal" id="portal" aria-hidden="true">
+            <div className="portal__ring" />
+            <div className="portal__edge" />
+            <div className="portal__core">
+              <WebGLPortalBg />
+            </div>
+          </div>
+          <div className="hero-vignette" />
+
+          <div ref={heroCopyRef} className="hero-copy">
+            <span className="kicker">v0.2.1 · 58 rules · 8 adapters · MIT</span>
+            <h1 className="hero-title">
+              The static analyzer<br />
+              <span className="glow">your AI agent reads.</span>
+            </h1>
+            <p className="hero-sub">
+              CodeMore catches the bugs that ship in vibe-coded apps — SQL injection,
+              leaked secrets, broken Supabase RLS, LLM-output-to-eval — and emits a JSON
+              report your coding agent can act on. Same brain across CLI · MCP · VS Code · GitHub Action.
+            </p>
+          </div>
+
+          <div ref={heroHintRef} className="hero-hint">
+            <span>scroll to enter</span>
+            <div className="bar" />
+          </div>
+        </div>
+      </section>
+
+      {/* ───── SCENE 2 — ARC CAROUSEL (scroll-bound, Phase 8A) ───── */}
+      <section id="scan" ref={scanRef} className="scene2">
+        <div className="scene2__sticky">
+          <div className="scene2__grid" />
+          <div className="scene2__beam" />
+          <span className="hud-bracket hud-bracket-tl" />
+          <span className="hud-bracket hud-bracket-tr" />
+          <span className="hud-bracket hud-bracket-bl" />
+          <span className="hud-bracket hud-bracket-br" />
+
+          <div className="scene2__hud-overlay">
+            <div className="scene2__hud-left">
+              <SidebarHUDBars sections={[...HUD_SECTIONS]} />
+            </div>
+            <div className="scene2__hud-right">
+              <SidebarHUDBars sections={[...HUD_SECTIONS]} />
+            </div>
+          </div>
+
+          <header className="scene2__head">
+            <div>
+              <div className="eyebrow">findings feed · 58 rules · scroll to advance</div>
+              <h2>Every finding is agent-actionable. Five sample classes from the 2026-06-12 audit.</h2>
+            </div>
+            <p>
+              Across 10 real codebases we caught 7 production secrets behind .gitignore,
+              10 Supabase RLS holes in a single Lovable export, and real shell + SQL injection
+              in deployed apps. ~85% TP rate.
+            </p>
+          </header>
+
+          <div className="arc">
+            {CARDS.map((c, i) => {
+              const delta = i - cardIdx;
+              const abs = Math.abs(delta);
+              const isCenter = delta === 0;
+              const xOffset = delta * 240;
+              const yOffset = abs * 18;
+              const rotate = delta * 6;
+              const opacity = abs > 2 ? 0 : 1 - abs * 0.22;
+              return (
+                <div
+                  key={c.id}
+                  className={"card" + (isCenter ? " is-center" : "")}
+                  onClick={() => goToCard(i)}
+                  style={{
+                    transform: `translate(calc(-50% + ${xOffset}px), calc(-50% + ${yOffset}px)) rotate(${rotate}deg)`,
+                    opacity,
+                    zIndex: 100 - abs,
+                    // @ts-expect-error: CSS custom properties
+                    "--h1": c.h1, "--h2": c.h2, "--h3": c.h3,
+                  }}
                 >
-                  <span className="bg-gradient-to-r from-brand-400 via-brand-300 to-acid-400 bg-clip-text text-transparent">
-                    AI agent
-                  </span>{" "}
-                  reads.
-                </motion.span>
-              </h1>
-
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.55 }}
-                className="mt-6 max-w-xl text-[17px] leading-relaxed text-surface-300"
-              >
-                CodeMore catches the bugs that ship in vibe-coded apps — SQL injection, leaked secrets,
-                broken Supabase RLS, LLM-output-to-eval — and emits a JSON report your coding agent
-                can act on. Same brain across CLI · MCP · VS Code · GitHub Actions.
-              </motion.p>
-
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.75 }}
-                className="mt-8 flex flex-wrap items-center gap-3"
-              >
-                <MagneticButton href="/docs/install#cli" variant="primary">
-                  <Terminal className="h-4 w-4" /> Install CLI
-                </MagneticButton>
-                <MagneticButton href="/docs/install#mcp" variant="ghost">
-                  <Boxes className="h-4 w-4" /> Connect MCP
-                </MagneticButton>
-                <MagneticButton href="/docs/install#vscode" variant="ghost">
-                  <Code2 className="h-4 w-4" /> Install VS Code
-                </MagneticButton>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4, delay: 0.95 }}
-                className="mt-7 inline-flex items-center gap-2 font-mono text-[12px] text-surface-500"
-              >
-                <Sparkles className="h-3.5 w-3.5 text-brand-400" />
-                MIT-licensed · opt-in telemetry · runs entirely in your repo
-              </motion.div>
-            </div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.7 }}
-              className="self-center"
-            >
-              <TerminalDemoPro />
-            </motion.div>
+                  <div className="card__inner">
+                    <div className="world" />
+                    <div className="card__scrim" />
+                    <div className="card__body">
+                      <div className="card__idx">{c.idx}</div>
+                      <div className="card__name">{c.name}</div>
+                      <div className="card__desc" style={{ whiteSpace: "pre-line" }}>{c.desc}</div>
+                      <div className="card__go">
+                        {c.icon}<span style={{ marginLeft: 6 }}>{c.tag}</span>
+                      </div>
+                    </div>
+                    <div className="card__detail">
+                      <div className="card__detail-row">
+                        <span className={c.severity === "BLOCKER" ? "pip-blocker" : "pip-major"}>
+                          {c.severity}
+                        </span>
+                        <span><b>cvss</b> {c.score}</span>
+                      </div>
+                      <div className="card__detail-fix">{c.remediation}</div>
+                      <div className="card__detail-snippet">{c.codeSnippet}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </SpotlightHero>
+
+          <div className="arc-ui">
+            <div className="arc-prog">
+              <i style={{ transform: `translateX(${cardIdx * 100}%)`, width: `${100 / CARDS.length}%` }} />
+            </div>
+            <div className="arc-count">
+              <b>{String(cardIdx + 1).padStart(2, "0")}</b>
+              <span> · {String(CARDS.length).padStart(2, "0")}</span>
+            </div>
+            <div className="arc-btns">
+              <button onClick={() => goToCard(Math.max(0, cardIdx - 1))} disabled={cardIdx === 0} aria-label="Previous">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button onClick={() => goToCard(Math.min(CARDS.length - 1, cardIdx + 1))} disabled={cardIdx === CARDS.length - 1} aria-label="Next">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
       </section>
 
-      {/* ───── TECH MARQUEE ───── */}
-      <MarqueeLogos />
+      {/* ───── PHASE 8B2 — THREAT TAXONOMY (WebGL rings) ───── */}
+      <section id="threats" ref={threatsRef} className="threats">
+        <div className="threats__sticky">
+          <WebGLThreatRings active={threatIdx} />
 
-      {/* ───── STATS ───── */}
-      <section className="relative border-y border-white/[0.04] bg-surface-950/40">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div>
-              <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.22em] text-brand-400">
-                industry impact
+          <header className="threats__head reveal">
+            <div className="eyebrow">threat taxonomy · 58 rules · 7 classes · scroll</div>
+            <h2>Every rule maps to a known threat class.</h2>
+          </header>
+
+          <div className="threats__grid">
+            <div className="threats__list">
+              {THREATS.map((t, i) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={"threats__row " + (i === threatIdx ? "is-active" : "")}
+                  onClick={() => goToThreat(i)}
+                >
+                  <span className="threats__row-idx">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="threats__row-name">{t.label}</span>
+                  <span className="threats__row-count">{t.count} rules</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="threats__detail" key={activeThreat.id}>
+              <div className="threats__detail-eyebrow">
+                Class {String(threatIdx + 1).padStart(2, "0")} · {activeThreat.count} rules
               </div>
-              <h2 className="font-display text-[32px] font-bold tracking-tight text-surface-50 sm:text-[40px]">
-                The bugs are <span className="text-brand-400">measurable.</span>
-              </h2>
-            </div>
-            <p className="max-w-md text-[14.5px] text-surface-300 leading-relaxed">
-              AI-generated apps ship with predictable, measurable vulnerabilities. Existing scanners
-              report them to dashboards — none speak fluently to the agent that wrote the code.
-            </p>
-          </div>
-          <BentoStats />
-        </div>
-      </section>
-
-      {/* ───── HOW IT WORKS ───── */}
-      <section className="relative">
-        <div className="mx-auto max-w-6xl px-6 py-24">
-          <div className="mb-14 max-w-2xl">
-            <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.22em] text-brand-400">
-              The loop
-            </div>
-            <h2 className="font-display text-[32px] font-bold leading-tight tracking-tight text-surface-50 sm:text-[40px]">
-              One brain. Three steps. One report contract.
-            </h2>
-            <p className="mt-4 text-[15px] leading-relaxed text-surface-300">
-              Whether you invoke from the terminal, an MCP-aware IDE, or a PR comment bot — the same
-              scanner emits the same schema and the same agentic fix loop closes the gap.
-            </p>
-          </div>
-          <HowItWorks />
-        </div>
-      </section>
-
-      {/* ───── INTERACTIVE DIFF SHOWCASE ───── */}
-      <section className="relative border-t border-white/[0.04] bg-surface-950/20">
-        {/* Subtle grid background */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff02_1px,transparent_1px),linear-gradient(to_bottom,#ffffff02_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
-        <div className="mx-auto max-w-6xl px-6 py-24">
-          <div className="mb-14 max-w-2xl">
-            <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.22em] text-brand-400">
-              agent workflow in action
-            </div>
-            <h2 className="font-display text-[32px] font-bold leading-tight tracking-tight text-surface-50 sm:text-[40px]">
-              Vibe-coded vulnerabilities. Fixed in seconds.
-            </h2>
-            <p className="mt-4 text-[15px] leading-relaxed text-surface-300">
-              See how CodeMore catches critical architectural flaws and provides structure-stable JSON feedback that AI coders use to auto-patch the codebase.
-            </p>
-          </div>
-          <InteractiveDiff />
-        </div>
-      </section>
-
-      {/* ───── SURFACES ───── */}
-      <section className="relative border-y border-white/[0.04] bg-surface-950/40">
-        <div className="mx-auto max-w-6xl px-6 py-24">
-          <div className="mb-12 flex flex-wrap items-end justify-between gap-6">
-            <div className="max-w-xl">
-              <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.22em] text-brand-400">
-                Install
+              <div className="threats__detail-title">{activeThreat.label}</div>
+              <p className="threats__detail-blurb">{activeThreat.blurb}</p>
+              <div className="threats__detail-rules">
+                {activeThreat.rules.map(r => (
+                  <span key={r} className="threats__detail-rule">{r}</span>
+                ))}
               </div>
-              <h2 className="font-display text-[32px] font-bold tracking-tight text-surface-50 sm:text-[40px]">
-                Pick your surface.
-              </h2>
-              <p className="mt-3 text-[15px] text-surface-300">
-                The CLI is canonical — every other surface wraps it. Hit{" "}
-                <kbd className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[11px]">⌘1</kbd>
-                {" "}–{" "}
-                <kbd className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[11px]">⌘4</kbd>
-                {" "}to jump between tabs.
+              <div className="threats__detail-cite">{activeThreat.cite}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ───── INTERACTIVE LINTER SANDBOX ───── */}
+      <section id="playground-linter" className="relative bg-[var(--ink)] py-20">
+        <div className="max-w-6xl mx-auto px-8">
+          <div className="reveal mb-12">
+            <div className="font-mono text-[11px] uppercase tracking-[0.38em] text-[var(--gold-soft)] mb-3">interactive linter</div>
+            <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight leading-tight max-w-3xl">
+              Drop a vulnerable snippet — watch the agentic fix loop close.
+            </h2>
+          </div>
+          <div className="reveal reveal-delay-1">
+            <CodeMoreLinterSandbox />
+          </div>
+        </div>
+      </section>
+
+      {/* ───── PHASE 8B3 — 3-SURFACE BYTE-EQUALITY DEMO ───── */}
+      <SurfaceParityDemo />
+
+      {/* ───── PHASE 8B4 — AGENTIC FIX-LOOP REPLAY ───── */}
+      <AgenticFixLoopReplay />
+
+      {/* ───── PHASE 8C — MANIFESTO 3-ACT REWRITE ───── */}
+      <section id="docs" className="manifesto">
+        <div className="manifesto__inner">
+          <div className="meta reveal">
+            <div className="rule" />
+            CODEMORE / MANIFESTO<br />
+            v0.2.1 · 2026-06-12<br />
+            MIT-LICENSED · OPT-IN TELEMETRY
+          </div>
+
+          <div className="manifesto__acts">
+            <div className="reveal">
+              <div className="manifesto__act-label">Act I — the bugs the agent wrote</div>
+              <h3>
+                <em>91.5%</em> of vibe-coded apps ship with at least one vulnerability.
+              </h3>
+              <p>
+                The agent that wrote your last feature also wrote a SQL-concat, a permissive
+                Supabase RLS policy, and an OpenAI key in <code>.env.local</code> that{" "}
+                <code>.gitignore</code> made invisible to your SAST. <strong>The bugs aren&apos;t subtle.</strong>{" "}
+                They are the same ones Veracode flagged on <em>45%</em> of AI-generated code,
+                and the same ones Symbiotic counted on <em>98%</em> of 1,072 scanned vibe-coded sites.
               </p>
             </div>
-          </div>
-          <CommandTabs />
-        </div>
-      </section>
 
-      {/* ───── CATALOG ───── */}
-      <section className="relative">
-        <div className="mx-auto max-w-6xl px-6 py-24">
-          <div className="mb-12 flex flex-wrap items-end justify-between gap-6">
-            <div>
-              <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.22em] text-brand-400">
-                Catalog
-              </div>
-              <h2 className="font-display text-[32px] font-bold tracking-tight text-surface-50 sm:text-[40px]">
-                58 rules across 7 packs.
-              </h2>
-              <p className="mt-3 max-w-xl text-[15px] text-surface-300">
-                Every rule has a TP / FP fixture pair in the corpus. 100% recall and 100% precision
-                verified on every release. Lifecycle: experimental → beta → stable.
+            <div className="reveal reveal-delay-1">
+              <div className="manifesto__act-label">Act II — the inversion</div>
+              <h3 className="manifesto__punchline">
+                Existing scanners report to <em>dashboards</em>.<br />
+                CodeMore reports to your <em>agent</em>.
+              </h3>
+              <p>
+                The agent that wrote the code can also <strong>fix</strong> the code — if it
+                can <strong>read</strong> the report. CodeMore is the structured-feedback bus
+                between the scanner and the coding agent: one schema, one fingerprint, the
+                same bytes from the CLI, the MCP server, the VS Code extension, and the
+                GitHub Action.
               </p>
             </div>
-            <Link
-              href="/docs/rules"
-              className="inline-flex items-center gap-1 rounded-md border border-white/[0.08] bg-surface-900/60 px-3.5 py-2 font-mono text-[12px] text-surface-100 transition hover:border-brand-500/40 hover:bg-surface-800/60"
-            >
-              browse all rules
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-          <PackBento />
-        </div>
-      </section>
 
-      {/* ───── HONESTY ───── */}
-      <section className="relative border-y border-white/[0.04] bg-surface-950/40">
-        <div className="mx-auto max-w-4xl px-6 py-24">
-          <div className="mb-10 max-w-2xl">
-            <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.22em] text-rose-400">
-              Honesty
+            <div className="reveal reveal-delay-2">
+              <div className="manifesto__act-label">Act III — the 2026-06-12 audit</div>
+              <h3>
+                Across <em>10</em> real codebases — <em>~85%</em> of BLOCKER findings were true positives.
+              </h3>
+              <p>
+                We surfaced real OpenAI keys hidden behind <code>.gitignore</code>, ten
+                Supabase RLS holes in a single Lovable export, real shell + SQL injection
+                in production-deployed apps. <Link href="/docs/limitations">Read what we
+                deliberately don&apos;t catch</Link> — context-dependent classes (weak password
+                policy, audit-log completeness, business logic) live elsewhere.
+              </p>
+              <Link
+                href="/docs"
+                className="inline-flex items-center gap-2 mt-8 font-mono text-xs uppercase tracking-[0.22em] text-[#156252] hover:text-[#0d4a3f]"
+              >
+                Read the docs <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
-            <h2 className="font-display text-[32px] font-bold tracking-tight text-surface-50 sm:text-[40px]">
-              What CodeMore <span className="text-rose-400">doesn&apos;t</span> catch.
-            </h2>
-            <p className="mt-3 text-[15px] text-surface-300">
-              We hold to a strict bar — every finding must be agent-actionable. The rest needs
-              other tools, and we link to them.
-            </p>
           </div>
-          <LimitationsTerminal />
         </div>
       </section>
 
-      {/* ───── CTA ───── */}
-      <section className="relative">
-        <div className="mx-auto max-w-3xl px-6 py-28 text-center">
-          <h2 className="font-display text-[40px] font-bold leading-[1.05] tracking-[-0.03em] text-surface-50 sm:text-[52px]">
-            Start scanning in <span className="text-brand-400">30 seconds.</span>
-          </h2>
-          <p className="mx-auto mt-5 max-w-lg text-[15.5px] text-surface-300">
-            No account for the CLI. The web scanner takes a one-click GitHub sign-in.
-          </p>
-          <div className="mx-auto mt-9 inline-flex items-center gap-3 rounded-lg border border-white/[0.06] bg-[#06091a]/85 px-5 py-3 font-mono text-[13px] text-surface-50 shadow-glow-top">
-            <span className="text-brand-400 select-none">$</span>
-            npx codemore@latest scan .
+      {/* ───── ATLAS / SAFETY FIGURES ───── */}
+      <section id="dashboard" className="atlas">
+        <div className="atlas__inner">
+          <h4 className="reveal">Safety figures — the production audit.</h4>
+          <div className="atlas-grid">
+            <div className="atlas-cell reveal reveal-delay-1">
+              <div className="k">Catalog</div>
+              <div className="n">58</div>
+              <div className="l">native rules across 7 packs, 100% TP / 100% FP on the corpus.</div>
+            </div>
+            <div className="atlas-cell reveal reveal-delay-2">
+              <div className="k">Adapters</div>
+              <div className="n">8</div>
+              <div className="l">Ruff · Biome · golangci-lint · clippy · bandit · gitleaks · npm-audit · pip-audit.</div>
+            </div>
+            <div className="atlas-cell reveal reveal-delay-3">
+              <div className="k">TP rate</div>
+              <div className="n">~85%</div>
+              <div className="l">on BLOCKER findings across 10 real codebases. DeepSource bar passed.</div>
+            </div>
+            <div className="atlas-cell reveal reveal-delay-4">
+              <div className="k">Surfaces</div>
+              <div className="n">4</div>
+              <div className="l">CLI · MCP · VS Code · GitHub Action — byte-identical reports.</div>
+            </div>
           </div>
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <MagneticButton href="/docs" variant="primary">
-              Read the docs <ArrowRight className="h-4 w-4" />
-            </MagneticButton>
-            <MagneticButton onClick={handleSignIn} variant="ghost">
-              <Github className="h-4 w-4" /> Sign in with GitHub
-            </MagneticButton>
+
+          <div className="mt-16 reveal">
+            <div className="rounded-2xl border border-white/[0.06] bg-[#06091a]/85 backdrop-blur-md p-8">
+              <div className="font-mono text-[11px] uppercase tracking-[0.25em] text-[var(--gold-soft)] mb-3">install · 30 seconds</div>
+              <div className="font-mono text-base text-white">
+                <span className="text-[var(--gold-soft)]">$</span>{" "}
+                npx codemore@latest scan .
+              </div>
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <Link href="/docs/install#cli" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--gold)] text-[var(--ink)] font-medium text-sm hover:bg-[var(--gold-soft)] transition">
+                  <Terminal className="w-4 h-4" /> CLI
+                </Link>
+                <Link href="/docs/install#mcp" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-white/[0.08] bg-white/[0.02] text-white font-medium text-sm hover:border-[var(--gold)] hover:text-[var(--gold-soft)] transition">
+                  <Boxes className="w-4 h-4" /> MCP
+                </Link>
+                <Link href="/docs/install#vscode" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-white/[0.08] bg-white/[0.02] text-white font-medium text-sm hover:border-[var(--gold)] hover:text-[var(--gold-soft)] transition">
+                  <Code2 className="w-4 h-4" /> VS Code
+                </Link>
+                <button onClick={onSignIn} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-white/[0.08] bg-white/[0.02] text-white font-medium text-sm hover:border-[var(--gold)] hover:text-[var(--gold-soft)] transition">
+                  <Github className="w-4 h-4" /> Web Scanner
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* ───── FOOTER ───── */}
-      <footer className="relative border-t border-white/[0.04] bg-surface-950">
-        {/* Shimmer hairline */}
-        <div
-          aria-hidden
-          className="h-px w-full animate-shimmer-x bg-[linear-gradient(90deg,transparent_0%,rgba(54,170,248,0.45)_30%,rgba(163,230,53,0.45)_60%,transparent_100%)] bg-[length:200%_100%]"
-        />
-        <div className="mx-auto flex max-w-6xl flex-col gap-5 px-6 py-10 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <HeroLogo size={22} />
-            <span className="font-mono text-[12px] text-surface-500">
-              CodeMore · MIT-licensed · opt-in telemetry
-            </span>
+      <footer className="footer">
+        <div className="footer__stars" />
+        <div className="footer__inner">
+          <div className="footer__top">
+            <h5>The static analyzer your AI agent reads.</h5>
+            <div className="fcol">
+              <b>Product</b>
+              <Link href="/docs/install">Install</Link>
+              <Link href="/docs/rules">Rules</Link>
+              <Link href="/docs/schema">Schema</Link>
+              <Link href="/docs/external-tools">Adapters</Link>
+            </div>
+            <div className="fcol">
+              <b>Docs</b>
+              <Link href="/docs">Overview</Link>
+              <Link href="/docs/security-gate">CI gate</Link>
+              <Link href="/docs/limitations">Limitations</Link>
+              <Link href="/docs/contributing">Contributing</Link>
+            </div>
+            <div className="fcol">
+              <b>Community</b>
+              <a href="https://github.com/codemore-dev/codemore" target="_blank" rel="noreferrer">GitHub</a>
+              <Link href="/docs/github-action">GitHub Action</Link>
+              <button onClick={onSignIn} className="text-left">Web scanner</button>
+            </div>
           </div>
-          <nav className="flex gap-6 font-mono text-[12px] text-surface-400">
-            <Link href="/docs"             className="hover:text-surface-100">docs</Link>
-            <Link href="/docs/rules"       className="hover:text-surface-100">rules</Link>
-            <Link href="/docs/limitations" className="hover:text-surface-100">limitations</Link>
-            <a href="https://github.com/codemore-dev/codemore" target="_blank" rel="noreferrer" className="hover:text-surface-100">github</a>
-          </nav>
+
+          <div className="footer__brand">
+            {["C","O","D","E","M","O","R","E"].map((ch, i) => (
+              <WebGLBrandLetter key={i} letter={ch} index={i} />
+            ))}
+          </div>
+
+          <div className="footer__legal">
+            <span>© 2026 CodeMore · MIT-licensed</span>
+            <span>v0.2.1 · 58 rules · 8 adapters · ~85% TP</span>
+            <span>opt-in telemetry · runs entirely in your repo</span>
+          </div>
         </div>
       </footer>
-    </div>
+
+      {/* Hidden AST connection mesh for ambient WebGL background depth — only mount when loaded */}
+      {isLoaded && (
+        <div aria-hidden style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 1, opacity: 0.08 }}>
+          <WebGLASTConnectionMesh />
+        </div>
+      )}
+    </>
   );
 }

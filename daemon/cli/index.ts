@@ -35,7 +35,10 @@ function printUsage(): void {
     `  --framework <name>           Hint a framework (repeatable; comma-separated).\n` +
     `  --external-tools <list|all>  Run external linters and merge their findings (e.g. ruff,biome,golangci,clippy).\n` +
     `  --telemetry / --no-telemetry Opt in/out of sending an anonymous, hashed scan ping to codemore.dev.\n` +
-    `  --verbose                    Print external-tool diagnostics (skipped tools, parse errors) to stderr.\n\n` +
+    `  --verbose                    Print external-tool diagnostics (skipped tools, parse errors) to stderr.\n` +
+    `  --respect-gitignore-fully    Honor .gitignore even for secret-shaped files (.env*, *.pem,\n` +
+    `                                firebase-adminsdk*.json, …). Default: those files are scanned\n` +
+    `                                even when gitignored, since devs often hide leaked secrets there.\n\n` +
     `  --help, -h                   Show this help.\n` +
     `  --version, -v                Show CLI version.\n`,
   );

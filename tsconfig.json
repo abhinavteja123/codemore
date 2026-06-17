@@ -27,6 +27,9 @@
         "out",
         "daemon",
         "webview",
-        "test"
+        "test",
+        "src/App.tsx",
+        "src/main.tsx",
+        "src/components/**/*"
     ]
 }

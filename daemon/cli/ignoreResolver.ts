@@ -23,6 +23,7 @@ const ignore = require('ignore');
 
 /** Hardcoded patterns that apply to every project regardless of .gitignore. */
 const UNIVERSAL_PATTERNS: ReadonlyArray<string> = [
+  // ── JS/TS dep + build dirs ───────────────────────────────────────
   'node_modules/',
   '.git/',
   '.next/',
@@ -36,12 +37,29 @@ const UNIVERSAL_PATTERNS: ReadonlyArray<string> = [
   'out/',
   'coverage/',
   'target/',
-  // CodeMore-internal — corpus dir + samples cache must always be skipped
-  // even when not in .gitignore (e.g. a downstream consumer copies our repo).
-  // The validator script passes the corpus subdir as an explicit root which
-  // bypasses these ignores.
+  // ── Python dep + build dirs ──────────────────────────────────────
+  // (Part 7 follow-up: shopsec scanned 22K files inside venv/site-packages
+  // and reported 22 088 noise findings. These dirs are ALWAYS vendored
+  // third-party code — never the user's source — and must always be skipped.)
+  'venv/',
+  '.venv/',
+  'env/',
+  '.env-venv/',
+  '__pycache__/',
+  '.mypy_cache/',
+  '.ruff_cache/',
+  '.pytest_cache/',
+  '.tox/',
+  '.eggs/',
+  '*.egg-info/',
+  'site-packages/',
+  // ── CodeMore-internal — corpus + samples + audit outputs ─────────
   'corpus/',
   '.samples-cache/',
+  // The accuracy audit (Part 7) writes per-project triage markdown into
+  // this dir; those reports contain redacted-secret snippets that look like
+  // BLOCKER findings to the secret-pattern rule. Always skip.
+  'triage-results/',
 ];
 
 export interface IgnoreResolverOptions {
@@ -51,6 +69,48 @@ export interface IgnoreResolverOptions {
   readGitignore?: boolean;
   /** If false, skip reading tsconfig outDir. Default true. */
   readTsconfig?: boolean;
+  /**
+   * If true, the secret-shaped filenames allowlist below STAYS HONORED by
+   * .gitignore (i.e., users who really want gitignored secret files to be
+   * skipped can pass this). Default false — we DO bypass gitignore for
+   * known secret-carrier patterns. See Part 7 §11B Fix 1.
+   */
+  respectGitignoreForSecretFiles?: boolean;
+}
+
+/**
+ * Filenames that are well-known secret carriers. Developers sometimes add
+ * these to `.gitignore` to "hide" a leaked credential, but the file IS still
+ * on their disk and STILL gets shipped via tarball / Docker / npm pack /
+ * GitHub clone (the .gitignore prevents tracking, not transport). We treat
+ * these as ALWAYS scanned so the user gets a BLOCKER finding they can act on.
+ *
+ * Pattern source: gitleaks default ruleset + GitGuardian's secret-file class.
+ *
+ * Behaviour: when one of these patterns matches a file the .gitignore would
+ * have excluded, we still walk + scan the file. The user can override with
+ * `--respect-gitignore-fully` (CLI) or `respectGitignoreForSecretFiles: true`.
+ */
+const SECRET_SHAPED_FILENAMES: ReadonlyArray<RegExp> = [
+  /(?:^|\/)\.env(?:\..+)?$/i,                          // .env, .env.local, .env.production
+  /(?:^|\/)[^/]+\.pem$/i,                              // *.pem
+  /(?:^|\/)[^/]+\.key$/i,                              // *.key
+  /(?:^|\/)[^/]*firebase-adminsdk[^/]*\.json$/i,       // Firebase Admin SDK (the Gen ai case)
+  /(?:^|\/)[^/]*firebase-service-account[^/]*\.json$/i, // alt Firebase
+  /(?:^|\/)[^/]*service-account[^/]*\.json$/i,         // generic service-account-*.json
+  /(?:^|\/)credentials\.json$/i,                       // gcloud / npm / pip credentials
+  /(?:^|\/)serviceAccountKey\.json$/i,                 // Firebase quickstart pattern
+  /(?:^|\/)[^/]*gcp[-_]credentials[^/]*$/i,            // GCP credential files
+  /(?:^|\/)\.npmrc$/i,                                 // npm auth tokens
+  /(?:^|\/)\.pypirc$/i,                                // PyPI auth tokens
+];
+
+function isSecretShaped(relPath: string): boolean {
+  const norm = relPath.replace(/\\/g, '/');
+  for (const re of SECRET_SHAPED_FILENAMES) {
+    if (re.test(norm)) return true;
+  }
+  return false;
 }
 
 export interface IgnoreResolver {
@@ -130,6 +190,11 @@ export function createIgnoreResolver(root: string, opts: IgnoreResolverOptions =
     sources.push(`.codemorerc.json ignore (${opts.extraPatterns.length} patterns)`);
   }
 
+  const bypassSecretFiles = opts.respectGitignoreForSecretFiles !== true;
+  if (bypassSecretFiles) {
+    sources.push('secret-shaped filenames bypass .gitignore (.env*, *.pem, *.key, firebase-adminsdk*.json, service-account*.json, credentials.json, serviceAccountKey.json, .npmrc, .pypirc)');
+  }
+
   return {
     shouldIgnore(relPath, kind): boolean {
       // `ignore` package uses POSIX paths.
@@ -137,7 +202,14 @@ export function createIgnoreResolver(root: string, opts: IgnoreResolverOptions =
       // The `ignores()` API doesn't take a kind hint directly, but a trailing
       // slash on dirs lets it match `name/` patterns correctly.
       const probe = kind === 'dir' && !normalised.endsWith('/') ? normalised + '/' : normalised;
-      return ig.ignores(probe);
+      const ignored = ig.ignores(probe);
+      // Bypass: if it WOULD be ignored AND it's a known secret-shaped file,
+      // DON'T ignore it. The user wanted to hide the file from git; we want
+      // to surface the BLOCKER finding to them.
+      if (ignored && bypassSecretFiles && kind === 'file' && isSecretShaped(normalised)) {
+        return false;
+      }
+      return ignored;
     },
     describe(): string {
       return sources.join('\n  + ');

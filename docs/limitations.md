@@ -32,3 +32,27 @@ adjacent tools above.
 If a vulnerability class you care about IS source-shape detectable and
 you want it added, open an issue with a TP/FP fixture pair and we'll
 calibrate against the contribution gate (see [CONTRIBUTING-RULES.md](../CONTRIBUTING-RULES.md)).
+
+## Rules calibrated below the 75% precision bar (documented for honesty)
+
+These rules fire but with real-world precision < 75 % on the 2026-06-12 audit
+(5 real codebases — see `accuracy-report-2026-06-12.md`). They stay in the
+catalog because their TPs are high-value, but agents should weight them lower:
+
+| Rule | Real-world precision | Why | Mitigation |
+|---|---:|---|---|
+| `core-quality-unused-export` | ~30 % | TypeScript `import type { X }` consumption isn't tracked; entry-point files (`index.ts`, `route.ts`, `page.tsx`) and dynamic registration patterns leak through | Lower `defaultConfidence: 0.7` so agents sort it below security findings |
+| `vibe-supply-chain-hallucinated-import` | ~25 % | Workspace packages + bundled deps that aren't on npm but ARE real | Read `package.json` `workspaces` field post-launch + add registry network fallback |
+| `vibe-agent-tool-no-confirm` | ~50 % | Agent SDK shapes vary too widely for regex | `defaultConfidence: 0.65` so agents downgrade it |
+| `core-quality-duplicate-string` | ~10 % | Threshold of ≥3 occurrences too aggressive for TypeScript | **Gated behind `--enable-experimental` as of v0.2.1**. Threshold-by-language tuning in v0.3 |
+
+## What changed in v0.2.1 (gitignore bypass)
+
+By default the walker now **scans `.env*`, `*.pem`, `*.key`,
+`firebase-adminsdk*.json`, `*service-account*.json`, `credentials.json`,
+`serviceAccountKey.json`, `.npmrc`, `.pypirc` EVEN when `.gitignore` excludes
+them.** Real-world testing found a leaked Firebase admin SDK JSON in a project
+whose `.gitignore` said "ROTATE THESE KEYS" — the file was on disk, in tarballs,
+in Docker images. `.gitignore` only prevents git TRACKING, not transport.
+
+To restore the previous behaviour: `codemore scan . --respect-gitignore-fully`.

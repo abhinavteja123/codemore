@@ -45,3 +45,8 @@ SAMPLES_REPORT.md
 # Legacy extension issue exports — one-off audit artefacts, not source.
 codemore-issues-*.json
 ai mentor bugs.json
+
+# graphify knowledge-graph artifacts — generated locally with /graphify,
+# regenerable from source, not needed in the repo.
+graphify-out/
+.graphify_*

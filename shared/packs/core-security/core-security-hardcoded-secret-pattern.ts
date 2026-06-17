@@ -109,7 +109,7 @@ function looksLikePlaceholder(token: string): boolean {
 
 export const coreSecurityHardcodedSecretPattern: Rule = {
   id: 'core-security-hardcoded-secret-pattern',
-  version: '1.1.0',
+  version: '1.2.0',
   pack: 'core-security',
   lifecycle: 'beta',
   // Apply broadly — provider tokens are plain strings and can leak into
@@ -130,6 +130,14 @@ export const coreSecurityHardcodedSecretPattern: Rule = {
 
   detect(ctx: RuleContext): RuleFinding[] {
     const findings: RuleFinding[] = [];
+    // Template / example env files are placeholder repositories — they exist
+    // to SHOW the format. Real values don't live here. Skip outright (Part 7
+    // follow-up: Senti's `.env.example:46` flagged a Slack token placeholder
+    // `xoxb-your-sl…` as a BLOCKER).
+    const normFile = ctx.filePath.replace(/\\/g, '/');
+    if (/(?:\.env\.(?:example|sample|template|dist)|\.env\.template$|env\.example$|env\.sample$)/i.test(normFile)) {
+      return findings;
+    }
     // Dedupe: a single token (e.g. `sk-proj-…`) can match multiple provider
     // regexes (`sk-…` and `sk-proj-…`). Key by the matched OFFSET so the
     // first match wins (PROVIDER_PATTERNS is ordered most-specific-first

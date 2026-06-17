@@ -173,7 +173,25 @@
       "Bash(where ruff *)",
       "Bash(where biome *)",
       "Bash(sed 's/.*\\\\.//')",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(mkdir -p 'C:/Users/ABHINAV TEJA/Downloads/codemore/web/src/components/landing/designed')",
+      "Bash(cp 'C:/Users/ABHINAV TEJA/Downloads/frontend codemore/src/components/WebGLPortalBg.tsx' 'C:/Users/ABHINAV TEJA/Downloads/codemore/web/src/components/landing/designed/')",
+      "Bash(cp 'C:/Users/ABHINAV TEJA/Downloads/frontend codemore/src/components/WebGLBrandLetter.tsx' 'C:/Users/ABHINAV TEJA/Downloads/codemore/web/src/components/landing/designed/')",
+      "Bash(cp 'C:/Users/ABHINAV TEJA/Downloads/frontend codemore/src/components/WebGLASTConnectionMesh.tsx' 'C:/Users/ABHINAV TEJA/Downloads/codemore/web/src/components/landing/designed/')",
+      "Bash(cp 'C:/Users/ABHINAV TEJA/Downloads/frontend codemore/src/components/WebGLHoloScope.tsx' 'C:/Users/ABHINAV TEJA/Downloads/codemore/web/src/components/landing/designed/')",
+      "Bash(awk '{print \"  \"$5\"\\\\t\"$NF}')",
+      "Bash(grep -E \"^┌ ○ /  |^├ ○ /\\\\b|^├ ƒ /\\\\b\")",
+      "Bash(grep -n \"<\\\\/span>\" \"C:/Users/ABHINAV TEJA/Downloads/codemore/web/src/app/docs/layout.tsx\")",
+      "PowerShell(python .graphify_ast_step.py; python .graphify_cache_step.py)",
+      "PowerShell(New-Item *)",
+      "PowerShell(python .graphify_build_step.py)",
+      "PowerShell(python .graphify_inspect_step.py)",
+      "PowerShell(python .graphify_label_step.py)",
+      "PowerShell(python .graphify_html_step.py)",
+      "PowerShell(python .graphify_bench_step.py)",
+      "PowerShell($env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'; python .graphify_bench_step.py)",
+      "Bash(grep -E \"\\(Failed|error|○ /\\\\s\\)\")",
+      "Bash(grep -E \"\\(Failed|error|○ /\\\\s|warn\\)\")"
     ]
   },
   "enabledPlugins": {

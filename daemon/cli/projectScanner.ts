@@ -118,6 +118,10 @@ export interface ScanOptions extends RegistryOptions {
    * silent-skipped. Threaded from the CLI's `--verbose` flag.
    */
   verbose?: boolean;
+  /** Threaded from `--respect-gitignore-fully`. When true, the walker honors
+   *  .gitignore even for secret-shaped filenames (.env*, *.pem, *.key,
+   *  firebase-adminsdk*.json, …). Default false — we bypass for those. */
+  respectGitignoreFully?: boolean;
 }
 
 interface DiscoveredFile {
@@ -305,6 +309,7 @@ export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
 
   const resolver = createIgnoreResolver(opts.root, {
     extraPatterns: userIgnore.length > 0 ? userIgnore : undefined,
+    respectGitignoreForSecretFiles: opts.respectGitignoreFully,
   });
   const discovered = walk(opts.root, userIgnore, resolver);
 

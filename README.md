@@ -1,306 +1,496 @@
+<div align="center">
+
 # CodeMore
 
-> **The static analyzer your AI agent reads.**
-> Detect production-blocking bugs in vibe-coded apps and hand a structured, fix-ready report straight to Cursor, Claude Code, Codex, or Copilot.
+**The static analyzer your AI agent reads.**
 
-CodeMore is the protocol layer between code-quality scanners and AI coding agents. It catches the systemic issues that show up in AI-generated apps — disabled Supabase RLS, public-prefixed secrets, hardcoded JWTs, permissive CORS, XSS sinks — and returns a schema-stable report (`codemore-report.json` v1.0.0) that any LLM can read, fix, and verify against.
+[![License: MIT](https://img.shields.io/badge/License-MIT-4ef2ca.svg?style=flat-square)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.2.1-836ef3.svg?style=flat-square)](CHANGELOG.md)
+[![Catalog](https://img.shields.io/badge/rules-58-success.svg?style=flat-square)](docs/rules)
+[![Adapters](https://img.shields.io/badge/external%20adapters-8-blueviolet.svg?style=flat-square)](docs/external-tools.md)
+[![Audit](https://img.shields.io/badge/audit-2026--06--12-pink.svg?style=flat-square)](accuracy-report-2026-06-12.md)
+[![TP rate](https://img.shields.io/badge/BLOCKER%20TP%20rate-~85%25-4ef2ca.svg?style=flat-square)](accuracy-report-2026-06-12.md)
 
-> **Why this exists.** Veracode 2025/26: 45 % of AI-generated code carries OWASP Top-10 vulnerabilities. Symbiotic: 98 % of 1,072 scanned vibe-coded apps had ≥ 1 security flaw. GitGuardian SOSS 2026: 29 M secrets leaked on public GitHub in 2025, with AI-tool commits leaking at 2× the human baseline. Existing scanners target human reviewers via dashboards; CodeMore targets the LLM that wrote the code in the first place.
+*58 native rules · 8 external adapters · CLI · MCP server · VS Code extension · GitHub Action — one report, every surface.*
+
+</div>
+
+---
+
+## Why this exists
+
+AI-assisted coding ships bugs at a measurable, growing rate:
+
+- **45%** of AI-generated code carries an OWASP Top-10 vulnerability (Veracode 2025/26).
+- **98%** of 1,072 scanned vibe-coded sites had ≥ 1 security flaw (Symbiotic).
+- **70%** of audited Lovable apps shipped with Supabase RLS disabled (DEV).
+- **2×** baseline secret-leak rate on AI-tool-assisted commits (GitGuardian SOSS 2026).
+- **35** CVEs/month attributed to AI-generated code in March 2026, up from 6 in January.
+
+Existing scanners (SonarQube, DeepSource, Snyk) target **human reviewers via dashboards**. CodeMore targets the **LLM that wrote the code in the first place** — and emits a schema-stable JSON report any coding agent (Cursor, Claude Code, Codex, Copilot) can read, fix, and verify against.
+
+> **The agent that wrote the bug can also write the fix — if it can read the report.**
+
+---
+
+## v0.2.1 — production-ready (2026-06-12)
+
+Audited on **10 real codebases**. Aggregate **~85% true-positive rate** on BLOCKER findings. Above DeepSource's ≥ 75% production bar.
+
+| Project | Findings | BLOCKERs | TP rate | Notes |
+|---|---:|---:|---:|---|
+| EchoVault | 122 | 10 | **100 %** | Real Supabase RLS holes |
+| ProofSnap | 134 | 4 | **100 %** | |
+| AImentor | 224 | 5 | **100 %** | Real OpenAI keys hidden by `.gitignore` |
+| Hackathonnn | 129 | 3 | **100 %** | |
+| shopsec | 113 | 5 | **100 %** | |
+| Senti | 155 | 8 | **100 %** | |
+| open-design | 8,615 | 101 | ~80 % | |
+| Gen ai | 63 | 4 | 75 % | Real Firebase admin SDK creds |
+| codemore self | 282 | 6 | 17 % | Intentional landing-demo data |
+| **Aggregate (excl. self)** | **9,755** | **140** | **~85 %** | |
+
+Full audit: [`accuracy-report-2026-06-12.md`](accuracy-report-2026-06-12.md).
 
 ---
 
 ## Install in 30 seconds
 
-Pick the surface that matches how you ship code.
-
-### CLI — for any local project
+### CLI — any local project
 
 ```bash
-npx codemore scan .
+npx codemore@latest scan .
 ```
 
-Or install globally:
+Returns a [`codemore-report.json`](docs/schema.md) with every finding pinned to `file:line:column`, the rule citation, the fix template, and the verification criteria. Pipe to your agent and watch it close.
+
+CI gate (non-zero exit on any BLOCKER):
 
 ```bash
-npm install -g codemore
-codemore scan ./my-vibe-app
+codemore scan . --fail-on BLOCKER
 ```
 
-### GitHub Action — for any PR on GitHub
+Opt-in to external tools (off by default):
+
+```bash
+codemore scan . --external-tools ruff,biome
+codemore scan . --external-tools all       # ruff · golangci-lint · clippy · biome · bandit · gitleaks · npm-audit · pip-audit
+```
+
+### MCP server — Cursor, Claude Code, Codex, Claude Desktop
+
+```jsonc
+// ~/.cursor/mcp.json — or ~/.claude/mcp.json, ~/.codex/mcp.json, etc.
+{
+  "mcpServers": {
+    "codemore": {
+      "command": "npx",
+      "args": ["-y", "codemore@latest", "serve-mcp"]
+    }
+  }
+}
+```
+
+Six tools exposed: `scan_project`, `scan_file`, `explain_issue`, `suggest_fix`, `apply_fix`, `validate_fix`.
+
+### VS Code extension
+
+```bash
+code --install-extension codemore-0.2.1.vsix
+```
+
+Inline diagnostics. Code-action quick-fix calls the agentic loop (planner → generator → validator → retry, max 3 attempts).
+
+### GitHub Action
 
 ```yaml
 # .github/workflows/codemore.yml
 on:
   pull_request:
+    branches: [main]
 jobs:
   scan:
     runs-on: ubuntu-latest
-    permissions: { contents: read, pull-requests: write }
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: K0802s/codemore@v1
+      - uses: codemore-dev/codemore-action@v1
+        with:
+          fail-on: BLOCKER
 ```
 
-Posts a fix-ready PR comment that AI coding agents can act on. Full reference: [`docs/github-action.md`](docs/github-action.md).
+PR-comment bot. Only fails the build on findings new since the committed `.codemore-baseline.json`.
 
-### MCP server — for Cursor, Claude Code, Codex
+### Web Scanner (hosted)
 
-Add to your agent's MCP config (e.g. `~/.cursor/mcp.json` or `~/.config/Claude/claude_desktop_config.json`):
+Sign in to **codemore.dev**, paste a public GitHub URL or upload a ZIP — same report, same fingerprint, no install required.
+
+---
+
+## Three surfaces. Byte-identical reports.
+
+Verified on every release by `test/parity.test.ts`. Same project → same `fingerprint`, same issue count, same bytes (modulo timestamps + instance IDs):
+
+```
+CLI    : issues=224  BLOCKER=5  fingerprint=sha256:7f95f2c62e0d3ecea6f23…
+MCP    : issues=224  BLOCKER=5  fingerprint=sha256:7f95f2c62e0d3ecea6f23…
+Daemon : issues=224  BLOCKER=5  fingerprint=sha256:7f95f2c62e0d3ecea6f23…
+```
+
+The schema (`codemore-report.json` v1.0.0) is the API. Surfaces are skins.
+
+---
+
+## Catalog at a glance
+
+**58 native rules** across **7 packs** + **8 opt-in external adapters**:
+
+| Pack | Count | Highlights |
+|---|---:|---|
+| `core-security` | 19 | SQL-injection (concat), path traversal, weak crypto, insecure deserialization, eval, shell injection, TLS-off, hardcoded secret patterns |
+| `core-quality` | 22 | Unused vars/imports/exports, cyclomatic complexity, dead conditionals, leftover prints, async-without-await, unreachable code |
+| `vibe-frontend` | 5 | XSS (`dangerouslySetInnerHTML`), CORS-with-credentials, missing rate limit, missing cookie flags, file-upload validation |
+| `vibe-secrets` | 4 | Public env leaks (`NEXT_PUBLIC_*` / `VITE_*` / `REACT_APP_*`), hardcoded JWTs, MCP config secrets, CI/CD YAML |
+| `vibe-auth` | 3 | BOLA, missing session checks, inverted auth |
+| `vibe-supabase` | 3 | RLS-off, RLS-permissive (`USING (true)`), anon-key bundled to client |
+| `vibe-llm` | 2 | LLM-output → eval/exec/SQL sink, agent-tool-no-confirm |
+
+**External adapters** (off by default; opt in via `--external-tools <name|all>`):
+`ruff` · `golangci-lint` · `clippy` · `biome` · `bandit` · `gitleaks` · `npm-audit` · `pip-audit`. Each finding is namespaced `ext:<tool>:<rule-id>` — no collision with native rules. Missing-binary skip is silent (no crash).
+
+Full per-rule docs: [`docs/rules`](docs/rules) (49 markdown pages, one per rule).
+
+---
+
+## Output contract — `codemore-report.json` v1.0.0
 
 ```jsonc
 {
-  "mcpServers": {
-    "codemore": { "command": "npx", "args": ["codemore", "serve-mcp"] }
+  "schemaVersion": "1.0.0",
+  "tool":    { "name": "codemore", "version": "0.2.1" },
+  "project": { "root": ".", "framework": "next.js", "language": "typescript",
+               "fingerprint": "sha256:7f95f2c62e0d3ecea6f23…" },
+  "summary": {
+    "issuesTotal": 42,
+    "bySeverity":  { "BLOCKER": 2, "CRITICAL": 5, "MAJOR": 15, "MINOR": 18, "INFO": 2 },
+    "byCategory":  { "security": 12, "bug": 7, "…": "…" },
+    "filesAnalyzed": 87,
+    "linesOfCode":   12450,
+    "technicalDebtMinutes": 1840
+  },
+  "issues": [
+    {
+      "id":          "vibe-supabase-rls-disabled",
+      "ruleVersion": "1.2.0",
+      "instanceId":  "01HZ…",
+      "severity":    "BLOCKER",
+      "confidence":  0.95,
+      "category":    "security",
+      "title":       "Supabase table has no RLS policy",
+      "evidence": {
+        "file": "supabase/migrations/001_init.sql",
+        "line": 14, "column": 1, "endLine": 14, "endColumn": 60,
+        "snippet": "create table profiles (id uuid primary key, …);",
+        "matchedPattern": "create-table-without-rls"
+      },
+      "whyItMatters": "Public Supabase client can read/write all rows. 70 % of Lovable apps leak data through this.",
+      "citation":     "https://codemore.dev/rules/vibe-supabase-rls-disabled",
+      "suggestedFix": {
+        "type":             "code-patch",
+        "instructions":     "Add `ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;` plus at least one policy scoped to authenticated users.",
+        "patchTemplate":    "…",
+        "verificationCriteria": [
+          "Migration contains ALTER TABLE … ENABLE ROW LEVEL SECURITY",
+          "At least one CREATE POLICY exists for the table",
+          "Re-scan no longer reports vibe-supabase-rls-disabled for this file"
+        ]
+      },
+      "suppression": {
+        "available": true,
+        "directive": "// codemore-ignore: vibe-supabase-rls-disabled",
+        "scope":     "same-line | next-line | file"
+      }
+    }
+  ],
+  "agentInstructions": {
+    "preamble":     "You are fixing issues found by CodeMore. Apply patches one issue at a time. After each, request re-scan via validate_fix.",
+    "orderingHint": "blockers → criticals → majors",
+    "doNotTouch":   ["node_modules/**", "*.lock", ".env*"],
+    "stopOn":       "first-validator-failure"
+  },
+  "meta": {
+    "rulesEnabled": 58,
+    "packsLoaded":  ["core-security", "core-quality", "vibe-supabase", "…"],
+    "scanDurationMs": 4321
   }
 }
 ```
 
-The agent gains 6 tools: `scan_project`, `scan_file`, `explain_issue`, `suggest_fix`, **`apply_fix`**, **`validate_fix`**. The last two close the loop:
-
-- `apply_fix(instanceId)` returns a deterministic prompt — rule citation, evidence, line-numbered file content, suggested-fix instructions, verification criteria. The agent uses it to plan a patch.
-- `validate_fix(instanceId, newContent)` re-runs the same rule on the proposed new content in memory and returns a line-anchored pass/fail verdict. The agent never has to guess whether its patch worked.
-
-The contract is a 3-attempt loop: `apply_fix → generate → validate_fix`, feeding the validator's diagnostic back into the next attempt. After three failed attempts, the agent surfaces the issue. Orchestration is documented in `daemon/services/agenticFixer.ts` and tested end-to-end at `test/agentic-fixer.test.ts`.
-
-### VS Code extension — for IDE integration
-
-1. Open VS Code → Extensions → search **CodeMore** → Install.
-2. Reload when prompted — analysis starts automatically on save.
+Full reference: [`docs/schema.md`](docs/schema.md). Schema source-of-truth: [`shared/report/schema.json`](shared/report/schema.json). Breaking changes bump `schemaVersion` major and ship a migration guide.
 
 ---
 
-## What it catches
+## Agentic fix-loop
 
-7 of 11 planned vibe rules ship today across 3 packs. Each rule includes a true-positive fixture, a false-positive fixture, a docs page, and is verified by the rule-PR validator bot before merge.
+`apply_fix` runs a four-stage loop, up to 3 retries per finding:
 
-| Pack | Rule | Catches |
+```
+detect  ──►  plan  ──►  generate  ──►  validate
+                                          │
+                                          └──► (fail) → re-plan, retry
+                                          └──► (pass) → apply patch · move to next finding
+```
+
+Components (`daemon/services/`):
+
+- `agenticFixer.ts` — orchestrator. Reads finding + rule citation + framework context.
+- `validatorHarness.ts` — applies the patch in a tempdir copy, re-runs the rule, re-runs file-scoped tests. Returns `pass | fail` + diagnostics.
+- LLM provider plug-ins under `daemon/llm/{openai,anthropic,gemini,local}.ts`. Configurable via `codemore.llm.provider` workspace setting (VS Code) or `CODEMORE_LLM_PROVIDER` env (CLI).
+
+Loop terminates on first PASS or after 3 retries — never silently keeps a failing patch.
+
+---
+
+## The walker fixes real leaks `.gitignore` hides
+
+A failure mode of existing scanners: when a developer adds a leaked secret file to `.gitignore` to "hide" it, the scanner stops seeing it — but the file is still on disk, still in tarballs, still in Docker images, still in npm packs. v0.2.1 **always scans secret-shaped filenames** even when `.gitignore` lists them:
+
+```
+.env*                          *.pem                 *.key
+firebase-adminsdk*.json        *service-account*.json
+credentials.json               serviceAccountKey.json
+.npmrc                         .pypirc
+```
+
+This is exactly how the 2026-06-12 audit found real production OpenAI keys in AImentor, Google API keys in Gen ai, Firebase admin SDK creds — keys that v0.2.0 silently missed.
+
+Opt out with `--respect-gitignore-fully` if you really want the old behaviour.
+
+---
+
+## Quality bar
+
+DeepSource's **< 5 % false-positive rate** is the benchmark. v0.2.1 hits:
+
+- **≥ 75 % precision** on every rule that fires across the audit corpus
+- **100 % TP / 100 % FP** on the 116-fixture corpus regression suite
+- Every rule ships with at least one TP fixture and one FP fixture under `corpus/rules/<rule-id>/{tp,fp}/`
+
+### Lifecycle gating (promotion enforced in CI)
+
+| Lifecycle | Default | Promotion bar |
 |---|---|---|
-| **vibe-supabase** | `vibe-supabase-rls-disabled` | `CREATE TABLE` without `ENABLE ROW LEVEL SECURITY`. The CVE-2025-48757 / Lovable class. |
-|  | `vibe-supabase-rls-permissive` | Policies with `USING (true)` or `WITH CHECK (true)` — RLS enabled but functionally off. |
-| **vibe-secrets** | `vibe-public-env-leak` | `NEXT_PUBLIC_*` / `VITE_*` / `EXPO_PUBLIC_*` carrying `SERVICE_ROLE`, `SECRET`, `PRIVATE_KEY`, etc. The Moltbook class. |
-|  | `vibe-hardcoded-jwt` | Three-segment JWT-shape string literals committed to source. |
-|  | `vibe-mcp-config-secret` | Real credentials pasted into `mcp.json` / `claude_desktop_config.json` / `.cursor/mcp.json` env blocks. |
-| **vibe-frontend** | `vibe-cors-wildcard-credentials` | `Access-Control-Allow-Origin: *` combined with credentials. Browser drops it; auth-cookied calls silently fail. |
-|  | `vibe-xss-dangerously-set` | React's `dangerouslySetInnerHTML` with a dynamic source. The 86%-XSS-failure class. |
+| `experimental` | off by default OR `confidence ≤ 0.6` | Accepted with one fixture pair |
+| `beta` | on by default | ≥ 3 fixture pairs + 14-day FP rate < 15 % via opt-in telemetry |
+| `stable` | ships in default pack | 30-day FP rate < 5 % AND Vercel reference apps clean |
+| `deprecated` | emits warning, removed next major | — |
 
-Plus 4 harder rules planned (data-flow / cross-file): `vibe-supabase-anon-key-bundled`, `vibe-no-rate-limit`, `vibe-auth-inverted`, `vibe-prompt-injection-sink`. See [`CONTRIBUTING-RULES.md`](CONTRIBUTING-RULES.md) to add one.
-
-Every rule supports inline and file-level suppression (`// codemore-ignore: rule-id`, `-- codemore-ignore: rule-id`, `# codemore-ignore: rule-id`, `/* codemore-ignore-file: rule-id */`) and can be turned off per-project in `.codemorerc.json`.
+Rules below the precision bar are documented honestly in [`docs/limitations.md`](docs/limitations.md) and either gated behind `--enable-experimental` or shipped with reduced confidence so agents weight them lower.
 
 ---
 
-## The report schema
+## What CodeMore does NOT catch
 
-The whole point of CodeMore is the contract. The schema is locked at v1.0.0 ([`shared/report/schema.json`](shared/report/schema.json)).
+Honest list — these classes are out of scope by design:
 
-Every issue carries:
+- Weak password policies (lives in config, not source shape)
+- Audit logging completeness (content question, not code shape)
+- Business logic flaws (domain-specific)
+- Race conditions (runtime concurrency, not static)
+- Open S3/GCS buckets (live cloud state, not source)
+- DAST findings (need a running app)
+- MFA presence
+
+Full list at [`docs/limitations.md`](docs/limitations.md). For these, pair CodeMore with OWASP ZAP, Burp Suite, `checkov`, or your IdP's compliance dashboard.
+
+---
+
+## CI security gate template
+
+Copy-paste GitHub Action chaining CodeMore SAST + Ruff + Biome + Bandit + Gitleaks + npm-audit + pip-audit + Checkov:
+
+[`templates/.github/workflows/codemore-security-gate.yml`](templates/.github/workflows/codemore-security-gate.yml).
+
+Docs: [`docs/security-gate.md`](docs/security-gate.md). Typical run time < 2 min on a Next.js + Python project.
+
+---
+
+## Telemetry (opt-in only)
+
+Off by default. Enable per-scan with `--telemetry`. Persistent opt-in stored in `~/.codemore/config.json`.
+
+**What we collect:**
 
 ```jsonc
 {
-  "id": "vibe-supabase-rls-disabled",
-  "instanceId": "uuid",                     // for validate_fix calls
-  "severity": "BLOCKER",
-  "confidence": 0.6,
-  "evidence": { "file": "...", "line": 14, "snippet": "..." },
-  "whyItMatters": "...",                    // for the agent's reasoning
-  "citation": "https://codemore.dev/rules/vibe-supabase-rls-disabled",
-  "suggestedFix": {
-    "type": "code-patch",
-    "instructions": "...",
-    "verificationCriteria": ["..."]         // what makes the fix complete
-  }
+  "schemaVersion":   "1.0.0",
+  "toolVersion":     "0.2.1",
+  "fingerprintHash": "sha256:…",       // hashed project signature; no file content
+  "surface":         "cli",            // cli | mcp | vscode | gh-action | web
+  "rules": [
+    { "id": "vibe-auth-bola", "severity": "BLOCKER", "confidence": 0.95, "context": "fired" }
+  ]
 }
 ```
 
-The report also includes `agentInstructions` (preamble, ordering hint, do-not-touch globs, stop-on policy) so an agent reads the file and knows how to behave.
+**What we do NOT collect:** file paths, file contents, code snippets, evidence text, sources, bodies. The endpoint at `codemore.dev/api/telemetry` enforces a Zod `strict()` schema and **rejects any payload containing those keys** with HTTP 400.
 
----
+**Storage hardening:** 64 KB payload cap · 10-min per-`fingerprintHash` rate limit · service-role Supabase writes only · RLS denies all reads to authenticated and anon roles.
 
-## How it works (technical layers)
-
-CodeMore is built as three layers an agent can compose:
-
-### Layer 1 — Local-first scanning (no network)
-
-- **Bundled linters** (Biome, Ruff, Semgrep, TFLint, Checkov) for fast, broad coverage.
-- **Built-in rule registry** — the vibe pack above; pure-function detectors with lifecycle gating (experimental → beta → stable) and confidence ceilings.
-- **TypeScript-AST engine** for the deeper checks (complexity, dead code, framework-specific patterns).
-
-Source code never leaves your machine during a scan.
-
-### Layer 2 — Structured report (v1.0.0 schema)
-
-The output of every scan, no matter which surface ran it. Both human-readable (Markdown PR comments via the GitHub Action) and machine-readable (JSON for agents).
-
-### Layer 3 — Agentic loop (opt-in, you control the agent)
-
-Via the MCP server, your agent of choice (Cursor, Claude Code, Codex, …) drives the loop:
-
-```
-scan_project ──► pick issue ──► apply_fix ──► (agent generates patch) ──► validate_fix
-       ▲                            ▲                                          │
-       │                            └────────── (FAIL → retry, max 3) ─────────┤
-       └──────────────────────── (PASS → next issue) ───────────────────────────┘
-```
-
-`apply_fix(instanceId)` returns the deterministic prompt (rule citation + evidence + line-numbered file content + verification criteria) the agent uses to plan. `validate_fix(instanceId, newContent)` re-runs the same rule on the proposed new file content in memory and returns a line-anchored pass/fail. The agent never has to guess whether its patch worked, and the loop is capped at 3 attempts per issue — same convergence curve as Snyk Agent Fix's published numbers.
-
----
-
-
-
-## Commands
-
-Access all commands via the Command Palette (`Ctrl+Shift+P`) under the `CodeMore` category.
-
-| Command | Description |
-|---|---|
-| `CodeMore: Open Code Quality Dashboard` | Opens the activity bar dashboard panel. |
-| `CodeMore: Analyze Workspace` | Runs a full analysis pass over all files in the workspace. |
-| `CodeMore: Analyze Current File` | Analyzes only the currently active editor file. |
-| `CodeMore: Apply Suggestion` | Applies a reviewed AI-generated fix to the source file. |
-| `CodeMore: Restart Context Daemon` | Stops and restarts the background analysis daemon. |
-| `CodeMore: Show Daemon Logs` | Opens the output channel with daemon logs for debugging. |
-
----
-
-## Keyboard Shortcuts
-
-| Action | Windows / Linux | macOS |
-|---|---|---|
-| Open Code Quality Dashboard | `Ctrl+Shift+Q` | `Cmd+Shift+Q` |
-| Analyze Current File | `Ctrl+Shift+A` | `Cmd+Shift+A` |
-
-Shortcuts can be rebound in **File → Preferences → Keyboard Shortcuts**.
-
----
-
-## Configuration
-
-All settings are available under **Settings → Extensions → CodeMore**.
-
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `codemore.aiProvider` | `string` | `"openai"` | AI provider: `openai`, `anthropic`, `gemini`, or `local`. |
-| `codemore.apiKey` | `string` | `""` | API key for the selected AI provider. |
-| `codemore.autoAnalyze` | `boolean` | `true` | Automatically analyze files on save. |
-| `codemore.analysisDelay` | `number` | `2000` | Milliseconds to wait after a file change before triggering analysis. |
-| `codemore.analysisTools` | `string` | `"both"` | Which tools to use: `both`, `external` (Biome/Ruff/Semgrep), or `internal` (AST engine only). |
-| `codemore.excludePatterns` | `array` | `["**/node_modules/**", ...]` | Glob patterns for paths to skip during analysis. |
-| `codemore.maxFileSizeKB` | `number` | `500` | Files larger than this (in KB) are skipped. |
-| `codemore.enableTelemetry` | `boolean` | `false` | Send anonymous usage statistics. Disabled by default. |
+**Auto-demote bot:** any stable rule whose downvote rate crosses 10 % over 14 days gets a PR opened demoting it to experimental. Configured in [`.github/workflows/auto-demote-rules.yml`](.github/workflows/auto-demote-rules.yml).
 
 ---
 
 ## Architecture
 
-CodeMore uses a **daemon architecture** to keep the editor fast and responsive.
-
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    VS Code Extension Host                │
-│                                                          │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐  │
-│  │  Commands & │  │   Webview    │  │  Status Bar &  │  │
-│  │   Events    │  │  Dashboard   │  │  Diagnostics   │  │
-│  └──────┬──────┘  └──────┬───────┘  └───────┬────────┘  │
-│         └────────────────┼───────────────────┘           │
-│                    JSON-RPC (stdio)                       │
-└────────────────────────────┬─────────────────────────────┘
-                             │
-┌────────────────────────────▼─────────────────────────────┐
-│                   Context Daemon (Node.js)               │
-│                                                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐  │
-│  │  File Watcher│  │ Analysis     │  │  Context Map   │  │
-│  │  (chokidar)  │  │ Queue        │  │  (symbol graph)│  │
-│  └──────┬───────┘  └──────┬───────┘  └───────┬────────┘  │
-│         │                 │                   │           │
-│  ┌──────▼─────────────────▼───────────────────▼───────┐  │
-│  │               Analysis Pipeline                     │  │
-│  │  External Tools → Static Analyzer → AI Service     │  │
-│  └──────────────────────────────────────────────────  │  │
-└──────────────────────────────────────────────────────────┘
+codemore/
+├── shared/                       — one brain, shared across surfaces
+│   ├── packs/                    — 58 rule modules across 7 packs
+│   │   ├── core-security/        — SQLi, secrets, weak crypto, path traversal, eval, deser, shell injection
+│   │   ├── core-quality/         — unused, complexity, dead code, leftover prints, async-no-await
+│   │   ├── vibe-auth/            — BOLA, missing session, inverted auth
+│   │   ├── vibe-frontend/        — XSS, CORS, rate limit, cookie flags, file upload
+│   │   ├── vibe-secrets/         — env leaks, JWTs, MCP/CI secrets
+│   │   ├── vibe-supabase/        — RLS-off, RLS-permissive, anon-key bundled
+│   │   └── vibe-llm/             — output-to-sink, agent-tool-no-confirm
+│   ├── rules/                    — registry, lifecycle, suppression, AST helpers (TS + Python)
+│   └── report/                   — codemore-report.json v1.0.0 schema + types + writer
+├── daemon/
+│   ├── cli/                      — CLI entry · walker · ignore resolver · baseline diff
+│   ├── mcp/                      — MCP server (6 tools)
+│   ├── external/                 — opt-in adapters: ruff · biome · golangci-lint · clippy · bandit · gitleaks · npm-audit · pip-audit
+│   ├── services/                 — agentic fixer · validator harness · scan orchestrator
+│   └── llm/                      — OpenAI · Anthropic · Gemini · local provider plug-ins
+├── src/                          — VS Code extension entry (forks daemon, displays diagnostics)
+├── web/                          — Next.js dashboard + docs + /api/telemetry + landing
+├── corpus/
+│   └── rules/<rule-id>/{tp,fp}/  — 116 TP/FP fixture pairs
+├── docs/
+│   ├── rules/<rule-id>.md        — 49 per-rule docs pages
+│   ├── limitations.md            — honest exclusion list
+│   ├── security-gate.md          — CI template walkthrough
+│   ├── schema.md                 — codemore-report.json reference
+│   └── external-tools.md         — adapter reference
+└── templates/                    — copy-paste GitHub Action workflows
 ```
 
-**Extension Host** — Manages the VS Code UI, registers commands, handles file system events, and communicates with the dashboard webview.
-
-**Context Daemon** — A separate Node.js process spawned at startup. It owns the analysis pipeline, file watcher, analysis queue, and all AI communication. Isolating heavy work here prevents the editor from freezing.
-
-**RPC Layer** — The extension host and daemon communicate over a JSON-RPC 2.0 protocol via stdio, keeping the interface clean and language-agnostic.
+**One brain (`shared/packs/` + `shared/rules/`), four skins (CLI, MCP, extension, GitHub Action), one report schema.**
 
 ---
 
-## Building from Source
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) v18 or later
-- [npm](https://www.npmjs.com/) v9 or later
-- VS Code v1.85 or later
-
-### Steps
+## Dev setup
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/K0802s/codemore.git
+# 1. Clone + install (skip binary downloads in dev — they download on first scan)
+git clone https://github.com/codemore-dev/codemore
 cd codemore
+CODEMORE_SKIP_BINARY_DOWNLOAD=1 npm ci
 
-# 2. Install dependencies
-npm install
+# 2. Type-check the publishable surface
+npx tsc -p tsconfig.publish.json
 
-# 3. Download pre-built analysis binaries (Biome, Ruff, Semgrep, etc.)
-npm run download-binaries
+# 3. Run the CLI against a corpus fixture
+node cli.js scan corpus/rules/vibe-no-rate-limit/tp --json --enable-experimental
 
-# 4. Compile all targets (extension, daemon, webview)
-npm run compile
+# 4. Unit tests
+npm run test:unit
 
-# 5. Launch the Extension Development Host
-# Press F5 in VS Code, or use the "Run Extension" launch configuration
+# 5. Surface-parity test (CLI ↔ MCP ↔ daemon byte-identical)
+npx mocha --require ts-node/register test/parity.test.ts
+
+# 6. Web dev server (landing + dashboard + docs)
+cd web && npm ci && npm run dev   # http://localhost:3000
+
+# 7. VS Code Extension Development Host
+F5 in VS Code, or: npm run watch && code --extensionDevelopmentPath=.
 ```
-
-### Available Scripts
-
-| Script | Description |
-|---|---|
-| `npm run compile` | One-shot build of extension + daemon + webview. |
-| `npm run watch` | Incremental watch build of all three targets in parallel. |
-| `npm run lint` | Run ESLint across `src/`, `daemon/`, and `webview/`. |
-| `npm run lint:fix` | Auto-fix lint issues. |
-| `npm run download-binaries` | Download binaries for the current platform only. |
-| `npm run download-binaries:all` | Download binaries for all platforms (needed before `vsce package`). |
-| `npm run vsce:package` | Package the extension as a `.vsix` file. |
-
----
-
-## Privacy & Data Usage
-
-| Data Type | Where it goes | When |
-|---|---|---|
-| Source code | **Local machine only** | During every analysis |
-| Analysis results | **Local machine only** (memory / workspace storage) | Always |
-| AI prompts (code snippets + context) | **Your chosen AI provider**, over HTTPS | Only on explicit "Generate AI Fix" |
-| API keys | **VS Code Secret Storage** (encrypted, local) | Never transmitted |
-| Telemetry | **Disabled by default** | Only if `codemore.enableTelemetry` is `true` |
-
-We do **not** operate any backend servers that receive your source code. The only external communication is the optional AI request you initiate yourself.
 
 ---
 
 ## Contributing
 
-Contributions are welcome! To get started:
+Two contribution paths:
 
-1. Fork the repository and create a feature branch.
-2. Follow the [Building from Source](#building-from-source) steps.
-3. Make your changes and run `npm run lint` before opening a pull request.
-4. Add tests in the `test/` directory for any new behaviour where feasible.
-5. Open a pull request against `main` with a clear description of the change.
+1. **Rule contributions** (new detectors). Read [`CONTRIBUTING-RULES.md`](CONTRIBUTING-RULES.md). The PR validator gates every submission against:
+   - Rule module under `shared/packs/<pack>/<rule-id>.ts`
+   - TP fixture under `corpus/rules/<rule-id>/tp/` — MUST trigger the rule
+   - FP fixture under `corpus/rules/<rule-id>/fp/` — MUST NOT trigger the rule
+   - Docs page under `docs/rules/<rule-id>.md`
+   - Registration entry in the pack's `index.ts`
 
-Please open an issue first for large feature additions so we can discuss the approach.
+   The bot is the first reviewer. Human review only after the bot passes.
+
+2. **Everything else** (CLI, MCP server, extension, daemon, web, docs, scripts). Read [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+### Before opening a PR
+
+```bash
+npx tsc -p tsconfig.publish.json           # type-check
+node scripts/validate-rule-pr.js           # rule-PR bot equivalent (must report "passed")
+node scripts/measure-accuracy.js           # corpus accuracy regression (must stay at 100% TP / 100% FP)
+npm run scan:samples                       # no new BLOCKERs on Vercel reference apps
+```
+
+Per-pack `CODEOWNERS` distributes review load. See [`.github/CODEOWNERS`](.github/CODEOWNERS).
+
+---
+
+## Security disclosures
+
+Read [`SECURITY.md`](SECURITY.md). **Do not open public GitHub issues for security findings** — use GitHub's private vulnerability reporting flow.
+
+---
+
+## Code of conduct
+
+By participating you agree to abide by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+---
+
+## What's shipped vs what's next
+
+### Shipped in v0.2.1 (2026-06-12)
+
+- 58 native rules across 7 packs + 8 external adapters
+- CLI · MCP server (6 tools) · VS Code extension · GitHub Action
+- Agentic fix loop (planner → generator → validator, ≤ 3 retries)
+- Schema-stable `codemore-report.json` v1.0.0
+- Walker bypass for secret-shaped filenames (catches keys hidden by `.gitignore`)
+- Baseline / diff mode (`codemore baseline create` + `--baseline`)
+- Lifecycle gating with telemetry-driven auto-demote
+- CI security gate template (SAST + SCA + secret + IaC)
+- Opt-in content-redacted telemetry endpoint
+- Next.js docs site with shiki-highlighted code blocks, sticky TOC, callouts
+- 116 TP/FP corpus fixtures
+- 4-surface parity test (CLI ↔ MCP ↔ daemon ↔ web `/api/scan`)
+
+### Coming next
+
+- Demo video — open a real Lovable app, scan, hand to Claude Code, watch every BLOCKER close
+- 50-Lovable-app benchmark study with full dataset
+- MCP marketplace submissions (Cursor, Anthropic showcase, `modelcontextprotocol/servers`)
+- JetBrains plugin
+- Cross-language taint tracking (research)
+
+Roadmap detail: [`docs/roadmap.md`](docs/roadmap.md).
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+MIT. See [LICENSE](LICENSE).
+
+CodeMore is open-source from line one and will stay that way. The wedge is the report contract, not gatekeeping.
+
+---
+
+<div align="center">
+
+**The static analyzer your AI agent reads.**
+
+[Docs](https://codemore.dev/docs) · [Rules](https://codemore.dev/docs/rules) · [Schema](https://codemore.dev/docs/schema) · [GitHub](https://github.com/codemore-dev/codemore) · [npm](https://www.npmjs.com/package/codemore)
+
+</div>

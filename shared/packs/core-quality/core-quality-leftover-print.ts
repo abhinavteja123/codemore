@@ -34,6 +34,17 @@ const SCRIPT_PATH_RE = /(?:^|\/)(?:scripts|bin|tools|\.github|cli|tasks)\//;
 // as production-debug residue produces overwhelming FP rates on real CLI
 // projects (claw-code's src/main.py had 32 FPs after the path exemption).
 const ENTRY_FILE_RE = /(?:^|\/)(?:main|__main__|cli|manage)\.py$/;
+// Diagnostic / inspection scripts — files whose name starts with verbs that
+// imply "print stuff to the terminal." Caught Part 7 §11B Fix 4: the Gen ai
+// project triage showed 40 FPs from `inspect_faiss.py`, `check_gemini_models.py`,
+// etc. These are tooling, not service code.
+const DIAGNOSTIC_FILE_RE = /(?:^|\/)(?:inspect|check|debug|dump|show|list|print|run|repl|sample|demo|smoke|probe|trace|profile|benchmark|migrate)_[\w-]*\.py$/i;
+// ML / training scripts. These use print() as the canonical progress channel
+// (alongside tqdm / wandb / tensorboard). Detected either by filename
+// (train_*, predict_*, eval_*, *_pipeline) OR by file content importing a
+// recognised ML framework.
+const ML_FILE_RE = /(?:^|\/)(?:train|predict|eval|evaluate|finetune|fit|infer)[\w-]*\.py$|_pipeline\.py$/i;
+const ML_IMPORT_RE = /^\s*(?:from|import)\s+(?:torch\b|tensorflow\b|tf\b|sklearn\b|transformers\b|tqdm\b|wandb\b|tensorboard\b|pytorch_lightning\b|lightning\b|jax\b|flax\b|catboost\b|xgboost\b)/m;
 // Recognised stderr / stdout aliases. If a print() routes to stderr/stdout
 // explicitly, the author has thought about the channel — not residue.
 const STDERR_STDOUT_KWARG_RE = /\bfile\s*=\s*(?:sys\.std(?:err|out)|stderr|stdout)\b/;
@@ -45,7 +56,18 @@ function isTestFile(filePath: string): boolean {
 
 function isScriptFile(filePath: string): boolean {
   const norm = filePath.replace(/\\/g, '/');
-  return SCRIPT_PATH_RE.test(norm) || ENTRY_FILE_RE.test(norm);
+  return (
+    SCRIPT_PATH_RE.test(norm) ||
+    ENTRY_FILE_RE.test(norm) ||
+    DIAGNOSTIC_FILE_RE.test(norm) ||
+    ML_FILE_RE.test(norm)
+  );
+}
+
+/** True if the file imports a recognised ML framework — these treat print
+ *  as their progress channel and we exempt them like script files. */
+function isMlFile(content: string): boolean {
+  return ML_IMPORT_RE.test(content);
 }
 
 /**
@@ -70,7 +92,7 @@ function isUnderDunderMain(lines: ReadonlyArray<string>, lineIdx: number): boole
 
 export const coreQualityLeftoverPrint: Rule = {
   id: 'core-quality-leftover-print',
-  version: '1.2.0',
+  version: '1.3.0',
   pack: 'core-quality',
   lifecycle: 'beta',
   languages: ['python'],
@@ -89,6 +111,9 @@ export const coreQualityLeftoverPrint: Rule = {
     if (!ctx.pythonAst) return [];
     if (isTestFile(ctx.filePath)) return [];
     if (isScriptFile(ctx.filePath)) return [];
+    // Content-based exemption for ML training scripts that aren't named
+    // train_*.py but still import torch/tensorflow/wandb/etc.
+    if (isMlFile(ctx.content)) return [];
     const tree = ctx.pythonAst as PythonTree;
     const findings: RuleFinding[] = [];
     for (const hit of findPrintCalls(tree)) {

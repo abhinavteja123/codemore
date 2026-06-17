@@ -5,6 +5,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Designed landing visual system (ported from the WebGL frontend) ─── */
+@import "../styles/landing-designed.css";
+
 /* Page-load choreography (used as a fallback when JS is hydrating).
    framer-motion takes over once mounted; this keeps the first paint
    from janking content into view via a class swap. */

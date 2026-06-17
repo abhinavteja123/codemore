@@ -41,6 +41,10 @@ export interface ScanArgs {
   telemetry: boolean;
   /** Print every external-tool diagnostic (including "ran ok" info lines). */
   verbose: boolean;
+  /** Honor .gitignore even for secret-shaped filenames (.env*, *.pem,
+   *  firebase-adminsdk*.json, etc.). Default false — we BYPASS .gitignore
+   *  for those because devs often hide leaked secrets there. */
+  respectGitignoreFully: boolean;
 }
 
 const SEVERITIES: ReadonlyArray<Severity> = ['BLOCKER', 'CRITICAL', 'MAJOR', 'MINOR', 'INFO'];
@@ -60,6 +64,7 @@ export function parseScanArgs(argv: string[]): ScanArgs {
   let externalTools: ExternalToolId[] | undefined;
   let telemetry = false;
   let verbose = false;
+  let respectGitignoreFully = false;
   const frameworks: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -104,6 +109,9 @@ export function parseScanArgs(argv: string[]): ScanArgs {
       case '--verbose':
         verbose = true;
         break;
+      case '--respect-gitignore-fully':
+        respectGitignoreFully = true;
+        break;
       case '--external-tools': {
         const v = (argv[++i] ?? '').trim();
         if (!v) throw new Error(
@@ -142,6 +150,7 @@ export function parseScanArgs(argv: string[]): ScanArgs {
     externalTools,
     telemetry,
     verbose,
+    respectGitignoreFully,
   };
 }
 
@@ -205,6 +214,7 @@ export async function runScan(args: ScanArgs): Promise<number> {
     frameworks: args.frameworks,
     externalTools: args.externalTools,
     verbose: args.verbose,
+    respectGitignoreFully: args.respectGitignoreFully,
   });
 
   // Telemetry: opt-in, best-effort. We await with a hard 3s cap so the

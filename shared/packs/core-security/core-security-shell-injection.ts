@@ -28,6 +28,7 @@
 /* codemore-ignore-file: core-security-shell-injection */
 
 import type { Rule, RuleContext, RuleFinding } from '../../rules/Rule';
+import { stripJsCommentsAndStrings } from '../../rules/stripContent';
 
 // Match calls to the child_process exec/spawn family. The function name
 // must NOT be preceded by `.` or another word char — that excludes
@@ -45,12 +46,6 @@ function lineForOffset(content: string, offset: number): number {
     if (content.charCodeAt(i) === 10) line++;
   }
   return line;
-}
-
-function stripJsComments(content: string): string {
-  let out = content.replace(/\/\/[^\n]*/g, m => ' '.repeat(m.length));
-  out = out.replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '));
-  return out;
 }
 
 /** Extract the first argument starting at `(`. Returns the raw text. */
@@ -109,7 +104,10 @@ function classifyFirstArg(raw: string): FirstArgKind {
 
 export const coreSecurityShellInjection: Rule = {
   id: 'core-security-shell-injection',
-  version: '1.0.0',
+  // Part 7 §11B Fix 5: now strips string literals (not just comments) before
+  // matching, so the rule no longer self-detects in its own whyItMatters
+  // strings + Python rule files' multi-line example strings.
+  version: '1.1.0',
   pack: 'core-security',
   lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
@@ -126,7 +124,7 @@ export const coreSecurityShellInjection: Rule = {
   citation: 'https://codemore.dev/rules/core-security-shell-injection',
 
   detect(ctx: RuleContext): RuleFinding[] {
-    const sanitized = stripJsComments(ctx.content);
+    const sanitized = stripJsCommentsAndStrings(ctx.content);
     const findings: RuleFinding[] = [];
 
     EXEC_CALL_RE.lastIndex = 0;
@@ -134,7 +132,10 @@ export const coreSecurityShellInjection: Rule = {
     while ((m = EXEC_CALL_RE.exec(sanitized)) !== null) {
       const fnName = m[1];
       const openParenIdx = m.index + m[0].length - 1;
-      const arg = firstArgAfterParen(sanitized, openParenIdx);
+      // Extract the argument from ORIGINAL content so pure string literals
+      // are classifiable. We use `sanitized` only to FIND the call site
+      // (so the rule doesn't fire on its own JSDoc / string-literal examples).
+      const arg = firstArgAfterParen(ctx.content, openParenIdx);
       if (arg === null) continue;
       const kind = classifyFirstArg(arg);
       if (kind === 'pure-literal') continue;
