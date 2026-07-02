@@ -6,6 +6,14 @@ type ScanJobResponsePayload = {
   error?: string;
 };
 
+/** The scan job itself reported `status: "failed"` — terminal, never retried. */
+export class ScanJobFailedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ScanJobFailedError";
+  }
+}
+
 // Circuit breaker configuration
 const MAX_POLL_ATTEMPTS = 150; // ~3 minutes at average intervals
 const MAX_CONSECUTIVE_FAILURES = 5;
@@ -110,7 +118,7 @@ export async function waitForScanJobCompletion(jobId: string): Promise<{
       }
 
       if (job.status === "failed") {
-        throw new Error(job.errorMessage || "Scan failed");
+        throw new ScanJobFailedError(job.errorMessage || "Scan failed");
       }
 
       // Job still processing - wait with exponential backoff
@@ -120,10 +128,12 @@ export async function waitForScanJobCompletion(jobId: string): Promise<{
 
     } catch (error) {
       // If it's a circuit breaker error or job failure, re-throw immediately
+      if (error instanceof ScanJobFailedError) {
+        throw error;
+      }
       if (error instanceof Error) {
         if (
           error.message.includes("Service unavailable") ||
-          error.message.includes("Scan failed") ||
           error.message.includes("did not include job details")
         ) {
           throw error;

@@ -1,0 +1,22 @@
+{
+  "extension": [".ts", ".tsx"],
+  "include": [
+    "shared/**",
+    "daemon/**",
+    "web/src/lib/**"
+  ],
+  "exclude": [
+    "test/**",
+    "corpus/**",
+    "out/**",
+    "dist/**",
+    "node_modules/**",
+    "web/.next/**",
+    "**/*.test.ts",
+    "**/*.d.ts",
+    "shared/protocol.js",
+    "daemon/dist/**"
+  ],
+  "all": false,
+  "reporter": ["text", "text-summary"]
+}

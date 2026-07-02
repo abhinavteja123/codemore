@@ -8,6 +8,14 @@ import crypto from "crypto";
 import { deleteArtifact, loadArtifact, saveGitHubArtifact, saveZipArtifact } from "../web/src/lib/scanArtifacts";
 
 describe("scan artifacts", () => {
+  before(() => {
+    // saveGitHubArtifact encrypts with CODEMORE_JOB_ENCRYPTION_KEY; use a
+    // synthetic per-run key so the suite doesn't depend on host env config.
+    if (!process.env.CODEMORE_JOB_ENCRYPTION_KEY) {
+      process.env.CODEMORE_JOB_ENCRYPTION_KEY = crypto.randomBytes(32).toString("base64");
+    }
+  });
+
   it("round-trips encrypted GitHub metadata", async () => {
     const jobId = `job-${crypto.randomUUID()}`;
 

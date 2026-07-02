@@ -100,6 +100,7 @@ describe("suggestion service", () => {
       "user@example.com",
       "issue-1",
       true,
+      undefined,
       {
         getProjectSnapshot: async () => project,
         getSuggestionsForIssue: async () => [],
@@ -147,6 +148,7 @@ describe("suggestion service", () => {
       "user@example.com",
       "issue-1",
       true,
+      undefined,
       {
         getProjectSnapshot: async () => project,
         getSuggestionsForIssue: async () => cached,
@@ -166,7 +168,7 @@ describe("suggestion service", () => {
   it("throws a typed error when the issue id is missing", async () => {
     await assert.rejects(
       () =>
-        resolveSuggestionsForProjectIssue("project-1", "user@example.com", "", true, {
+        resolveSuggestionsForProjectIssue("project-1", "user@example.com", "", true, undefined, {
           getProjectSnapshot: async () => project,
           getSuggestionsForIssue: async () => [],
           saveSuggestionsForIssue: async () => true,

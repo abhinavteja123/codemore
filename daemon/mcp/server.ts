@@ -330,7 +330,9 @@ export async function runMcpServer(): Promise<void> {
 
   // ---------------------------------------------------------------------
   // run_agentic_fix — single-shot in-process fixer for callers that BRING
-  // their own generator (used by the CLI's `codemore apply-fix` command).
+  // their own generator. Experimental: registered only when
+  // CODEMORE_MCP_IN_PROCESS_GENERATOR=1 is set, and NOT part of the public
+  // 6-tool MCP contract. No CLI wrapper exists yet.
   // The MCP transport itself cannot run this since the generator IS the
   // remote agent; this tool is for SDK consumers that have a local LLM
   // client wired up.

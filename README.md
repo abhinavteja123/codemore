@@ -339,7 +339,7 @@ Off by default. Enable per-scan with `--telemetry`. Persistent opt-in stored in 
 
 **Storage hardening:** 64 KB payload cap · 10-min per-`fingerprintHash` rate limit · service-role Supabase writes only · RLS denies all reads to authenticated and anon roles.
 
-**Auto-demote bot:** any stable rule whose downvote rate crosses 10 % over 14 days gets a PR opened demoting it to experimental. Configured in [`.github/workflows/auto-demote-rules.yml`](.github/workflows/auto-demote-rules.yml).
+**Auto-demote bot (planned):** any stable rule whose downvote rate crosses 10 % over 14 days will get a PR opened demoting it to experimental. The workflow isn't built yet — see [`docs/roadmap.md`](docs/roadmap.md).
 
 ---
 
