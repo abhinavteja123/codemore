@@ -816,7 +816,7 @@ export async function getUserStats(userEmail: string): Promise<{
     return { totalProjects: 0, totalScans: 0, totalIssuesFound: 0, avgScore: 0 };
   }
 
-  const projectIds = projects.map((p) => p.id);
+  const projectIds = projects.map((p: { id: string }) => p.id);
 
   const { data: scans } = await supabase!
     .from("scans")
@@ -824,9 +824,9 @@ export async function getUserStats(userEmail: string): Promise<{
     .in("project_id", projectIds);
 
   const totalScans = scans?.length || 0;
-  const totalIssuesFound = (scans ?? []).reduce((acc, s) => acc + (s.issue_count ?? 0), 0);
+  const totalIssuesFound = (scans ?? []).reduce((acc: number, s: { issue_count: number | null }) => acc + (s.issue_count ?? 0), 0);
   const avgScore = totalScans > 0
-    ? (scans ?? []).reduce((acc, s) => acc + (s.overall_score ?? 0), 0) / totalScans
+    ? (scans ?? []).reduce((acc: number, s: { overall_score: number | null }) => acc + (s.overall_score ?? 0), 0) / totalScans
     : 0;
 
   return {
@@ -914,7 +914,7 @@ export async function getDailyAICost(
   if (error || !data) return { totalTokens: 0, totalCostUsd: 0, apiCalls: 0 };
 
   return data.reduce(
-    (acc, row) => ({
+    (acc: { totalTokens: number; totalCostUsd: number; apiCalls: number }, row: { total_tokens: number | null; total_cost_usd: number | null; api_calls: number | null }) => ({
       totalTokens: acc.totalTokens + (row.total_tokens ?? 0),
       totalCostUsd: acc.totalCostUsd + Number(row.total_cost_usd ?? 0),
       apiCalls: acc.apiCalls + (row.api_calls ?? 0),
@@ -943,8 +943,8 @@ export async function getMonthlyAICost(
   if (error || !data) return { totalTokens: 0, totalCostUsd: 0, apiCalls: 0 };
 
   return {
-    totalTokens: data.reduce((sum, r) => sum + (r.total_tokens ?? 0), 0),
-    totalCostUsd: data.reduce((sum, r) => sum + Number(r.estimated_cost_usd ?? 0), 0),
+    totalTokens: data.reduce((sum: number, r: { total_tokens: number | null }) => sum + (r.total_tokens ?? 0), 0),
+    totalCostUsd: data.reduce((sum: number, r: { estimated_cost_usd: number | null }) => sum + Number(r.estimated_cost_usd ?? 0), 0),
     apiCalls: data.length,
   };
 }
@@ -1027,7 +1027,20 @@ export async function getHealthHistory(
 
   if (error || !data) return [];
 
-  const snapshots = data.map(row => ({
+  const snapshots = data.map((row: {
+    id: string;
+    project_id: string;
+    scan_id: string;
+    health_score: number;
+    blocker_count: number;
+    critical_count: number;
+    major_count: number;
+    minor_count: number;
+    info_count: number;
+    total_issues: number;
+    files_analyzed: number;
+    scanned_at: string;
+  }) => ({
     id: row.id,
     projectId: row.project_id,
     scanId: row.scan_id,
