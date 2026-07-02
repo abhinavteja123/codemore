@@ -74,11 +74,11 @@ async function runPipAuditJson(root: string, timeoutMs: number, diagnostics: Ext
     let stderr = '';
     let killed = false;
     let errored = false;
-    const timer = setTimeout(() => { killed = true; try { proc.kill('SIGTERM'); } catch {} }, timeoutMs);
+    const timer = setTimeout(() => { killed = true; try { proc.kill('SIGTERM'); } catch { /* intentionally empty */ } }, timeoutMs);
     proc.stdout?.on('data', (c: Buffer) => { stdout += c.toString('utf8'); });
     proc.stderr?.on('data', (c: Buffer) => { stderr += c.toString('utf8'); });
     proc.on('error', (err) => {
-      if (errored) return;
+      if (errored) {return;}
       errored = true;
       clearTimeout(timer);
       diagnostics.push({
@@ -90,7 +90,7 @@ async function runPipAuditJson(root: string, timeoutMs: number, diagnostics: Ext
       resolve(null);
     });
     proc.on('close', (code) => {
-      if (errored) return;
+      if (errored) {return;}
       clearTimeout(timer);
       if (killed) {
         diagnostics.push({ tool: 'pip-audit', level: 'warn', message: 'pip-audit timeout' });
@@ -123,11 +123,11 @@ async function runPipAuditJson(root: string, timeoutMs: number, diagnostics: Ext
 export async function runPipAudit(root: string, opts: { timeoutMs: number }): Promise<ExternalToolResult> {
   const diagnostics: ExternalToolDiagnostic[] = [];
   const output = await runPipAuditJson(root, opts.timeoutMs, diagnostics);
-  if (output === null) return { issues: [], diagnostics };
+  if (output === null) {return { issues: [], diagnostics };}
 
   const issues: ReportIssue[] = [];
   for (const dep of output.dependencies ?? []) {
-    if (!dep || !dep.name || !dep.vulns?.length) continue;
+    if (!dep || !dep.name || !dep.vulns?.length) {continue;}
     for (const v of dep.vulns) {
       const vulnId = v.id ?? 'unknown';
       const file = fs.existsSync('requirements.txt') ? 'requirements.txt' : 'pyproject.toml';

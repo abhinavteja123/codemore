@@ -30,7 +30,7 @@ export default function WebGLBrandLetter({ letter, index }: WebGLBrandLetterProp
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {return;}
 
     // Use WebGL context (fallback to experimental)
     const gl =
@@ -153,7 +153,7 @@ export default function WebGLBrandLetter({ letter, index }: WebGLBrandLetterProp
     // Shader compilation utility
     const compileShader = (source: string, type: number): WebGLShader | null => {
       const shader = gl.createShader(type);
-      if (!shader) return null;
+      if (!shader) {return null;}
       gl.shaderSource(shader, source);
       gl.compileShader(shader);
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
@@ -166,11 +166,11 @@ export default function WebGLBrandLetter({ letter, index }: WebGLBrandLetterProp
 
     const vs = compileShader(vsSource, gl.VERTEX_SHADER);
     const fs = compileShader(fsSource, gl.FRAGMENT_SHADER);
-    if (!vs || !fs) return;
+    if (!vs || !fs) {return;}
 
     // Shader program setup
     const program = gl.createProgram();
-    if (!program) return;
+    if (!program) {return;}
     gl.attachShader(program, vs);
     gl.attachShader(program, fs);
     gl.linkProgram(program);
@@ -217,7 +217,7 @@ export default function WebGLBrandLetter({ letter, index }: WebGLBrandLetterProp
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-    let startTime = performance.now();
+    const startTime = performance.now();
 
     // High performance animation loop
     const frame = () => {
@@ -245,7 +245,7 @@ export default function WebGLBrandLetter({ letter, index }: WebGLBrandLetterProp
 
     // Handle viewport resize mapping
     const handleResize = () => {
-      if (!canvas) return;
+      if (!canvas) {return;}
       const r = canvas.getBoundingClientRect();
       const w = Math.floor((r.width || 120) * dpr);
       const h = Math.floor((r.height || 160) * dpr);

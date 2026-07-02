@@ -97,18 +97,18 @@ async function runNpmAuditJson(root: string, timeoutMs: number, diagnostics: Ext
     let stderr = '';
     let killed = false;
     let errored = false;
-    const timer = setTimeout(() => { killed = true; try { proc.kill('SIGTERM'); } catch {} }, timeoutMs);
+    const timer = setTimeout(() => { killed = true; try { proc.kill('SIGTERM'); } catch { /* intentionally empty */ } }, timeoutMs);
     proc.stdout?.on('data', (c: Buffer) => { stdout += c.toString('utf8'); });
     proc.stderr?.on('data', (c: Buffer) => { stderr += c.toString('utf8'); });
     proc.on('error', (err) => {
-      if (errored) return;
+      if (errored) {return;}
       errored = true;
       clearTimeout(timer);
       diagnostics.push({ tool: 'npm-audit', level: 'info', message: `npm spawn failed: ${err.message}` });
       resolve(null);
     });
     proc.on('close', (_code) => {
-      if (errored) return;
+      if (errored) {return;}
       clearTimeout(timer);
       if (killed) {
         diagnostics.push({ tool: 'npm-audit', level: 'warn', message: 'npm audit timeout' });
@@ -139,7 +139,7 @@ async function runNpmAuditJson(root: string, timeoutMs: number, diagnostics: Ext
 export async function runNpmAudit(root: string, opts: { timeoutMs: number }): Promise<ExternalToolResult> {
   const diagnostics: ExternalToolDiagnostic[] = [];
   const output = await runNpmAuditJson(root, opts.timeoutMs, diagnostics);
-  if (output === null) return { issues: [], diagnostics };
+  if (output === null) {return { issues: [], diagnostics };}
 
   const issues: ReportIssue[] = [];
   for (const [pkg, vuln] of Object.entries(output.vulnerabilities ?? {})) {

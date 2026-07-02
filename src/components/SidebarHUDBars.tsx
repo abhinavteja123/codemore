@@ -26,13 +26,13 @@ export default function SidebarHUDBars({ sections }: SidebarHUDBarsProps) {
 
     sections.forEach((sec) => {
       const el = document.getElementById(sec.id);
-      if (el) observer.observe(el);
+      if (el) {observer.observe(el);}
     });
 
     return () => {
       sections.forEach((sec) => {
         const el = document.getElementById(sec.id);
-        if (el) observer.unobserve(el);
+        if (el) {observer.unobserve(el);}
       });
     };
   }, [sections]);

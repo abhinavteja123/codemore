@@ -6,7 +6,7 @@ export default function WebGLPortalBg() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {return;}
 
     const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl") as WebGLRenderingContext | null;
     if (!gl) {
@@ -134,7 +134,7 @@ export default function WebGLPortalBg() {
     // Helper to compile shaders
     const compileShader = (source: string, type: number): WebGLShader | null => {
       const shader = gl.createShader(type);
-      if (!shader) return null;
+      if (!shader) {return null;}
       gl.shaderSource(shader, source);
       gl.compileShader(shader);
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
@@ -154,7 +154,7 @@ export default function WebGLPortalBg() {
 
     // Link shader program
     const program = gl.createProgram();
-    if (!program) return;
+    if (!program) {return;}
     gl.attachShader(program, vs);
     gl.attachShader(program, fs);
     gl.linkProgram(program);
@@ -198,7 +198,7 @@ export default function WebGLPortalBg() {
 
     // Set canvas dimensions with high density ratio
     const resize = () => {
-      if (!canvas) return;
+      if (!canvas) {return;}
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
       if (canvas.width !== width || canvas.height !== height) {

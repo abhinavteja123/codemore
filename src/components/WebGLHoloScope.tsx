@@ -30,7 +30,7 @@ export default function WebGLHoloScope({ isScanning, issuesCount, hasScanRun }: 
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {return;}
 
     const gl =
       canvas.getContext("webgl", { alpha: true, antialias: true, depth: false }) ||
@@ -44,7 +44,7 @@ export default function WebGLHoloScope({ isScanning, issuesCount, hasScanRun }: 
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const resize = () => {
-      if (!canvas) return;
+      if (!canvas) {return;}
       const width = canvas.clientWidth || 210;
       const height = canvas.clientHeight || 210;
       canvas.width = Math.floor(width * dpr);
@@ -142,7 +142,7 @@ export default function WebGLHoloScope({ isScanning, issuesCount, hasScanRun }: 
     // Helpers to compile shaders safely
     const compileShader = (source: string, type: number): WebGLShader | null => {
       const shader = gl.createShader(type);
-      if (!shader) return null;
+      if (!shader) {return null;}
       gl.shaderSource(shader, source);
       gl.compileShader(shader);
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
@@ -161,7 +161,7 @@ export default function WebGLHoloScope({ isScanning, issuesCount, hasScanRun }: 
     }
 
     const program = gl.createProgram();
-    if (!program) return;
+    if (!program) {return;}
     gl.attachShader(program, vs);
     gl.attachShader(program, fs);
     gl.linkProgram(program);
@@ -231,10 +231,10 @@ export default function WebGLHoloScope({ isScanning, issuesCount, hasScanRun }: 
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // Additive blending for gorgeous sci-fi glow overlay
 
     let animationId: number;
-    let startTime = performance.now();
+    const startTime = performance.now();
 
     const loop = () => {
-      if (!canvas) return;
+      if (!canvas) {return;}
       const now = performance.now();
       const time = (now - startTime) * 0.001;
 

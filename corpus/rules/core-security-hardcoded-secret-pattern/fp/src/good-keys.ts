@@ -16,3 +16,11 @@ export const REPEAT_PLACEHOLDER_GH = 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx';
 
 // Good: docs-style placeholders.
 export const YOUR_KEY = 'sk_live_YOUR_KEY_HERE_PLACEHOLDER';
+
+// Good: a public certificate / public key block — NOT a secret, must not fire.
+export const PUBLIC_CERT = `-----BEGIN CERTIFICATE-----
+MIIfakefakefakefakefakefakefakefakefakefakefakefakefakeAAAA
+-----END CERTIFICATE-----`;
+export const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIIfakefakefakefakefakefakefakefakefakefakefakefakefakeAAAA
+-----END PUBLIC KEY-----`;

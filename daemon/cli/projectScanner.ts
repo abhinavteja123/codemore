@@ -55,6 +55,7 @@ const SCANNABLE_EXTENSIONS = new Set([
   '.md', '.markdown',
   '.sh', '.bash', '.zsh',
   '.py', '.pyi',
+  '.pem', '.key',
 ]);
 
 // File-size cap. Vibe-coded apps rarely have >2 MB hand-written files —
@@ -77,6 +78,13 @@ function detectLanguage(filename: string, extension: string): string | null {
   // Dockerfile detection by exact basename (no extension).
   if (filename === 'Dockerfile' || filename.toLowerCase() === 'dockerfile') return 'dockerfile';
 
+  // Secret-carrying config/key files: no normal extension routing exists
+  // for these, but ignoreResolver.ts's SECRET_SHAPED_FILENAMES bypass only
+  // has an effect if the file reaches the walker at all. Route them to the
+  // 'env' label so they hit core-security-hardcoded-secret-pattern (and any
+  // other 'env'-scoped rule).
+  if (filename === '.npmrc' || filename === '.pypirc') return 'env';
+
   switch (extension) {
     case '.ts': case '.tsx': case '.cts': case '.mts': return 'typescript';
     case '.js': case '.jsx': case '.mjs': case '.cjs': return 'javascript';
@@ -86,6 +94,7 @@ function detectLanguage(filename: string, extension: string): string | null {
     case '.yaml': case '.yml':                         return 'yaml';
     case '.md': case '.markdown':                      return 'markdown';
     case '.sh': case '.bash': case '.zsh':             return 'shell';
+    case '.pem': case '.key':                          return 'env';
     default:                                           return null;
   }
 }

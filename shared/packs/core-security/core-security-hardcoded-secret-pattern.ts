@@ -85,6 +85,11 @@ const PROVIDER_PATTERNS: ReadonlyArray<ProviderPattern> = [
 
   // Discord bot.
   { name: 'Discord bot token',      pattern: /[MN][A-Za-z0-9]{23}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}/g },
+
+  // PEM private key block (RSA / EC / generic PKCS#8 / OpenSSH / DSA). Public
+  // certificates ("CERTIFICATE") and public keys ("PUBLIC KEY") are excluded
+  // by the negative lookahead — those aren't secrets.
+  { name: 'PEM private key',        pattern: /-----BEGIN (?!CERTIFICATE|PUBLIC KEY|X509 CERTIFICATE)[A-Z0-9 ]*PRIVATE KEY-----/g },
 ];
 
 function lineForOffset(content: string, offset: number): number {

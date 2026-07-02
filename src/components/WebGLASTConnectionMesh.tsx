@@ -6,7 +6,7 @@ export default function WebGLASTConnectionMesh() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {return;}
 
     const gl =
       canvas.getContext("webgl", { alpha: true, depth: false, antialias: true }) ||
@@ -20,7 +20,7 @@ export default function WebGLASTConnectionMesh() {
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const resize = () => {
-      if (!canvas) return;
+      if (!canvas) {return;}
       const width = window.innerWidth;
       const height = window.innerHeight;
       canvas.width = Math.floor(width * dpr);
@@ -89,7 +89,7 @@ export default function WebGLASTConnectionMesh() {
     // Shader compilation utility
     const compileShader = (source: string, type: number): WebGLShader | null => {
       const shader = gl.createShader(type);
-      if (!shader) return null;
+      if (!shader) {return null;}
       gl.shaderSource(shader, source);
       gl.compileShader(shader);
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
@@ -112,14 +112,14 @@ export default function WebGLASTConnectionMesh() {
 
     // Link Line Program
     const lineProgram = gl.createProgram();
-    if (!lineProgram) return;
+    if (!lineProgram) {return;}
     gl.attachShader(lineProgram, vsLine);
     gl.attachShader(lineProgram, fsLine);
     gl.linkProgram(lineProgram);
 
     // Link Point Program
     const pointProgram = gl.createProgram();
-    if (!pointProgram) return;
+    if (!pointProgram) {return;}
     gl.attachShader(pointProgram, vsPoint);
     gl.attachShader(pointProgram, fsPoint);
     gl.linkProgram(pointProgram);
@@ -328,7 +328,7 @@ export default function WebGLASTConnectionMesh() {
     };
   }, []);
 
-  if (initFailed) return null;
+  if (initFailed) {return null;}
 
   return (
     <canvas

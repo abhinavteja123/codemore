@@ -350,7 +350,7 @@ export class StaticAnalyzer {
                         hasWhere = true;
                         break;
                     }
-                    if (/;/.test(this.lines[j])) break; // Statement ended
+                    if (/;/.test(this.lines[j])) {break;} // Statement ended
                 }
 
                 // Check for UPDATE without WHERE - but exclude ON UPDATE CASCADE/SET NULL (foreign key constraints)
@@ -415,7 +415,7 @@ export class StaticAnalyzer {
                         hasLimit = true;
                         break;
                     }
-                    if (/;/.test(this.lines[j])) break;
+                    if (/;/.test(this.lines[j])) {break;}
                 }
                 
                 if (!hasLimit) {
@@ -586,7 +586,7 @@ export class StaticAnalyzer {
             const line = this.lines[i];
 
             // Check for unquoted variables
-            if (/\$[a-zA-Z_][a-zA-Z0-9_]*(?!\s*["\'])/m.test(line) && !/"\$/.test(line) && !/'\$/.test(line)) {
+            if (/\$[a-zA-Z_][a-zA-Z0-9_]*(?!\s*["'])/m.test(line) && !/"\$/.test(line) && !/'\$/.test(line)) {
                 const match = line.match(/\$([a-zA-Z_][a-zA-Z0-9_]*)/);
                 if (match && !line.includes(`"$${match[1]}"`)) {
                     issues.push(this.createIssue({
@@ -606,7 +606,7 @@ export class StaticAnalyzer {
             }
 
             // Check for useless cat
-            if (/cat\s+[^\|]+\|\s*/.test(line)) {
+            if (/cat\s+[^|]+\|\s*/.test(line)) {
                 issues.push(this.createIssue({
                     id: `shell-useless-cat-${this.issueCounter++}`,
                     title: 'Useless use of cat',
@@ -671,7 +671,7 @@ export class StaticAnalyzer {
             const line = this.lines[i].trim();
 
             // Skip comments and empty lines
-            if (line.startsWith('#') || line === '') continue;
+            if (line.startsWith('#') || line === '') {continue;}
 
             // Check for latest tag
             if (/FROM\s+\S+:latest/i.test(line)) {
@@ -789,7 +789,7 @@ export class StaticAnalyzer {
     private analyzeComplexity(context: FileContext): CodeIssue[] {
         const issues: CodeIssue[] = [];
 
-        if (!this.sourceFile) return issues;
+        if (!this.sourceFile) {return issues;}
 
         // Analyze each function for complexity
         this.visitNodes(this.sourceFile, (node) => {
@@ -927,7 +927,7 @@ export class StaticAnalyzer {
                 case ts.SyntaxKind.CaseClause:
                     complexity++;
                     break;
-                case ts.SyntaxKind.BinaryExpression:
+                case ts.SyntaxKind.BinaryExpression: {
                     const binaryExpr = n as ts.BinaryExpression;
                     if (binaryExpr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
                         binaryExpr.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
@@ -935,6 +935,7 @@ export class StaticAnalyzer {
                         complexity++;
                     }
                     break;
+                }
             }
             ts.forEachChild(n, countComplexity);
         };
@@ -961,21 +962,23 @@ export class StaticAnalyzer {
             case ts.SyntaxKind.ConditionalExpression:
                 return { delta: 1 + nesting, addsNesting: false };
 
-            case ts.SyntaxKind.BinaryExpression:
+            case ts.SyntaxKind.BinaryExpression: {
                 const binaryExpr = node as ts.BinaryExpression;
                 if (binaryExpr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
                     binaryExpr.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
                     return { delta: 1, addsNesting: false };
                 }
                 break;
+            }
 
             case ts.SyntaxKind.BreakStatement:
-            case ts.SyntaxKind.ContinueStatement:
+            case ts.SyntaxKind.ContinueStatement: {
                 const stmt = node as ts.BreakOrContinueStatement;
                 if (stmt.label) {
                     return { delta: 1, addsNesting: false };
                 }
                 break;
+            }
         }
         return { delta: 0, addsNesting: false };
     }
@@ -1025,7 +1028,7 @@ export class StaticAnalyzer {
     private analyzeDeadCode(context: FileContext): CodeIssue[] {
         const issues: CodeIssue[] = [];
 
-        if (!this.sourceFile) return issues;
+        if (!this.sourceFile) {return issues;}
 
         // Track declared and used identifiers
         const declared = new Map<string, { node: ts.Node; used: boolean }>();
@@ -1043,7 +1046,7 @@ export class StaticAnalyzer {
                     grandparent.modifiers?.some(
                         m => m.kind === ts.SyntaxKind.ExportKeyword
                     );
-                if (isExported) return; // exported = used externally
+                if (isExported) {return;} // exported = used externally
 
                 const name = node.name.text;
                 if (!name.startsWith('_') && !declared.has(name)) {
@@ -1065,7 +1068,7 @@ export class StaticAnalyzer {
                 const isExported = node.modifiers?.some(
                     m => m.kind === ts.SyntaxKind.ExportKeyword
                 );
-                if (isExported) return; // enum members used via enum name
+                if (isExported) {return;} // enum members used via enum name
             }
 
             // Parameters
@@ -1089,7 +1092,7 @@ export class StaticAnalyzer {
                     }
                     parentNode = parentNode.parent;
                 }
-                if (isInTypeContext) return;
+                if (isInTypeContext) {return;}
 
                 const name = node.name.text;
                 // Skip underscore-prefixed params (intentionally unused)
@@ -1249,7 +1252,7 @@ export class StaticAnalyzer {
     private analyzeSecurityPatterns(): CodeIssue[] {
         const issues: CodeIssue[] = [];
 
-        if (!this.sourceFile) return issues;
+        if (!this.sourceFile) {return issues;}
 
         // Detect eval() usage
         this.visitNodes(this.sourceFile, (node) => {
@@ -1417,7 +1420,7 @@ export class StaticAnalyzer {
     private analyzeTypeScriptPatterns(context: FileContext): CodeIssue[] {
         const issues: CodeIssue[] = [];
 
-        if (!this.sourceFile) return issues;
+        if (!this.sourceFile) {return issues;}
 
         // Check if file is TypeScript
         const ext = path.extname(this.filePath).toLowerCase();
@@ -1547,7 +1550,7 @@ export class StaticAnalyzer {
     private analyzePerformancePatterns(): CodeIssue[] {
         const issues: CodeIssue[] = [];
 
-        if (!this.sourceFile) return issues;
+        if (!this.sourceFile) {return issues;}
 
         // Detect nested loops
         this.visitNodes(this.sourceFile, (node) => {
@@ -1690,7 +1693,7 @@ export class StaticAnalyzer {
     private analyzeAsyncPatterns(): CodeIssue[] {
         const issues: CodeIssue[] = [];
 
-        if (!this.sourceFile) return issues;
+        if (!this.sourceFile) {return issues;}
 
         // Detect await inside loops (potential sequential execution)
         this.visitNodes(this.sourceFile, (node) => {
@@ -1939,7 +1942,7 @@ export class StaticAnalyzer {
     private analyzeReactPatterns(): CodeIssue[] {
         const issues: CodeIssue[] = [];
 
-        if (!this.sourceFile) return issues;
+        if (!this.sourceFile) {return issues;}
 
         // Detect missing keys in list rendering
         this.visitNodes(this.sourceFile, (node) => {
@@ -2368,20 +2371,20 @@ export class StaticAnalyzer {
                     }
 
                     // Skip time-related values
-                    if ([24, 60, 365, 3600, 86400].includes(value)) return; // hours, minutes, days, seconds
+                    if ([24, 60, 365, 3600, 86400].includes(value)) {return;} // hours, minutes, days, seconds
 
                     // Skip round hundreds and thousands
-                    if (value >= 100 && value < 1000 && value % 100 === 0) return;
-                    if (value >= 1000 && value < 10000 && value % 1000 === 0) return;
+                    if (value >= 100 && value < 1000 && value % 100 === 0) {return;}
+                    if (value >= 1000 && value < 10000 && value % 1000 === 0) {return;}
 
                     // Skip HTTP status codes
-                    if ([200, 201, 204, 301, 302, 304, 400, 401, 403, 404, 500, 502, 503].includes(value)) return;
+                    if ([200, 201, 204, 301, 302, 304, 400, 401, 403, 404, 500, 502, 503].includes(value)) {return;}
 
                     // Skip common ports
-                    if ([80, 443, 3000, 5000, 8000, 8080, 8443, 9000].includes(value)) return;
+                    if ([80, 443, 3000, 5000, 8000, 8080, 8443, 9000].includes(value)) {return;}
 
                     // Skip percentages (0-100)
-                    if (value >= 0 && value <= 100 && Number.isInteger(value)) return;
+                    if (value >= 0 && value <= 100 && Number.isInteger(value)) {return;}
 
                     // Skip if it's in a const declaration
                     let parent: ts.Node | undefined = node.parent;
@@ -2494,7 +2497,7 @@ export class StaticAnalyzer {
      */
     private isInsideStringOrRegex(line: string, token: string): boolean {
         const tokenIdx = line.indexOf(token);
-        if (tokenIdx === -1) return false;
+        if (tokenIdx === -1) {return false;}
         let inSingle = false, inDouble = false, inTemplate = false;
         for (let i = 0; i < tokenIdx; i++) {
             const c = line[i];
@@ -2503,7 +2506,7 @@ export class StaticAnalyzer {
             if (!inSingle && !inTemplate && c === '"')  { inDouble   = !inDouble;   continue; }
             if (!inSingle && !inDouble   && c === '`')  { inTemplate = !inTemplate; continue; }
         }
-        if (inSingle || inDouble || inTemplate) return true;
+        if (inSingle || inDouble || inTemplate) {return true;}
         // Check if token is inside a regex literal /...token.../
         const before = line.slice(0, tokenIdx);
         const after = line.slice(tokenIdx + token.length);
@@ -2514,9 +2517,9 @@ export class StaticAnalyzer {
         const normalized = filePath.toLowerCase().replace(/\\/g, '/');
 
         // Match both absolute (/daemon/) and relative (daemon/) paths
-        if (/(?:^|\/)daemon\//.test(normalized)) return 'daemon-service';
-        if (/(?:^|\/)(?:scripts|bin)\//.test(normalized)) return 'build-script';
-        if (/\.(?:test|spec)\.|(?:^|\/)__tests__\//.test(normalized)) return 'test';
+        if (/(?:^|\/)daemon\//.test(normalized)) {return 'daemon-service';}
+        if (/(?:^|\/)(?:scripts|bin)\//.test(normalized)) {return 'build-script';}
+        if (/\.(?:test|spec)\.|(?:^|\/)__tests__\//.test(normalized)) {return 'test';}
 
         return 'production-web';
     }
@@ -2527,8 +2530,8 @@ export class StaticAnalyzer {
     private isConfigContext(node: ts.Node): boolean {
         let parent: ts.Node | undefined = node.parent;
         while (parent) {
-            if (ts.isObjectLiteralExpression(parent)) return true;
-            if (ts.isCallExpression(parent)) return false; // In function call, not config
+            if (ts.isObjectLiteralExpression(parent)) {return true;}
+            if (ts.isCallExpression(parent)) {return false;} // In function call, not config
             parent = parent.parent;
         }
         return false;
@@ -2621,11 +2624,11 @@ export class StaticAnalyzer {
     }
 
     private getLoopType(node: ts.Node): string {
-        if (ts.isForStatement(node)) return 'for loop';
-        if (ts.isForInStatement(node)) return 'for...in loop';
-        if (ts.isForOfStatement(node)) return 'for...of loop';
-        if (ts.isWhileStatement(node)) return 'while loop';
-        if (ts.isDoStatement(node)) return 'do...while loop';
+        if (ts.isForStatement(node)) {return 'for loop';}
+        if (ts.isForInStatement(node)) {return 'for...in loop';}
+        if (ts.isForOfStatement(node)) {return 'for...of loop';}
+        if (ts.isWhileStatement(node)) {return 'while loop';}
+        if (ts.isDoStatement(node)) {return 'do...while loop';}
         return 'loop';
     }
 
@@ -2665,7 +2668,7 @@ export class StaticAnalyzer {
      * This avoids false positives from finding these strings in code/strings/regexes.
      */
     private hasLeadingTsIgnore(node: ts.Node): boolean {
-        if (!this.sourceFile) return false;
+        if (!this.sourceFile) {return false;}
 
         const sourceText = this.sourceFile.getFullText();
         const commentRanges = ts.getLeadingCommentRanges(
@@ -2673,7 +2676,7 @@ export class StaticAnalyzer {
             node.getFullStart()
         );
 
-        if (!commentRanges) return false;
+        if (!commentRanges) {return false;}
 
         return commentRanges.some(range => {
             const commentText = sourceText.slice(range.pos, range.end);

@@ -54,7 +54,7 @@ function classifySeverity(sev: string): Severity {
 function relativise(rootAbs: string, fileAbs: string): string {
   let rel = path.relative(rootAbs, fileAbs);
   rel = rel.replace(/\\/g, '/');
-  if (rel.length === 0) rel = path.basename(fileAbs);
+  if (rel.length === 0) {rel = path.basename(fileAbs);}
   return rel;
 }
 
@@ -83,13 +83,13 @@ async function runBanditJson(root: string, timeoutMs: number, diagnostics: Exter
     let stderr = '';
     let killed = false;
     let errored = false;
-    const timer = setTimeout(() => { killed = true; try { proc.kill('SIGTERM'); } catch {} }, timeoutMs);
+    const timer = setTimeout(() => { killed = true; try { proc.kill('SIGTERM'); } catch { /* intentionally empty */ } }, timeoutMs);
 
     proc.stdout?.on('data', (c: Buffer) => { stdout += c.toString('utf8'); });
     proc.stderr?.on('data', (c: Buffer) => { stderr += c.toString('utf8'); });
 
     proc.on('error', (err) => {
-      if (errored) return;
+      if (errored) {return;}
       errored = true;
       clearTimeout(timer);
       const msg = (err as { code?: string }).code === 'ENOENT'
@@ -100,7 +100,7 @@ async function runBanditJson(root: string, timeoutMs: number, diagnostics: Exter
     });
 
     proc.on('close', (code) => {
-      if (errored) return;
+      if (errored) {return;}
       clearTimeout(timer);
       if (killed) {
         diagnostics.push({ tool: 'bandit', level: 'warn', message: 'bandit timeout' });
@@ -133,12 +133,12 @@ async function runBanditJson(root: string, timeoutMs: number, diagnostics: Exter
 export async function runBandit(root: string, opts: { timeoutMs: number }): Promise<ExternalToolResult> {
   const diagnostics: ExternalToolDiagnostic[] = [];
   const output = await runBanditJson(root, opts.timeoutMs, diagnostics);
-  if (output === null) return { issues: [], diagnostics };
+  if (output === null) {return { issues: [], diagnostics };}
 
   const rootAbs = path.resolve(root);
   const issues: ReportIssue[] = [];
   for (const r of output.results ?? []) {
-    if (!r || typeof r.test_id !== 'string' || typeof r.filename !== 'string') continue;
+    if (!r || typeof r.test_id !== 'string' || typeof r.filename !== 'string') {continue;}
     const file = relativise(rootAbs, r.filename);
     issues.push({
       id: `ext:bandit:${r.test_id}`,

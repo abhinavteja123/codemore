@@ -40,7 +40,7 @@ interface GitleaksFinding {
 function relativise(rootAbs: string, fileAbs: string): string {
   let rel = path.relative(rootAbs, fileAbs);
   rel = rel.replace(/\\/g, '/');
-  if (rel.length === 0) rel = path.basename(fileAbs);
+  if (rel.length === 0) {rel = path.basename(fileAbs);}
   return rel;
 }
 
@@ -50,8 +50,8 @@ function ulidLike(): string {
 
 function redact(secret: string): string {
   // Keep first 4 and last 2 chars of the secret, mask the middle.
-  if (!secret) return '';
-  if (secret.length <= 8) return '***';
+  if (!secret) {return '';}
+  if (secret.length <= 8) {return '***';}
   return `${secret.slice(0, 4)}…${secret.slice(-2)}`;
 }
 
@@ -76,13 +76,13 @@ async function runGitleaksJson(root: string, timeoutMs: number, diagnostics: Ext
     let stderr = '';
     let killed = false;
     let errored = false;
-    const timer = setTimeout(() => { killed = true; try { proc.kill('SIGTERM'); } catch {} }, timeoutMs);
+    const timer = setTimeout(() => { killed = true; try { proc.kill('SIGTERM'); } catch { /* intentionally empty */ } }, timeoutMs);
 
     proc.stdout?.on('data', (c: Buffer) => { stdout += c.toString('utf8'); });
     proc.stderr?.on('data', (c: Buffer) => { stderr += c.toString('utf8'); });
 
     proc.on('error', (err) => {
-      if (errored) return;
+      if (errored) {return;}
       errored = true;
       clearTimeout(timer);
       const msg = (err as { code?: string }).code === 'ENOENT'
@@ -93,7 +93,7 @@ async function runGitleaksJson(root: string, timeoutMs: number, diagnostics: Ext
     });
 
     proc.on('close', (code) => {
-      if (errored) return;
+      if (errored) {return;}
       clearTimeout(timer);
       if (killed) {
         diagnostics.push({ tool: 'gitleaks', level: 'warn', message: 'gitleaks timeout' });
@@ -128,12 +128,12 @@ async function runGitleaksJson(root: string, timeoutMs: number, diagnostics: Ext
 export async function runGitleaks(root: string, opts: { timeoutMs: number }): Promise<ExternalToolResult> {
   const diagnostics: ExternalToolDiagnostic[] = [];
   const findings = await runGitleaksJson(root, opts.timeoutMs, diagnostics);
-  if (findings === null) return { issues: [], diagnostics };
+  if (findings === null) {return { issues: [], diagnostics };}
 
   const rootAbs = path.resolve(root);
   const issues: ReportIssue[] = [];
   for (const f of findings) {
-    if (!f || !f.RuleID || !f.File) continue;
+    if (!f || !f.RuleID || !f.File) {continue;}
     const file = relativise(rootAbs, f.File);
     const ruleId = f.RuleID;
     issues.push({

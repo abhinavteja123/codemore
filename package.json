@@ -257,6 +257,8 @@
     "@vscode/codicons": "^0.0.44",
     "@vscode/test-electron": "^2.3.8",
     "@vscode/vsce": "^2.22.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "c8": "^11.0.0",
     "concurrently": "^8.2.2",
     "css-loader": "^6.8.1",

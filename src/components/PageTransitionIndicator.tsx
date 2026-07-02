@@ -13,7 +13,7 @@ export default function PageTransitionIndicator({ sections }: PageTransitionIndi
   useEffect(() => {
     const handleScroll = () => {
       const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
-      if (totalHeight <= 0) return;
+      if (totalHeight <= 0) {return;}
       const progress = (window.scrollY / totalHeight) * 100;
       setScrollProgress(progress);
     };
@@ -24,7 +24,7 @@ export default function PageTransitionIndicator({ sections }: PageTransitionIndi
 
   // Handle auto-scroll presentation loops
   useEffect(() => {
-    if (!isAutoScrolling) return;
+    if (!isAutoScrolling) {return;}
 
     let animationFrameId: number;
     const scrollSpeed = 0.8; // px per tick

@@ -3,6 +3,8 @@
    intentional. The test-path heuristic already downgrades severity to
    MINOR/INFO; this directive removes the noise from CI summaries. */
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- mock callback/return shims, untyped by design */
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { execFile } from 'child_process';
 import { promisify } from 'util';

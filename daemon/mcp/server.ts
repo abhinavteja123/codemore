@@ -26,8 +26,10 @@ import { registerAllPacks } from '../cli/registerPacks';
 import { globalRegistry } from '../../shared/rules/registry';
 import type { RuleContext } from '../../shared/rules/Rule';
 import { validateFix } from '../services/validatorHarness';
-import { runAgenticFix } from '../services/agenticFixer';
+import { runAgenticFix, buildFixPrompt } from '../services/agenticFixer';
 import { toolVersion } from '../../shared/toolVersion';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // CJS-friendly imports — the SDK ships both ESM and CJS builds, and our
 // daemon tsconfig is commonjs.
@@ -46,7 +48,7 @@ function cacheIssues(issues: ReadonlyArray<ReportIssue>): void {
   for (const iss of issues) {
     if (issueCache.size >= MAX_CACHED_ISSUES) {
       const firstKey = issueCache.keys().next().value;
-      if (firstKey !== undefined) issueCache.delete(firstKey);
+      if (firstKey !== undefined) {issueCache.delete(firstKey);}
     }
     issueCache.set(iss.instanceId, iss);
   }
@@ -64,16 +66,16 @@ function buildSingleFileContext(filePath: string, content: string, languageHint?
   const basename = filePath.replace(/^.*[/\\]/, '');
   let language = languageHint;
   if (!language) {
-    if (basename === '.env' || basename.startsWith('.env.')) language = 'env';
-    else if (extension === '.ts' || extension === '.tsx') language = 'typescript';
-    else if (extension === '.js' || extension === '.jsx' || extension === '.mjs' || extension === '.cjs') language = 'javascript';
-    else if (extension === '.sql') language = 'sql';
-    else if (extension === '.json' || extension === '.jsonc') language = 'json';
-    else if (extension === '.yaml' || extension === '.yml') language = 'yaml';
-    else if (extension === '.md' || extension === '.markdown') language = 'markdown';
-    else if (extension === '.sh' || extension === '.bash' || extension === '.zsh') language = 'shell';
-    else if (extension === '.py' || extension === '.pyi') language = 'python';
-    else language = 'unknown';
+    if (basename === '.env' || basename.startsWith('.env.')) {language = 'env';}
+    else if (extension === '.ts' || extension === '.tsx') {language = 'typescript';}
+    else if (extension === '.js' || extension === '.jsx' || extension === '.mjs' || extension === '.cjs') {language = 'javascript';}
+    else if (extension === '.sql') {language = 'sql';}
+    else if (extension === '.json' || extension === '.jsonc') {language = 'json';}
+    else if (extension === '.yaml' || extension === '.yml') {language = 'yaml';}
+    else if (extension === '.md' || extension === '.markdown') {language = 'markdown';}
+    else if (extension === '.sh' || extension === '.bash' || extension === '.zsh') {language = 'shell';}
+    else if (extension === '.py' || extension === '.pyi') {language = 'python';}
+    else {language = 'unknown';}
   }
   return {
     filePath,
@@ -302,14 +304,11 @@ export async function runMcpServer(): Promise<void> {
           message: 'No issue with this instanceId is cached. Re-run scan_project to populate.',
         });
       }
-      const fs = require('fs') as typeof import('fs');
-      const path = require('path') as typeof import('path');
       const absPath = path.isAbsolute(iss.evidence.file)
         ? iss.evidence.file
         : path.resolve(process.cwd(), iss.evidence.file);
       let currentContent = '';
       try { currentContent = fs.readFileSync(absPath, 'utf8'); } catch { /* let agent know */ }
-      const { buildFixPrompt } = require('../services/agenticFixer') as typeof import('../services/agenticFixer');
       const prompt = buildFixPrompt({ issue: iss, currentContent, attempt: 1 });
       return textResult({
         instanceId,

@@ -31,7 +31,7 @@ let diagnosticCollection: vscode.DiagnosticCollection | undefined;
 
 // Debounce timers (module-level for cleanup in deactivate)
 let debounceTimer: NodeJS.Timeout | undefined;
-let invalidateDebounceMap = new Map<string, NodeJS.Timeout>();
+const invalidateDebounceMap = new Map<string, NodeJS.Timeout>();
 
 // Current state
 let currentIssues: CodeIssue[] = [];
@@ -287,10 +287,14 @@ function registerCommands(context: vscode.ExtensionContext): void {
     );
 
     // Apply Suggestion command
+    type SuggestionRange = {
+        start: { line: number; column: number };
+        end: { line: number; column: number };
+    };
     context.subscriptions.push(
         vscode.commands.registerCommand(
             'codemore.applySuggestion',
-            async (suggestion: { location?: { filePath: string; range: any }; filePath?: string; range?: any; suggestedCode: string }) => {
+            async (suggestion: { location?: { filePath: string; range: SuggestionRange }; filePath?: string; range?: SuggestionRange; suggestedCode: string }) => {
                 try {
                     // Support both old format (filePath, range) and new format (location.filePath, location.range)
                     const filePath = suggestion.location?.filePath ?? suggestion.filePath;
@@ -409,7 +413,7 @@ function registerEventHandlers(context: vscode.ExtensionContext): void {
             }
 
             debounceTimer = setTimeout(async () => {
-                if (!isDaemonReady || !rpcClient) return;
+                if (!isDaemonReady || !rpcClient) {return;}
                 try {
                     await rpcClient.call('analyzeFile', {
                         filePath: document.uri.fsPath,
@@ -579,7 +583,7 @@ function setupDaemonNotifications(): void {
  *   INFO               → Information
  */
 function publishDiagnostics(issues: CodeIssue[]): void {
-    if (!diagnosticCollection) return;
+    if (!diagnosticCollection) {return;}
     diagnosticCollection.clear();
 
     const byFile = new Map<string, vscode.Diagnostic[]>();

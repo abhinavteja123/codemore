@@ -85,14 +85,14 @@ const Dashboard: React.FC<DashboardProps> = ({ metrics, issues, fileDiscovery, o
     };
 
     const getScoreColor = (score: number): string => {
-        if (score >= 80) return 'var(--color-success)';
-        if (score >= 60) return 'var(--color-warning)';
+        if (score >= 80) {return 'var(--color-success)';}
+        if (score >= 60) {return 'var(--color-warning)';}
         return 'var(--color-error)';
     };
 
     const formatDebt = (minutes: number): string => {
-        if (minutes < 60) return `${minutes}m`;
-        if (minutes < 480) return `${Math.round(minutes / 60)}h`;
+        if (minutes < 60) {return `${minutes}m`;}
+        if (minutes < 480) {return `${Math.round(minutes / 60)}h`;}
         return `${Math.round(minutes / 480)}d`;
     };
 

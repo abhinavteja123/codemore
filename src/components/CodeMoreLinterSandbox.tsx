@@ -90,10 +90,19 @@ async function processTransaction(req, res) {
   }
 };
 
+interface SandboxFinding {
+  id: string;
+  line: number;
+  type: string;
+  vulnerability: string;
+  fix: string;
+  [key: string]: unknown;
+}
+
 export default function CodeMoreLinterSandbox() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("mongodb");
   const [editorCode, setEditorCode] = useState<string>(TEMPLATES.mongodb.code);
-  const [findings, setFindings] = useState<any[]>([]);
+  const [findings, setFindings] = useState<SandboxFinding[]>([]);
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [astNodes, setAstNodes] = useState<ParserNode[]>([]);
   const [selectedAstNode, setSelectedAstNode] = useState<ParserNode | null>(null);
@@ -115,7 +124,7 @@ export default function CodeMoreLinterSandbox() {
 
     setTimeout(() => {
       const lines = editorCode.split("\n");
-      const currentFindings: any[] = [];
+      const currentFindings: SandboxFinding[] = [];
       const nodes: ParserNode[] = [];
 
       // Create primary Abstract Syntax Tree (AST) Root
@@ -155,7 +164,7 @@ export default function CodeMoreLinterSandbox() {
         } 
         
         // 2. Check for Secret Keys
-        else if (/(AKIA[A-Z0-9]{16}|secret.*=.*["'][0-9a-zA-Z\/+]{20,}["'])/i.test(lineStr)) {
+        else if (/(AKIA[A-Z0-9]{16}|secret.*=.*["'][0-9a-zA-Z/+]{20,}["'])/i.test(lineStr)) {
           hasIssues = true;
           currentFindings.push({
             id: `err-secret-${lineNum}`,
@@ -250,7 +259,7 @@ export default function CodeMoreLinterSandbox() {
     runSemanticCheck();
   }, [editorCode]);
 
-  const handleApplyCleanFix = (finding: any) => {
+  const handleApplyCleanFix = (finding: SandboxFinding) => {
     const lines = editorCode.split("\n");
     lines[finding.line - 1] = finding.fix;
     setEditorCode(lines.join("\n"));

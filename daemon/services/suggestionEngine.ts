@@ -70,7 +70,7 @@ export class SuggestionEngine {
 
         // Cache by id so getSuggestionsForIssue can look up the issue later
         // — the old contract.
-        for (const issue of issues) this.issueCache.set(issue.id, issue);
+        for (const issue of issues) {this.issueCache.set(issue.id, issue);}
 
         // Sort by priority (severity + impact + confidence) so callers
         // that only show top-N still pick the right N.
@@ -193,8 +193,8 @@ export class SuggestionEngine {
         // 2. Find files that import this file (reverse dependencies)
         const allFiles = await this.contextMap.getAllFiles();
         for (const otherPath of allFiles) {
-            if (otherPath === filePath) continue;
-            if (relatedFiles.size >= maxRelatedFiles) break;
+            if (otherPath === filePath) {continue;}
+            if (relatedFiles.size >= maxRelatedFiles) {break;}
 
             const otherContext = this.contextMap.getFileContext(otherPath);
             if (otherContext) {
@@ -223,11 +223,10 @@ export class SuggestionEngine {
      */
     private resolveImport(fromPath: string, importPath: string): string | null {
         // Basic resolution - in production you'd use proper module resolution
-        const path = require('path');
         const dir = path.dirname(fromPath);
         
         // Handle various import styles
-        let resolved = path.resolve(dir, importPath);
+        const resolved = path.resolve(dir, importPath);
         
         // Try with common extensions
         const extensions = ['.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.js'];

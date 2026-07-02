@@ -114,21 +114,11 @@ describe('walker: ignore + secret-bypass logic (Part-7 regression)', () => {
       });
     }
 
-    // CONTRACT GAP: daemon/cli/ignoreResolver.ts documents *.pem and *.key
-    // as secret-shaped bypass patterns (lines 96-97) and the CLI help text
-    // (daemon/cli/index.ts:39) advertises "*.pem" as a bypassed pattern.
-    // But daemon/cli/projectScanner.ts's detectLanguage() (lines 73-91)
-    // has no case for `.pem` or `.key` extensions, and SCANNABLE_EXTENSIONS
-    // (lines 50-58) doesn't list them either — so `language` is null and
-    // the walker drops the file at projectScanner.ts:169-173, *before*
-    // resolver.shouldIgnore() is consulted. Net effect: a gitignored
-    // server.pem (or app.key) is NEVER scanned, contradicting the
-    // documented "secret-shaped files always win" contract. Verified via
-    // a throwaway probe against discoverFiles(): with .gitignore listing
-    // "server.pem", discoverFiles() returns [] — the file is invisible
-    // regardless of the bypass, because it's invisible even when NOT
-    // gitignored.
-    it.skip('CONTRACT GAP: scans server.pem even when gitignored (documented in ignoreResolver.ts:96, index.ts:39, but detectLanguage() in projectScanner.ts has no case for *.pem so the file never reaches the resolver at all)', () => {
+    // Fixed contract: detectLanguage() now maps *.pem / *.key / .npmrc /
+    // .pypirc to the 'env' language (they're secret-carrying config/key
+    // files), so they reach resolver.shouldIgnore() like every other
+    // secret-shaped filename and the bypass applies.
+    it('scans server.pem even when gitignored', () => {
       const dir = fixture('walker-secret-bypass-pem-');
       writeFile(dir, '.gitignore', '*\n');
       writeFile(dir, 'server.pem', '-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----\n');
@@ -139,11 +129,7 @@ describe('walker: ignore + secret-bypass logic (Part-7 regression)', () => {
         'server.pem is documented as secret-shaped and should bypass .gitignore');
     });
 
-    // Same class of gap for *.key, .npmrc, .pypirc — documented bypass
-    // patterns (ignoreResolver.ts:97,104-105) that never reach the
-    // resolver because they have no recognised `language`. Grouped into
-    // one skipped case to avoid duplicating the CONTRACT GAP five times.
-    it.skip('CONTRACT GAP: scans app.key / .npmrc / .pypirc even when gitignored (same detectLanguage() omission as server.pem)', () => {
+    it('scans app.key / .npmrc / .pypirc even when gitignored', () => {
       const dir = fixture('walker-secret-bypass-misc-');
       writeFile(dir, '.gitignore', '*\n');
       writeFile(dir, 'app.key', 'fake-key-material\n');
@@ -155,6 +141,42 @@ describe('walker: ignore + secret-bypass logic (Part-7 regression)', () => {
       assert.equal(files.includes('app.key'), true, 'app.key should bypass .gitignore');
       assert.equal(files.includes('.npmrc'), true, '.npmrc should bypass .gitignore');
       assert.equal(files.includes('.pypirc'), true, '.pypirc should bypass .gitignore');
+    });
+
+    it('hides server.pem under --respect-gitignore-fully', () => {
+      const dir = fixture('walker-secret-bypass-pem-strict-');
+      writeFile(dir, '.gitignore', '*\n');
+      writeFile(dir, 'server.pem', '-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----\n');
+
+      // discoverFiles() doesn't accept the strict flag (same limitation
+      // noted in case 3 below), so we assert at the resolver level directly.
+      const strictResolver = createIgnoreResolver(dir, { respectGitignoreForSecretFiles: true });
+      assert.equal(strictResolver.shouldIgnore('server.pem', 'file'), true,
+        '--respect-gitignore-fully must fully honor .gitignore for server.pem');
+    });
+
+    it('scanProject: a gitignored server.pem with real PEM content is found by default, and hidden under --respect-gitignore-fully', async function () {
+      this.timeout(20000);
+      registerAllPacks();
+
+      const dir = fixture('walker-secret-bypass-pem-scan-');
+      writeFile(dir, '.gitignore', 'server.pem\n');
+      writeFile(dir, 'server.pem',
+        '-----BEGIN RSA PRIVATE KEY-----\nMIIfakefakefakefakefakefakefakefakefakefakefakefakefakeAAAA\n-----END RSA PRIVATE KEY-----\n');
+
+      const defaultReport = await scanProject({ root: dir });
+      const defaultHasFinding = defaultReport.issues.some(
+        iss => iss.id === 'core-security-hardcoded-secret-pattern' && iss.evidence.file.replace(/\\/g, '/') === 'server.pem',
+      );
+      assert.equal(defaultHasFinding, true,
+        'gitignored server.pem with real PEM key material must be scanned and flagged by default');
+
+      const strictReport = await scanProject({ root: dir, respectGitignoreFully: true });
+      const strictHasFinding = strictReport.issues.some(
+        iss => iss.id === 'core-security-hardcoded-secret-pattern' && iss.evidence.file.replace(/\\/g, '/') === 'server.pem',
+      );
+      assert.equal(strictHasFinding, false,
+        '--respect-gitignore-fully must fully honor .gitignore, hiding server.pem from the scan');
     });
   });
 

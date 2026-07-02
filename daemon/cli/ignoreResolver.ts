@@ -108,7 +108,7 @@ const SECRET_SHAPED_FILENAMES: ReadonlyArray<RegExp> = [
 function isSecretShaped(relPath: string): boolean {
   const norm = relPath.replace(/\\/g, '/');
   for (const re of SECRET_SHAPED_FILENAMES) {
-    if (re.test(norm)) return true;
+    if (re.test(norm)) {return true;}
   }
   return false;
 }
@@ -129,14 +129,14 @@ function findTsconfigOutputs(root: string): string[] {
   let entries: string[] = [];
   try { entries = fs.readdirSync(root); } catch { return found; }
   for (const name of entries) {
-    if (!/^tsconfig(?:[.-][\w.-]+)?\.json$/.test(name)) continue;
+    if (!/^tsconfig(?:[.-][\w.-]+)?\.json$/.test(name)) {continue;}
     const full = path.join(root, name);
     try {
       const stat = fs.statSync(full);
-      if (!stat.isFile()) continue;
+      if (!stat.isFile()) {continue;}
       // tsconfig allows comments — try a tolerant parser. Fallback: strip
       // common comment forms and re-try.
-      let raw = fs.readFileSync(full, 'utf8');
+      const raw = fs.readFileSync(full, 'utf8');
       let parsed: { compilerOptions?: { outDir?: string; outFile?: string } } | null = null;
       try { parsed = JSON.parse(raw); } catch {
         const stripped = raw
@@ -150,11 +150,11 @@ function findTsconfigOutputs(root: string): string[] {
         // Normalise the outDir to be relative to root with trailing slash —
         // matches gitignore directory semantics.
         const norm = co.outDir.replace(/^\.\//, '').replace(/\/$/, '');
-        if (norm && norm !== '.') found.push(norm + '/');
+        if (norm && norm !== '.') {found.push(norm + '/');}
       }
       if (co?.outFile) {
         const norm = co.outFile.replace(/^\.\//, '');
-        if (norm) found.push(norm);
+        if (norm) {found.push(norm);}
       }
     } catch { /* skip */ }
   }

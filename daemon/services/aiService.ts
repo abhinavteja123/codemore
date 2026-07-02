@@ -64,7 +64,7 @@ function normalizeParsedSuggestions(payload: unknown): CodeSuggestion[] | null {
         suggestions = (payload as { suggestions: CodeSuggestion[] }).suggestions;
     }
 
-    if (!suggestions) return null;
+    if (!suggestions) {return null;}
 
     // Filter out incomplete suggestions - must have required fields with actual content
     const validSuggestions = suggestions.filter(s =>
@@ -99,6 +99,7 @@ function sanitizeJsonString(text: string): string {
 
     // Replace raw control characters (except in escape sequences) with escaped versions
     // This regex matches control chars (0x00-0x1F) that are NOT preceded by backslash
+    // eslint-disable-next-line no-control-regex -- intentional: sanitizing control chars
     result = result.replace(/(?<!\\)([\x00-\x08\x0B\x0C\x0E-\x1F])/g, (match) => {
         const code = match.charCodeAt(0);
         return `\\u${code.toString(16).padStart(4, '0')}`;
@@ -131,7 +132,7 @@ function tryRepairTruncatedJson(text: string): string | null {
             continue;
         }
 
-        if (inString) continue;
+        if (inString) {continue;}
 
         if (char === '[' || char === '{') {
             stack.push(char);
@@ -519,7 +520,7 @@ export class AiService {
         const severityOrder: Record<Severity, number> = { 'BLOCKER': 0, 'CRITICAL': 1, 'MAJOR': 2, 'MINOR': 3, 'INFO': 4 };
         return merged.sort((a, b) => {
             const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
-            if (severityDiff !== 0) return severityDiff;
+            if (severityDiff !== 0) {return severityDiff;}
             return a.location.range.start.line - b.location.range.start.line;
         });
     }
@@ -1098,7 +1099,7 @@ function getHandler(type) {
      * Call Anthropic for fix generation
      */
     private async callAnthropicForFix(prompt: string): Promise<string> {
-        if (!this.config.apiKey) throw new Error('Anthropic API key not configured');
+        if (!this.config.apiKey) {throw new Error('Anthropic API key not configured');}
         const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: {
@@ -1177,7 +1178,7 @@ function getHandler(type) {
                 logger.info(`[AiService] Gemini attempt ${attempt} returned incomplete response, retrying...`);
             } catch (error) {
                 logger.info(`[AiService] Gemini attempt ${attempt} failed: ${error}`);
-                if (attempt === 2) throw error;
+                if (attempt === 2) {throw error;}
             }
         }
 
@@ -1306,7 +1307,7 @@ function getHandler(type) {
      * Call Anthropic API
      */
     private async callAnthropic(prompt: string): Promise<CodeIssue[]> {
-        if (!this.config.apiKey) throw new Error('Anthropic API key not configured');
+        if (!this.config.apiKey) {throw new Error('Anthropic API key not configured');}
         try {
             const response = await fetch('https://api.anthropic.com/v1/messages', {
                 method: 'POST',
@@ -1561,7 +1562,7 @@ OUTPUT FORMAT - Return a JSON array:
         const validSeverities = ['error', 'warning', 'info', 'hint'];
 
         return response.filter((item): item is CodeIssue => {
-            if (!item || typeof item !== 'object') return false;
+            if (!item || typeof item !== 'object') {return false;}
 
             const hasValidId = typeof item.id === 'string' && item.id.length > 0;
             const hasValidTitle = typeof item.title === 'string' && item.title.length > 0;

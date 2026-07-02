@@ -213,7 +213,7 @@ const DiffPreview: React.FC<DiffPreviewProps> = ({
     }
 
     const handleApply = () => {
-        if (!selectedSuggestion) return;
+        if (!selectedSuggestion) {return;}
         setIsApplying(true);
         onApply(selectedSuggestion);
         // Reset applying state after a reasonable delay for the file write to complete

@@ -55,7 +55,7 @@ export class FileWatcher {
         this.watcher = chokidar.watch(this.workspacePath, {
             ignored: [
                 ...this.excludePatterns,
-                /(^|[\/\\])\../, // Dotfiles
+                /(^|[/\\])\../, // Dotfiles
                 /node_modules/,
                 /\.git/,
                 /dist/,

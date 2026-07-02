@@ -182,7 +182,7 @@ export class ExternalToolRunner {
      */
     private async isToolAvailable(tool: ExternalTool): Promise<boolean> {
         const toolConfig = this.config[tool];
-        if (!toolConfig.enabled) return false;
+        if (!toolConfig.enabled) {return false;}
 
         const binaryPath = toolConfig.path || this.getDefaultBinaryPath(tool);
 
@@ -213,7 +213,7 @@ export class ExternalToolRunner {
     private getDefaultBinaryPath(tool: ExternalTool): string {
         // Check if there's a custom path configured
         const toolConfig = this.config[tool];
-        if (toolConfig.path) return toolConfig.path;
+        if (toolConfig.path) {return toolConfig.path;}
 
         // Otherwise, just use the tool name (assumes it's in PATH)
         return tool;
@@ -424,30 +424,30 @@ export class ExternalToolRunner {
     }
 
     private semgrepCategoryToIssueCategory(category?: string): IssueCategory {
-        if (!category) return 'security';
+        if (!category) {return 'security';}
         const lower = category.toLowerCase();
-        if (lower.includes('security') || lower.includes('vuln')) return 'security';
-        if (lower.includes('performance')) return 'performance';
-        if (lower.includes('correctness') || lower.includes('bug')) return 'bug';
-        if (lower.includes('best-practice')) return 'best-practice';
+        if (lower.includes('security') || lower.includes('vuln')) {return 'security';}
+        if (lower.includes('performance')) {return 'performance';}
+        if (lower.includes('correctness') || lower.includes('bug')) {return 'bug';}
+        if (lower.includes('best-practice')) {return 'best-practice';}
         return 'security';
     }
 
     private semgrepSeverityToSeverity(severity?: string): Severity {
-        if (!severity) return 'MAJOR';
+        if (!severity) {return 'MAJOR';}
         const lower = severity.toLowerCase();
-        if (lower === 'error' || lower === 'high') return 'CRITICAL';
-        if (lower === 'warning' || lower === 'medium') return 'MAJOR';
-        if (lower === 'info' || lower === 'low') return 'MINOR';
+        if (lower === 'error' || lower === 'high') {return 'CRITICAL';}
+        if (lower === 'warning' || lower === 'medium') {return 'MAJOR';}
+        if (lower === 'info' || lower === 'low') {return 'MINOR';}
         return 'INFO';
     }
 
     private semgrepConfidenceToNumber(confidence?: string): number {
-        if (!confidence) return 70;
+        if (!confidence) {return 70;}
         const lower = confidence.toLowerCase();
-        if (lower === 'high') return 95;
-        if (lower === 'medium') return 75;
-        if (lower === 'low') return 50;
+        if (lower === 'high') {return 95;}
+        if (lower === 'medium') {return 75;}
+        if (lower === 'low') {return 50;}
         return 70;
     }
 
@@ -474,10 +474,11 @@ export class ExternalToolRunner {
             });
 
             return this.parseBiomeOutput(stdout, filePath);
-        } catch (error: any) {
+        } catch (error: unknown) {
             // Biome exits with non-zero if it finds issues, but still outputs JSON
-            if (error.stdout) {
-                return this.parseBiomeOutput(error.stdout, filePath);
+            const stdout = (error as { stdout?: string }).stdout;
+            if (stdout) {
+                return this.parseBiomeOutput(stdout, filePath);
             }
             throw error;
         } finally {
@@ -523,22 +524,22 @@ export class ExternalToolRunner {
     }
 
     private biomeCategoryToIssueCategory(category?: string): IssueCategory {
-        if (!category) return 'code-smell';
+        if (!category) {return 'code-smell';}
         const lower = category.toLowerCase();
-        if (lower.includes('suspicious') || lower.includes('correctness')) return 'bug';
-        if (lower.includes('security')) return 'security';
-        if (lower.includes('performance')) return 'performance';
-        if (lower.includes('complexity') || lower.includes('style')) return 'maintainability';
-        if (lower.includes('a11y') || lower.includes('accessibility')) return 'accessibility';
+        if (lower.includes('suspicious') || lower.includes('correctness')) {return 'bug';}
+        if (lower.includes('security')) {return 'security';}
+        if (lower.includes('performance')) {return 'performance';}
+        if (lower.includes('complexity') || lower.includes('style')) {return 'maintainability';}
+        if (lower.includes('a11y') || lower.includes('accessibility')) {return 'accessibility';}
         return 'code-smell';
     }
 
     private biomeSeverityToSeverity(severity?: string): Severity {
-        if (!severity) return 'MAJOR';
+        if (!severity) {return 'MAJOR';}
         const lower = severity.toLowerCase();
-        if (lower === 'error') return 'CRITICAL';
-        if (lower === 'warning') return 'MAJOR';
-        if (lower === 'information' || lower === 'info') return 'MINOR';
+        if (lower === 'error') {return 'CRITICAL';}
+        if (lower === 'warning') {return 'MAJOR';}
+        if (lower === 'information' || lower === 'info') {return 'MINOR';}
         return 'INFO';
     }
 
@@ -565,10 +566,11 @@ export class ExternalToolRunner {
             });
 
             return this.parseRuffOutput(stdout, filePath);
-        } catch (error: any) {
+        } catch (error: unknown) {
             // Ruff exits with non-zero if it finds issues
-            if (error.stdout) {
-                return this.parseRuffOutput(error.stdout, filePath);
+            const stdout = (error as { stdout?: string }).stdout;
+            if (stdout) {
+                return this.parseRuffOutput(stdout, filePath);
             }
             throw error;
         } finally {
@@ -612,7 +614,7 @@ export class ExternalToolRunner {
     }
 
     private ruffCodeToIssueCategory(code?: string): IssueCategory {
-        if (!code) return 'code-smell';
+        if (!code) {return 'code-smell';}
         const prefix = code.slice(0, 1).toUpperCase();
         
         // Ruff rule prefixes: https://docs.astral.sh/ruff/rules/
@@ -633,22 +635,22 @@ export class ExternalToolRunner {
     }
 
     private ruffCodeToSeverity(code?: string): Severity {
-        if (!code) return 'MAJOR';
+        if (!code) {return 'MAJOR';}
         const prefix = code.slice(0, 1).toUpperCase();
         
         // Security and bugs are more severe
-        if (prefix === 'S') return 'CRITICAL'; // Security
-        if (prefix === 'F') return 'MAJOR'; // Errors
-        if (prefix === 'B') return 'MAJOR'; // Bugbear
+        if (prefix === 'S') {return 'CRITICAL';} // Security
+        if (prefix === 'F') {return 'MAJOR';} // Errors
+        if (prefix === 'B') {return 'MAJOR';} // Bugbear
         return 'INFO';
     }
 
     private ruffCodeToImpact(code?: string): number {
-        if (!code) return 50;
+        if (!code) {return 50;}
         const prefix = code.slice(0, 1).toUpperCase();
-        if (prefix === 'S') return 90; // Security
-        if (prefix === 'F' || prefix === 'B') return 70; // Bugs
-        if (prefix === 'PERF') return 60; // Performance
+        if (prefix === 'S') {return 90;} // Security
+        if (prefix === 'F' || prefix === 'B') {return 70;} // Bugs
+        if (prefix === 'PERF') {return 60;} // Performance
         return 40;
     }
 
@@ -676,9 +678,10 @@ export class ExternalToolRunner {
             });
 
             return this.parseTFLintOutput(stdout, filePath);
-        } catch (error: any) {
-            if (error.stdout) {
-                return this.parseTFLintOutput(error.stdout, filePath);
+        } catch (error: unknown) {
+            const stdout = (error as { stdout?: string }).stdout;
+            if (stdout) {
+                return this.parseTFLintOutput(stdout, filePath);
             }
             throw error;
         } finally {
@@ -723,11 +726,11 @@ export class ExternalToolRunner {
     }
 
     private tflintSeverityToSeverity(severity?: string): Severity {
-        if (!severity) return 'MAJOR';
+        if (!severity) {return 'MAJOR';}
         const lower = severity.toLowerCase();
-        if (lower === 'error') return 'CRITICAL';
-        if (lower === 'warning') return 'MAJOR';
-        if (lower === 'notice') return 'MINOR';
+        if (lower === 'error') {return 'CRITICAL';}
+        if (lower === 'warning') {return 'MAJOR';}
+        if (lower === 'notice') {return 'MINOR';}
         return 'INFO';
     }
 
@@ -753,10 +756,11 @@ export class ExternalToolRunner {
             });
 
             return this.parseCheckovOutput(stdout, filePath);
-        } catch (error: any) {
+        } catch (error: unknown) {
             // Checkov exits non-zero when it finds issues
-            if (error.stdout) {
-                return this.parseCheckovOutput(error.stdout, filePath);
+            const stdout = (error as { stdout?: string }).stdout;
+            if (stdout) {
+                return this.parseCheckovOutput(stdout, filePath);
             }
             throw error;
         } finally {
@@ -801,12 +805,12 @@ export class ExternalToolRunner {
     }
 
     private checkovSeverityToSeverity(severity?: string): Severity {
-        if (!severity) return 'MAJOR';
+        if (!severity) {return 'MAJOR';}
         const upper = severity.toUpperCase();
-        if (upper === 'CRITICAL') return 'BLOCKER';
-        if (upper === 'HIGH') return 'CRITICAL';
-        if (upper === 'MEDIUM') return 'MAJOR';
-        if (upper === 'LOW') return 'MINOR';
+        if (upper === 'CRITICAL') {return 'BLOCKER';}
+        if (upper === 'HIGH') {return 'CRITICAL';}
+        if (upper === 'MEDIUM') {return 'MAJOR';}
+        if (upper === 'LOW') {return 'MINOR';}
         return 'INFO';
     }
 

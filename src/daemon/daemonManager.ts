@@ -493,7 +493,8 @@ export class DaemonManager implements vscode.Disposable {
         // package's README.
         return new Promise((resolve) => {
             // codemore-ignore-next-line: core-typescript-as-any
-            const kill = (treeKill as any).default || treeKill;
+            type TreeKillFn = (pid: number, signal?: string | number, callback?: (error?: Error) => void) => void;
+            const kill = ((treeKill as unknown as { default?: unknown }).default ?? treeKill) as TreeKillFn;
             kill(pid, 'SIGKILL', (error: Error | undefined) => {
                 // Ignore "process not found" errors - process already exited
                 if (error && !error.message.includes('not found')) {
