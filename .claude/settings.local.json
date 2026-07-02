@@ -191,7 +191,11 @@
       "PowerShell(python .graphify_bench_step.py)",
       "PowerShell($env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'; python .graphify_bench_step.py)",
       "Bash(grep -E \"\\(Failed|error|○ /\\\\s\\)\")",
-      "Bash(grep -E \"\\(Failed|error|○ /\\\\s|warn\\)\")"
+      "Bash(grep -E \"\\(Failed|error|○ /\\\\s|warn\\)\")",
+      "PowerShell(gh run *)",
+      "PowerShell($lock = Get-Content package-lock.json -Raw | ConvertFrom-Json; $p = $lock.packages.'node_modules/@biomejs/cli-darwin-arm64'; if \\($p\\) { \"present. optional=$\\($p.optional\\) os=$\\($p.os\\) cpu=$\\($p.cpu\\)\" } else { \"absent from lockfile\" }; \"lockfile version field: $\\($lock.version\\)\")",
+      "PowerShell(node -e \"const l=require\\('./package-lock.json'\\); const p=l.packages['node_modules/@biomejs/cli-darwin-arm64']; console.log\\('version:',l.version\\); console.log\\(p?JSON.stringify\\({optional:p.optional,os:p.os,cpu:p.cpu}\\):'absent'\\); const d=l.packages['']; console.log\\('direct deps mention darwin:', JSON.stringify\\(Object.keys\\({...d.dependencies,...d.devDependencies}\\).filter\\(k=>k.includes\\('darwin'\\)\\)\\)\\)\")",
+      "PowerShell(npm run *)"
     ]
   },
   "enabledPlugins": {
