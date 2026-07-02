@@ -24,6 +24,20 @@ None of this is catastrophic — the core numbers people will actually check (**
 
 ---
 
+## 0.5 Update — 2026-07-02 (supersedes stale claims below)
+
+Everything in §0's gap table has since been fixed, plus more. Current truth:
+
+- **Docs:** `docs/schema.md` / `docs/contributing.md` / `docs/roadmap.md` written; `docs/rules/` is now 58/58 (was 48); README's dead `auto-demote-rules.yml` link reworded as planned. The stale `apply-fix` comment in `daemon/mcp/server.ts` is corrected.
+- **Tests:** 10 files → 17+; **111 passing** (white-box Phases 1–3: walker/ignore, lifecycle gating, suppression parser, ProjectIndex isolation, comment-strip self-match, ajv report-schema validation; plus `test/surface-smoke.test.ts` spawning the real `cli.js` and doing a live MCP `initialize`+`tools/list` handshake). c8 coverage wired: `npm run test:coverage` + `test/COVERAGE-BASELINE.md` (caveat: `all:false`).
+- **Security fix (was an open hole):** gitignored `*.pem` / `*.key` / `.npmrc` / `.pypirc` were invisible — `detectLanguage()` dropped them before the ignore-resolver bypass ran. Fixed; `core-security-hardcoded-secret-pattern` gained a PEM private-key pattern (certs/public keys excluded); corpus updated; 58/58+58/58 held.
+- **Product bug fixed:** `web/src/lib/scanJobClient.ts` retried failed scan jobs forever when `errorMessage` was custom (string-sniffing misclassification) — now typed `ScanJobFailedError`.
+- **CI (was failing since March):** root causes were (1) 638 phantom `../Users/...` entries in a stale `package-lock.json` — phantom `@biomejs/cli-darwin-arm64` lacked `optional:true`, so Linux `npm ci` died `EBADPLATFORM`; lockfile regenerated from scratch; (2) 47 eslint errors; (3) TS7006 implicit-anys in `web/src/lib/database.ts` that only bit on fresh installs. All fixed through commit `d51ba65`.
+- **Where the project exists:** public source at github.com/abhinavteja123/codemore ONLY. npm unpublished (name free as of 2026-07-02), Marketplace unpublished, docs site undeployed.
+- **§5 below is superseded — the live plan is [`PLAN.md`](PLAN.md)** (hardening Track A, distribution Track B, trust-flywheel Track C).
+
+---
+
 ## 1. Why this exists — the actual problem
 
 AI coding agents (Cursor, Claude Code, Copilot, Codex) ship code fast and ship *bugs* fast. The data driving this project:
