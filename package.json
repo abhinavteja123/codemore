@@ -243,6 +243,7 @@
     "vsce:publish": "npm run download-binaries:all && vsce publish"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.110.0",
     "@types/diff": "^7.0.2",
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.6",
