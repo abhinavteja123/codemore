@@ -1,6 +1,8 @@
-<div align="center">
+
 
 # CodeMore
+**LINK: [www.codemore.tech](https://codemore.tech/)**
+
 
 **The static analyzer your AI agent reads.**
 
