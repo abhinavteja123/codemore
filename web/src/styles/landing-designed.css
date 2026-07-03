@@ -355,6 +355,20 @@ body {
   pointer-events: none;
   z-index: 5;
 }
+/* Dive veil — same paint as .scene2__sticky so the last ~20% of the dive
+   crossfades into the next scene and the sticky release is invisible.
+   Opacity is driven from the scroll rAF in page.tsx. */
+.dive-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity;
+  background:
+    radial-gradient(120% 70% at 50% -5%, rgba(131, 110, 243, 0.08), transparent 50%),
+    linear-gradient(180deg, #04040a, #07060f 50%, #04040a 100%);
+}
 
 /* Refined Portal Ring (Extremely clean, smooth, non-harsh) */
 .portal {

@@ -104,6 +104,7 @@ export default function Landing() {
   const portalRef   = useRef<HTMLDivElement>(null);
   const heroCopyRef = useRef<HTMLDivElement>(null);
   const heroHintRef = useRef<HTMLDivElement>(null);
+  const diveVeilRef = useRef<HTMLDivElement>(null);
   const navRef      = useRef<HTMLElement>(null);
   const scanRef     = useRef<HTMLElement>(null);
   const threatsRef  = useRef<HTMLElement>(null);
@@ -113,17 +114,12 @@ export default function Landing() {
       const t = Math.min(Math.max((v - e0) / (e1 - e0), 0), 1);
       return t * t * (3 - 2 * t);
     };
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let rafId: number | null = null;
-    const apply = () => {
-      rafId = null;
-      if (navRef.current) {
-        navRef.current.classList.toggle("is-scrolled", window.scrollY > 50);
-      }
-      if (!passageRef.current || !portalRef.current || !heroCopyRef.current || !heroHintRef.current) return;
-      const rect = passageRef.current.getBoundingClientRect();
-      const len  = Math.max(passageRef.current.offsetHeight - window.innerHeight, 1);
-      const p    = Math.min(Math.max(-rect.top / len, 0), 1);
+    let curP  = -1; // eased progress; -1 = not yet initialised
+    let lastT = 0;
 
+    const apply = (p: number) => {
       const zoom      = 1 + Math.pow(p, 2.4) * 24;       // 1 → 25× — disc swells into a dive
       const coreB     = 1 + p * 1.6;                     // core brightens as we dive
       const ringO     = 1 - smooth(0.72, 0.96, p);       // ring fades just before the dive ends
@@ -131,19 +127,50 @@ export default function Landing() {
       const copyShift = p * -160;
       const copyScale = 1 + p * 0.12;
       const hintO     = 1 - smooth(0.02, 0.12, p);
+      const veilO     = smooth(0.8, 0.99, p);            // crossfade into scene2 palette at dive end
 
-      portalRef.current.style.setProperty("--pz",     zoom.toFixed(3));
-      portalRef.current.style.setProperty("--core-b", coreB.toFixed(3));
-      portalRef.current.style.setProperty("--ring-o", ringO.toFixed(3));
-      heroCopyRef.current.style.opacity   = copyO.toFixed(3);
-      heroCopyRef.current.style.transform = `translateY(${copyShift.toFixed(1)}px) scale(${copyScale.toFixed(3)})`;
-      heroHintRef.current.style.opacity   = hintO.toFixed(3);
+      portalRef.current!.style.setProperty("--pz",     zoom.toFixed(3));
+      portalRef.current!.style.setProperty("--core-b", coreB.toFixed(3));
+      portalRef.current!.style.setProperty("--ring-o", ringO.toFixed(3));
+      heroCopyRef.current!.style.opacity   = copyO.toFixed(3);
+      heroCopyRef.current!.style.transform = `translateY(${copyShift.toFixed(1)}px) scale(${copyScale.toFixed(3)})`;
+      heroHintRef.current!.style.opacity   = hintO.toFixed(3);
+      if (diveVeilRef.current) diveVeilRef.current.style.opacity = veilO.toFixed(3);
+    };
+
+    // Eased follower: raw scroll position is the target; the displayed value
+    // chases it with a time-based lerp. A fast flick from bottom to top no
+    // longer teleports the portal 25×→1× in one frame (the visible "shutter") —
+    // it settles over ~120ms instead. Loop keeps running until it converges.
+    const tick = (t: number) => {
+      rafId = null;
+      if (navRef.current) {
+        navRef.current.classList.toggle("is-scrolled", window.scrollY > 50);
+      }
+      if (!passageRef.current || !portalRef.current || !heroCopyRef.current || !heroHintRef.current) return;
+      const rect   = passageRef.current.getBoundingClientRect();
+      const len    = Math.max(passageRef.current.offsetHeight - window.innerHeight, 1);
+      const target = Math.min(Math.max(-rect.top / len, 0), 1);
+
+      const dt = Math.min((t - lastT) / 1000, 0.05);
+      lastT = t;
+      if (curP < 0 || reduced) {
+        curP = target; // first frame / reduced motion: no easing
+      } else {
+        curP += (target - curP) * (1 - Math.exp(-dt * 18)); // frame-rate independent
+        if (Math.abs(target - curP) < 0.0008) curP = target;
+      }
+      apply(curP);
+      if (curP !== target) rafId = requestAnimationFrame(tick);
     };
     const onScroll = () => {
-      if (rafId === null) rafId = requestAnimationFrame(apply);
+      if (rafId === null) {
+        lastT = performance.now();
+        rafId = requestAnimationFrame(tick);
+      }
     };
     window.addEventListener("scroll", onScroll, { passive: true });
-    apply();
+    onScroll();
     return () => {
       window.removeEventListener("scroll", onScroll);
       if (rafId !== null) cancelAnimationFrame(rafId);
@@ -382,6 +409,10 @@ export default function Landing() {
             <span>scroll to enter</span>
             <div className="bar" />
           </div>
+
+          {/* Painted over everything at dive end so the sticky release into
+              scene2 is a seamless crossfade instead of a hard cut. */}
+          <div ref={diveVeilRef} className="dive-veil" aria-hidden />
         </div>
       </section>
 

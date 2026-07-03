@@ -193,17 +193,18 @@ export default function WebGLPortalBg() {
     const uMouseLoc = gl.getUniformLocation(program, "uMouse");
 
     // Track state parameters
-    let animationFrameId: number;
+    let animationFrameId: number | null = null;
     let lastTime = 0;
     let accumulatedTime = 0;
     const mouse = { x: 0.5, y: 0.5, targetX: 0.5, targetY: 0.5 };
 
-    // Set canvas dimensions with high density ratio
+    // Resize only when the element actually changes size — reading
+    // clientWidth/clientHeight every frame forces a layout pass per rAF and
+    // fights the scroll handlers writing styles (layout thrash → scroll jank).
     const resize = () => {
-      if (!canvas) return;
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
-      if (canvas.width !== width || canvas.height !== height) {
+      if (width > 0 && height > 0 && (canvas.width !== width || canvas.height !== height)) {
         canvas.width = width;
         canvas.height = height;
         gl.viewport(0, 0, width, height);
@@ -211,7 +212,8 @@ export default function WebGLPortalBg() {
     };
 
     resize();
-    window.addEventListener("resize", resize, { passive: true });
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
 
     // Handle mouse tracking over hero zone
     const handleMouseMove = (e: MouseEvent) => {
@@ -224,9 +226,9 @@ export default function WebGLPortalBg() {
 
     // Main WebGL drawing tick
     const render = (time: number) => {
-      resize();
-
-      const delta = (time - lastTime) * 0.001;
+      // Clamp delta so a dropped frame (fast scroll, tab switch) can't make
+      // the shader time leap — that leap reads as a visible stutter/jump.
+      const delta = Math.min((time - lastTime) * 0.001, 0.05);
       lastTime = time;
       accumulatedTime += delta;
 
@@ -247,11 +249,30 @@ export default function WebGLPortalBg() {
       animationFrameId = requestAnimationFrame(render);
     };
 
-    animationFrameId = requestAnimationFrame(render);
+    // Only render while the portal is on screen — frees the GPU for the rest
+    // of the page and prevents composite contention during long scrolls.
+    const startLoop = () => {
+      if (animationFrameId === null) {
+        lastTime = performance.now();
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+    const stopLoop = () => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+    };
+    const io = new IntersectionObserver(
+      ([entry]) => (entry.isIntersecting ? startLoop() : stopLoop())
+    );
+    io.observe(canvas);
+    startLoop();
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener("resize", resize);
+      stopLoop();
+      io.disconnect();
+      ro.disconnect();
       window.removeEventListener("mousemove", handleMouseMove);
       gl.deleteBuffer(buffer);
       gl.deleteProgram(program);
