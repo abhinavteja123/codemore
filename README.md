@@ -1,7 +1,10 @@
 
 
 # CodeMore
-**LINK : codemore.tech**
+****LINK : codemore.tech****************
+
+
+
 **The static analyzer your AI agent reads.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-4ef2ca.svg?style=flat-square)](LICENSE)
