@@ -12,11 +12,12 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 const cspHeader = [
   "default-src 'self'",
-  // In dev: unsafe-eval for HMR, unsafe-inline for dev tools
-  // In prod: no unsafe-inline or unsafe-eval for scripts (XSS protection)
+  // Next.js requires 'unsafe-inline' for hydration scripts in production.
+  // Without it, React cannot initialize on the client and all JS features break.
+  // For tighter security, consider nonce-based CSP via middleware in the future.
   isDev
     ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
-    : "script-src 'self'",
+    : "script-src 'self' 'unsafe-inline'",
   // unsafe-inline required for styled-jsx and CSS-in-JS
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
