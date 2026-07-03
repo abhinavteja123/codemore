@@ -1,0 +1,3 @@
+{
+  "installCommand": "npm install && cd .. && npm install pino @google/generative-ai typescript"
+}
