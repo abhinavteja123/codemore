@@ -2,6 +2,8 @@
 /* Legacy web infra — Phase 3 plan demotes this surface. Rules will re-apply
    per-module once the web dashboard rewrite lands. */
 
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 
 // CSP: unsafe-eval is required for Next.js development mode hot reloading
@@ -34,6 +36,13 @@ const nextConfig = {
   },
   // Also add to webpack externals for API routes
   webpack: (config, { isServer }) => {
+    // Monorepo fix: ensure cross-boundary imports from daemon/ and shared/
+    // can resolve packages installed in web/node_modules/
+    config.resolve.modules = [
+      path.resolve(__dirname, 'node_modules'),
+      ...(config.resolve.modules || ['node_modules']),
+    ];
+
     if (isServer) {
       // Mark pino as external to avoid bundling worker threads
       config.externals = config.externals || [];
