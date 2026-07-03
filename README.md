@@ -1,7 +1,7 @@
-<div align="center">
+<img width="1008" height="504" alt="image" src="https://github.com/user-attachments/assets/23a6f2fb-3a98-4473-bddf-d71b24713118" /><div align="center">
 
 # CodeMore
-
+**LINK : codemore.tech**
 **The static analyzer your AI agent reads.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-4ef2ca.svg?style=flat-square)](LICENSE)
