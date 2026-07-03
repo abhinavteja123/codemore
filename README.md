@@ -1,8 +1,7 @@
 
 
 # CodeMore
-****LINK : codemore.tech****************
-
+**LINK: codemore.tech**
 
 
 **The static analyzer your AI agent reads.**
