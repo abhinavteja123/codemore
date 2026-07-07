@@ -74,6 +74,11 @@ const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 function detectLanguage(filename: string, extension: string): string | null {
   // Env files are detected by basename prefix; they have no normal extension.
   if (filename === '.env' || filename.startsWith('.env.')) return 'env';
+  // Suffix form too (docker-compose env_file convention: secrets.env,
+  // prod.env). Without this the walker's secret-bypass is moot — the file
+  // is dropped for lack of a language before rules ever see it (the same
+  // silent-drop class as the 2026-07-02 .pem fix).
+  if (filename.toLowerCase().endsWith('.env')) return 'env';
 
   // Dockerfile detection by exact basename (no extension).
   if (filename === 'Dockerfile' || filename.toLowerCase() === 'dockerfile') return 'dockerfile';
@@ -290,6 +295,13 @@ export async function scanProject(opts: ScanOptions): Promise<CodeMoreReport> {
   // for ignore + rules; for packs and experimental, caller wins so CLI
   // flags can override the file.
   const rc = loadCodemorerc(opts.root);
+  // Config problems must be visible: a malformed .codemorerc.json that is
+  // silently ignored means the user's packs/rules/ignore config isn't
+  // applied and they have no way to know. Same stderr channel as the
+  // external-tool diagnostics printed later in this function.
+  for (const w of rc.warnings) {
+    process.stderr.write(`codemore: ${w}\n`);
+  }
 
   const userIgnore = Array.from(new Set([
     ...(opts.ignore ?? []),

@@ -112,4 +112,79 @@ describe('surface smoke: real CLI binary + MCP server process', function () {
       child.kill();
     }
   });
+
+  it('serve-mcp: scan_file runs AST rules, scan_project errors on a missing root', async () => {
+    // Regression for two 2026-07-07 tester findings:
+    //  - scan_file built its RuleContext with sourceFile:null, so every
+    //    AST rule silently skipped — 0 findings for content scan_project
+    //    flagged (daemon/mcp/server.ts buildSingleFileContext).
+    //  - scan_project on a nonexistent rootPath returned a valid EMPTY
+    //    report; an agent reads that as "project is clean".
+    const UNREACHABLE = 'export function f(): string {\n  return "x";\n  helper();\n}\nfunction helper(): void {}\n';
+
+    const child = spawn(process.execPath, [CLI, 'serve-mcp'], {
+      cwd: REPO_ROOT,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    interface RpcMsg {
+      id?: number;
+      result?: { isError?: boolean; content?: Array<{ text?: string }> };
+    }
+    try {
+      const results = await new Promise<Map<number, RpcMsg['result']>>((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error('MCP tools/call flow timed out after 45s')), 45000);
+        const got = new Map<number, RpcMsg['result']>();
+        let buf = '';
+        child.stdout.on('data', (chunk: Buffer) => {
+          buf += chunk.toString();
+          const lines = buf.split('\n');
+          buf = lines.pop() ?? '';
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            let msg: RpcMsg;
+            try { msg = JSON.parse(line); } catch { continue; }
+            if (msg.id === 1) {
+              child.stdin.write(JSON.stringify({
+                jsonrpc: '2.0', id: 2, method: 'tools/call',
+                params: { name: 'scan_file', arguments: { filePath: 'src/pivot.ts', content: UNREACHABLE } },
+              }) + '\n');
+            } else if (msg.id === 2) {
+              got.set(2, msg.result);
+              child.stdin.write(JSON.stringify({
+                jsonrpc: '2.0', id: 3, method: 'tools/call',
+                params: { name: 'scan_project', arguments: { rootPath: path.join(os.tmpdir(), 'codemore-definitely-missing-dir-xyz') } },
+              }) + '\n');
+            } else if (msg.id === 3) {
+              got.set(3, msg.result);
+              clearTimeout(timer);
+              resolve(got);
+            }
+          }
+        });
+        child.on('error', reject);
+        child.stdin.write(JSON.stringify({
+          jsonrpc: '2.0', id: 1, method: 'initialize',
+          params: {
+            protocolVersion: '2024-11-05',
+            capabilities: {},
+            clientInfo: { name: 'surface-smoke', version: '0.0.0' },
+          },
+        }) + '\n');
+      });
+
+      const scanFile = results.get(2);
+      const payload = JSON.parse(scanFile?.content?.[0]?.text ?? '{}') as { issues?: Array<{ id: string }> };
+      assert.ok(
+        (payload.issues ?? []).some(i => i.id === 'core-quality-unreachable-code'),
+        'scan_file must run AST rules on inline TS content (sourceFile parsed, not null)');
+
+      const badRoot = results.get(3);
+      assert.equal(badRoot?.isError, true,
+        'scan_project on a nonexistent rootPath must be an isError result, not an empty clean report');
+    } finally {
+      child.kill();
+    }
+  });
 });

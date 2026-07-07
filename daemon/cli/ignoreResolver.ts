@@ -115,6 +115,7 @@ export interface IgnoreResolverOptions {
  */
 const SECRET_SHAPED_FILENAMES: ReadonlyArray<RegExp> = [
   /(?:^|\/)\.env(?:\..+)?$/i,                          // .env, .env.local, .env.production
+  /(?:^|\/)[^/]+\.env$/i,                              // secrets.env, prod.env (docker-compose env_file convention)
   /(?:^|\/)[^/]+\.pem$/i,                              // *.pem
   /(?:^|\/)[^/]+\.key$/i,                              // *.key
   /(?:^|\/)[^/]*firebase-adminsdk[^/]*\.json$/i,       // Firebase Admin SDK (the Gen ai case)

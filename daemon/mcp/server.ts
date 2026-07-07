@@ -30,6 +30,7 @@ import { runAgenticFix, buildFixPrompt } from '../services/agenticFixer';
 import { toolVersion } from '../../shared/toolVersion';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as ts from 'typescript';
 
 // CJS-friendly imports — the SDK ships both ESM and CJS builds, and our
 // daemon tsconfig is commonjs.
@@ -77,13 +78,25 @@ function buildSingleFileContext(filePath: string, content: string, languageHint?
     else if (extension === '.py' || extension === '.pyi') {language = 'python';}
     else {language = 'unknown';}
   }
+  // Parse a TS AST for TS/JS files so AST-based rules can run. Without
+  // this every AST rule silently returns no findings on scan_file while
+  // the same file scanned via scan_project reports them — the exact
+  // silent-miss the validator harness guards against (validatorHarness.ts).
+  let sourceFile: ts.SourceFile | null = null;
+  if (language === 'typescript' || language === 'javascript') {
+    try {
+      sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
+    } catch {
+      sourceFile = null;
+    }
+  }
   return {
     filePath,
     extension,
     language,
     content,
     lines: content.split('\n'),
-    sourceFile: null,
+    sourceFile,
     frameworks: [],
   };
 }
@@ -125,6 +138,18 @@ export async function runMcpServer(): Promise<void> {
       packs?: string[];
       frameworks?: string[];
     }) => {
+      // A nonexistent root must be a loud error, not an empty "clean"
+      // report — an agent reading zero issues would wrongly conclude the
+      // project passed the scan.
+      if (!fs.existsSync(rootPath) || !fs.statSync(rootPath).isDirectory()) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({ error: 'root-not-found', message: `rootPath does not exist or is not a directory: ${rootPath}` }),
+          }],
+          isError: true,
+        };
+      }
       const report = await scanProject({
         root: rootPath,
         enableExperimental: enableExperimental ?? false,

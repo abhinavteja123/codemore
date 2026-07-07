@@ -139,9 +139,12 @@ export class RuleRegistry {
         if (isLocationSuppressed(rule.id, finding.evidence.line, suppressed)) continue;
 
         const override = opts.ruleOverrides?.[rule.id];
+        // User override outranks BOTH the rule default and any per-finding
+        // severity a detector sets — otherwise a .codemorerc.json remap is
+        // silently ignored for every rule that emits finding.severity.
         const severity: Severity =
-          finding.severity ??
-          (override && override.state !== 'off' ? (override.state as Severity) : rule.defaultSeverity);
+          (override && override.state !== 'off') ? (override.state as Severity)
+          : (finding.severity ?? rule.defaultSeverity);
 
         const rawConfidence = finding.confidence ?? rule.defaultConfidence;
         const confidence = Math.min(rawConfidence, maxConfidenceFor(rule.lifecycle));
