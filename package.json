@@ -29,7 +29,7 @@
   "icon": "resources/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/codemore/codemore-vscode"
+    "url": "git+https://github.com/codemore/codemore-vscode.git"
   },
   "files": [
     "cli.js",
@@ -51,7 +51,7 @@
   ],
   "main": "./dist/extension.js",
   "bin": {
-    "codemore": "./cli.js"
+    "codemore": "cli.js"
   },
   "contributes": {
     "commands": [
@@ -239,8 +239,8 @@
     "build:publish": "tsc -p tsconfig.publish.json",
     "clean:publish": "node -e \"require('fs').rmSync('lib',{recursive:true,force:true})\"",
     "prepack": "npm run clean:publish && npm run build:publish",
-    "vsce:package": "npm run download-binaries:all && vsce package",
-    "vsce:publish": "npm run download-binaries:all && vsce publish"
+    "vsce:package": "npm run download-binaries:all && node scripts/vsce-package.js package",
+    "vsce:publish": "npm run download-binaries:all && node scripts/vsce-package.js publish"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.110.0",
