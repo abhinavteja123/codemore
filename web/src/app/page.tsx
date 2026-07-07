@@ -438,12 +438,12 @@ export default function Landing() {
           <header className="scene2__head">
             <div>
               <div className="eyebrow">findings feed · 58 rules · scroll to advance</div>
-              <h2>Every finding is agent-actionable. Five sample classes from the 2026-06-12 audit.</h2>
+              <h2>Every finding is agent-actionable. Five sample classes from the 2026-07-07 audit.</h2>
             </div>
             <p>
-              Across 10 real codebases we caught 7 production secrets behind .gitignore,
-              10 Supabase RLS holes in a single Lovable export, and real shell + SQL injection
-              in deployed apps. ~85% TP rate.
+              Across 7 codebases we caught a real OpenAI key in a production .env, MCP-config
+              secrets, Supabase RLS holes, and real shell + SQL injection — 100% of planted
+              vulnerabilities detected, ~90% TP on BLOCKER findings.
             </p>
           </header>
 
@@ -586,7 +586,7 @@ export default function Landing() {
           <div className="meta reveal">
             <div className="rule" />
             CODEMORE / MANIFESTO<br />
-            v0.2.1 · 2026-06-12<br />
+            v0.2.1 · 2026-07-07<br />
             MIT-LICENSED · OPT-IN TELEMETRY
           </div>
 
@@ -621,14 +621,16 @@ export default function Landing() {
             </div>
 
             <div className="reveal reveal-delay-2">
-              <div className="manifesto__act-label">Act III — the 2026-06-12 audit</div>
+              <div className="manifesto__act-label">Act III — the 2026-07-07 audit</div>
               <h3>
-                Across <em>10</em> real codebases — <em>~85%</em> of BLOCKER findings were true positives.
+                Across <em>7</em> codebases — <em>100%</em> of planted vulnerabilities detected,
+                and a real key caught in the wild.
               </h3>
               <p>
-                We surfaced real OpenAI keys hidden behind <code>.gitignore</code>, ten
-                Supabase RLS holes in a single Lovable export, real shell + SQL injection
-                in production-deployed apps. <Link href="/docs/limitations">Read what we
+                We surfaced a real OpenAI key sitting in a production <code>.env</code>, RLS
+                holes, MCP-config secrets, and shell + SQL injection — then turned the scanner
+                on itself and cut false-positive noise by 85% in the same day (three FP classes
+                fixed, corpus still 100/100). <Link href="/docs/limitations">Read what we
                 deliberately don&apos;t catch</Link> — context-dependent classes (weak password
                 policy, audit-log completeness, business logic) live elsewhere.
               </p>
@@ -651,7 +653,7 @@ export default function Landing() {
             <div className="atlas-cell reveal reveal-delay-1">
               <div className="k">Catalog</div>
               <div className="n">58</div>
-              <div className="l">native rules across 7 packs, 100% TP / 100% FP on the corpus.</div>
+              <div className="l">native rules across 6 packs, 100% recall / 100% precision on the 116-fixture corpus.</div>
             </div>
             <div className="atlas-cell reveal reveal-delay-2">
               <div className="k">Adapters</div>
@@ -660,8 +662,8 @@ export default function Landing() {
             </div>
             <div className="atlas-cell reveal reveal-delay-3">
               <div className="k">TP rate</div>
-              <div className="n">~85%</div>
-              <div className="l">on BLOCKER findings across 10 real codebases. DeepSource bar passed.</div>
+              <div className="n">~90%</div>
+              <div className="l">on BLOCKER findings, 2026-07-07 audit across 7 codebases — 156 tests, CI green.</div>
             </div>
             <div className="atlas-cell reveal reveal-delay-4">
               <div className="k">Surfaces</div>
@@ -732,7 +734,7 @@ export default function Landing() {
 
           <div className="footer__legal">
             <span>© 2026 CodeMore · MIT-licensed</span>
-            <span>v0.2.1 · 58 rules · 8 adapters · ~85% TP</span>
+            <span>v0.2.1 · 58 rules · 8 adapters · ~90% TP</span>
             <span>opt-in telemetry · runs entirely in your repo</span>
           </div>
         </div>
