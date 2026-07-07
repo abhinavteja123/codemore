@@ -38,6 +38,22 @@ Everything in §0's gap table has since been fixed, plus more. Current truth:
 
 ---
 
+## 0.6 Update — 2026-07-07 (WebGL portal scroll-dive polish)
+
+Task this session: make the hero WebGL portal (the vortex globe) *dive* smoothly into the next section on scroll-down, and kill a stutter that hit when scrolling **up** fast. Production-polish pass on `web/`'s landing hero.
+
+**Three fixes, all landed and committed (byte-identical to `682e9cd "frontend"` — working tree was carrying reverted-old copies at session start; the edits re-synced it to HEAD, so `git diff HEAD` is now 0 on all three files, tree clean):**
+
+1. **`web/src/app/page.tsx` — eased scroll follower (the up-scroll stutter fix).** The portal's scroll progress `p` used to map 1:1 to raw scroll position and write CSS vars (`--pz` zoom 1→25×, `--core-b`, `--ring-o`) directly each frame. A fast flick from bottom→top teleported the disc from 25× back to 1× in a single frame — the visible "shutter." Replaced with a frame-rate-independent eased follower: raw scroll is the *target*, the displayed value chases it with `curP += (target - curP) * (1 - exp(-dt * 18))`, settling over ~120 ms, and the rAF loop keeps running until it converges (`|target - curP| < 0.0008`). Respects `prefers-reduced-motion` (direct map, no easing). Also added `diveVeilRef`.
+2. **`web/src/components/landing/designed/WebGLPortalBg.tsx` — three shader-loop fixes.** (a) **Delta-time clamp** `Math.min(dt, 0.05)` so a dropped frame can't make shader `uTime` leap (that leap = the vortex shudder). (b) **`ResizeObserver`** replaces the per-frame `clientWidth/clientHeight` read inside `render()` — the old code forced a synchronous layout every rAF, thrashing against the scroll handlers writing styles. (c) **`IntersectionObserver`** pauses the whole rAF loop when the portal scrolls offscreen, freeing the GPU for the rest of the page and killing composite contention during long scrolls. Cleanup disconnects both observers.
+3. **`web/src/styles/landing-designed.css` — `.dive-veil` crossfade.** A full-bleed layer (`z-index: 20`, `pointer-events: none`) painted with the **exact same gradient as `.scene2__sticky`**. Its opacity is driven from the page.tsx rAF (`smooth(0.8, 0.99, p)`), so the last ~20% of the dive crossfades into the next scene's palette — the sticky-hero release into the findings carousel is now seamless instead of a hard cut.
+
+**Verified:** `npx tsc --noEmit` in `web/` is clean. **NOT verified live in a browser this session** — dev server was started (port 3001, 3000 was busy) then stopped; the browser tab-open was rejected by the user, so the *visual* smoothness was not eyeballed here. Next person should `cd web && npm run dev`, scroll the hero down (smooth dive + seamless veil handoff) and flick back to top fast (disc should shrink smoothly, no snap). This is the one open loop on this change.
+
+**Related history (context, already documented in §3's "frontend pivot" item 4):** an *earlier* flicker fix — removing a conflicting `transition: opacity` on `.portal__ring`, `contain: layout paint` on heavy sections, `translateZ(0)` + `will-change` on canvases, rAF-batched scroll listeners — is still in place and complementary to the above; this session's work sits on top of it.
+
+---
+
 ## 1. Why this exists — the actual problem
 
 AI coding agents (Cursor, Claude Code, Copilot, Codex) ship code fast and ship *bugs* fast. The data driving this project:
@@ -249,6 +265,7 @@ In rough priority order:
 6. **Multi-IDE verification matrix** (Cursor, Claude Code, Claude Desktop, Codex CLI) was planned in Part 3/6 but there's no evidence in this session it was actually executed with screen recordings as specced.
 7. **Demo video + 50-app benchmark study + MCP marketplace submissions** — all Phase-6-launch-tier work, not started as of this handoff.
 8. **`auto-demote-rules.yml` and `docs-site.yml` workflows** were planned (Part 3/5) but never built — if the docs site under `web/` is meant to auto-deploy, or telemetry-driven auto-demotion is meant to run nightly, those need actual workflow files.
+9. **Browser-verify the 2026-07-07 WebGL scroll-dive polish** (§0.6) — the eased follower, shader-loop fixes, and `.dive-veil` crossfade typecheck clean and are committed, but were never eyeballed live this session. `cd web && npm run dev`, scroll the hero down and flick back up fast; confirm no shutter and a seamless veil handoff into the findings section. Low risk, but it's the one unverified loop on that change.
 
 ## 6. If you're picking this up cold
 
