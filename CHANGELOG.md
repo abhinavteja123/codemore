@@ -2,6 +2,30 @@
 
 All notable changes to CodeMore. Semantic Versioning.
 
+## [0.2.2] — 2026-07-07 — pre-publish hardening: adapter drift guards, precision fixes, tester-pass defects
+
+### Added
+
+- **External-adapter fail-loud parsers** — every `daemon/external/*.ts` parser extracted to a pure `parseXOutput(stdout)` + shared `parseShape.ts`; malformed output AND valid-JSON-wrong-shape (tool version drift, e.g. npm v6 `advisories`) now produce an error diagnostic instead of a silent zero-findings result. 30 canned-fixture tests.
+- **Vendored AI-tooling dirs skipped by the walker** — `.agents/`, `.codex/`, `.windsurf/`, `.aider/`, `.github/skills/`, and subdir-only `.claude/*/` + `.cursor/*/` (top-level `mcp.json`/`settings.json` stay scannable for `vibe-mcp-config-secret`). codemore self-scan noise −85% (2,148 → 318 findings; BLOCKERs 98 → 8, all genuine).
+- **Suffix `*.env` secret carriers** (`secrets.env`, `prod.env` — docker-compose `env_file` convention) now routed to the env language and covered by the gitignore secret-bypass. Previously silently dropped (same class as the 0.2.1 `.pem` fix).
+- `test/validator-harness.test.ts`, `test/external-adapters.test.ts`, `test/codemorerc-effects.test.ts`, MCP `tools/call` surface tests — suite 111 → 160.
+
+### Fixed
+
+- **`core-quality-unused-export`**: `ProjectIndex.allImportedNames` now also collects renamed re-exports (`export { X as Y } from`), CommonJS `require()` destructuring, and namespace member access (`import * as ns; ns.foo`) — the rule no longer flags exports consumed through those forms.
+- **`core-security-shell-injection` v1.2.0**: array-args `spawn`/`spawnSync`/`execFile`/`execFileSync` without a literal truthy `shell:` option is Node's safe form and is no longer flagged (open-design: 25 → 3 BLOCKERs).
+- **`core-security-path-traversal` v1.3.0**: constant-only joins (`os.path.join(CONST_DIR, "x.json")`) no longer flagged — the `\.json\b` user-input hint was matching file extensions inside string literals.
+- **MCP `scan_file`**: built its RuleContext with `sourceFile: null`, so every AST rule silently skipped inline content that `scan_project` flagged. Now parses a TS AST for TS/JS.
+- **MCP `scan_project`**: a nonexistent `rootPath` returned a valid empty report (agents read "clean project"); now an `isError` result.
+- **`.codemorerc.json` severity remap**: a per-finding severity set by a detector silently defeated the user's rules remap; user override now outranks both.
+- **Malformed `.codemorerc.json`**: loader warnings are now written to stderr instead of being silently swallowed.
+- Dispatcher no longer reports "ran ok — 0 findings" for a tool that emitted an error diagnostic.
+
+### Audit
+
+- `accuracy-report-2026-07-07.md` — 7 codebases: 100% planted-vuln recall, ~90% BLOCKER TP post-fixes, real OpenAI key caught in a production `.env`; corpus held at 58/58 recall + 58/58 precision throughout.
+
 ## [0.2.1] — 2026-06-12 — Part 7 accuracy audit + calibration
 
 ### Added — walker hardening from multi-project testing (11 codebases)
@@ -126,7 +150,7 @@ Shared helper for `stripJsCommentsAndStrings` + `stripPyCommentsAndStrings`. Rep
 
 ---
 
-## [Unreleased] — Phase 2 catalog expansion + Phase 3 agentic loop
+## [0.2.0-dev] — Phase 2 catalog expansion + Phase 3 agentic loop (shipped in 0.2.0; was mislabeled "Unreleased")
 
 ### Added
 

@@ -7,11 +7,11 @@
 **The static analyzer your AI agent reads.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-4ef2ca.svg?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.1-836ef3.svg?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.2-836ef3.svg?style=flat-square)](CHANGELOG.md)
 [![Catalog](https://img.shields.io/badge/rules-58-success.svg?style=flat-square)](docs/rules)
 [![Adapters](https://img.shields.io/badge/external%20adapters-8-blueviolet.svg?style=flat-square)](docs/external-tools.md)
-[![Audit](https://img.shields.io/badge/audit-2026--06--12-pink.svg?style=flat-square)](accuracy-report-2026-06-12.md)
-[![TP rate](https://img.shields.io/badge/BLOCKER%20TP%20rate-~85%25-4ef2ca.svg?style=flat-square)](accuracy-report-2026-06-12.md)
+[![Audit](https://img.shields.io/badge/audit-2026--07--07-pink.svg?style=flat-square)](accuracy-report-2026-07-07.md)
+[![TP rate](https://img.shields.io/badge/BLOCKER%20TP%20rate-~90%25-4ef2ca.svg?style=flat-square)](accuracy-report-2026-07-07.md)
 
 *58 native rules · 8 external adapters · CLI · MCP server · VS Code extension · GitHub Action — one report, every surface.*
 
@@ -32,6 +32,12 @@ AI-assisted coding ships bugs at a measurable, growing rate:
 Existing scanners (SonarQube, DeepSource, Snyk) target **human reviewers via dashboards**. CodeMore targets the **LLM that wrote the code in the first place** — and emits a schema-stable JSON report any coding agent (Cursor, Claude Code, Codex, Copilot) can read, fix, and verify against.
 
 > **The agent that wrote the bug can also write the fix — if it can read the report.**
+
+---
+
+## v0.2.2 — pre-publish hardening (2026-07-07)
+
+Second audit pass across 7 codebases (Python app, TS monorepo at 1.35M LOC, polyglot Rust, synthetic ground-truth apps, self): **100% of planted vulnerabilities detected**, a real OpenAI key caught in a production `.env`, **~90% BLOCKER TP** after fixing four false-positive classes in one day (`unused-export` cross-file import resolution, safe array-arg `spawn`/`execFile` no longer flagged, constant-only path joins no longer flagged, vendored AI-tooling dirs skipped — self-scan noise −85%). External-adapter parsers now fail loud on tool-version drift. End-to-end tester pass fixed five more defects (MCP `scan_file` AST parsing, `scan_project` missing-root error, `.codemorerc.json` severity remap + malformed-file warning, suffix `*.env` secret bypass). 160 unit tests. Full audit: [`accuracy-report-2026-07-07.md`](accuracy-report-2026-07-07.md).
 
 ---
 
@@ -147,7 +153,7 @@ The schema (`codemore-report.json` v1.0.0) is the API. Surfaces are skins.
 
 ## Catalog at a glance
 
-**58 native rules** across **7 packs** + **8 opt-in external adapters**:
+**58 native rules** across **6 packs** + **8 opt-in external adapters**:
 
 | Pack | Count | Highlights |
 |---|---:|---|
@@ -350,7 +356,7 @@ Off by default. Enable per-scan with `--telemetry`. Persistent opt-in stored in 
 ```
 codemore/
 ├── shared/                       — one brain, shared across surfaces
-│   ├── packs/                    — 58 rule modules across 7 packs
+│   ├── packs/                    — 58 rule modules across 6 packs
 │   │   ├── core-security/        — SQLi, secrets, weak crypto, path traversal, eval, deser, shell injection
 │   │   ├── core-quality/         — unused, complexity, dead code, leftover prints, async-no-await
 │   │   ├── vibe-auth/            — BOLA, missing session, inverted auth
@@ -456,7 +462,7 @@ By participating you agree to abide by the [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ### Shipped in v0.2.1 (2026-06-12)
 
-- 58 native rules across 7 packs + 8 external adapters
+- 58 native rules across 6 packs + 8 external adapters
 - CLI · MCP server (6 tools) · VS Code extension · GitHub Action
 - Agentic fix loop (planner → generator → validator, ≤ 3 retries)
 - Schema-stable `codemore-report.json` v1.0.0
