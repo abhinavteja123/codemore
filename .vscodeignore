@@ -91,3 +91,27 @@ package.json.bak
 SAMPLES_REPORT.md
 MEMORY.md
 webpack.*.config.js
+
+# ---- generated/local artifacts added after this file was written -------
+# (mirrors .gitignore; these are gitignored but vsce ignores .gitignore
+# once a .vscodeignore exists, so they must be listed here too)
+coverage/**
+**/graphify-out/**
+.graphify_*
+triage-results/**
+.agents/**
+.ruff_cache/**
+.env.example
+
+# ---- internal audit/planning docs — not needed at runtime -------------
+HANDOFF.md
+PLAN.md
+accuracy-report-*.md
+A3-recall-audit-*.md
+skills-lock.json
+metadata.json
+index.html
+assets/**
+templates/**
+CODE_OF_CONDUCT.md
+package-lock.json
