@@ -27,9 +27,13 @@
     "security"
   ],
   "icon": "resources/icon.png",
+  "homepage": "https://codemore.tech",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/codemore/codemore-vscode.git"
+    "url": "git+https://github.com/abhinavteja123/codemore.git"
+  },
+  "bugs": {
+    "url": "https://github.com/abhinavteja123/codemore/issues"
   },
   "files": [
     "cli.js",
