@@ -28,6 +28,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import type { ReportIssue, Severity } from '../../shared/report/types';
 import type { ExternalToolResult, ExternalToolDiagnostic } from './index';
+import { parseToolJson, isRecord, type ParseResult } from './parseShape';
 
 interface BanditResult {
   filename: string;
@@ -60,6 +61,21 @@ function relativise(rootAbs: string, fileAbs: string): string {
 
 function ulidLike(): string {
   return crypto.randomBytes(8).toString('hex');
+}
+
+/**
+ * Parse bandit's `-f json` stdout. Empty output = clean run. Malformed
+ * JSON or a payload missing the top-level `results` array (old/renamed
+ * schema) fails loud with an error diagnostic instead of silently
+ * reporting zero findings.
+ */
+export function parseBanditOutput(stdout: string): ParseResult<BanditOutput> {
+  if (stdout.trim().length === 0) { return { value: { results: [] } }; }
+  return parseToolJson<BanditOutput>(
+    stdout, 'bandit',
+    (p) => isRecord(p) && Array.isArray((p as BanditOutput).results),
+    'is missing the "results" array',
+  );
 }
 
 async function runBanditJson(root: string, timeoutMs: number, diagnostics: ExternalToolDiagnostic[]):
@@ -116,16 +132,9 @@ async function runBanditJson(root: string, timeoutMs: number, diagnostics: Exter
         resolve(null);
         return;
       }
-      if (stdout.trim().length === 0) { resolve({ results: [] }); return; }
-      try {
-        resolve(JSON.parse(stdout) as BanditOutput);
-      } catch (err) {
-        diagnostics.push({
-          tool: 'bandit', level: 'error',
-          message: `failed to parse bandit JSON: ${(err as Error).message}`,
-        });
-        resolve(null);
-      }
+      const { value, diagnostic } = parseBanditOutput(stdout);
+      if (diagnostic) { diagnostics.push(diagnostic); }
+      resolve(value);
     });
   });
 }

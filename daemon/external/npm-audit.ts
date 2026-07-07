@@ -32,6 +32,7 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import type { ReportIssue, Severity } from '../../shared/report/types';
 import type { ExternalToolResult, ExternalToolDiagnostic } from './index';
+import { parseToolJson, isRecord, type ParseResult } from './parseShape';
 
 interface NpmAuditVia {
   title?: string;
@@ -65,6 +66,22 @@ function classify(sev: string): Severity {
 }
 
 function ulidLike(): string { return crypto.randomBytes(8).toString('hex'); }
+
+/**
+ * Parse `npm audit --json` stdout. Empty output = clean. Malformed JSON or
+ * a payload missing the top-level `vulnerabilities` object fails loud with
+ * an error diagnostic instead of a silent zero — this is the exact npm v6
+ * drift case (v6 emitted `advisories`/`actions`, not `vulnerabilities`, so
+ * the old shape would otherwise flatten to zero findings unnoticed).
+ */
+export function parseNpmAuditOutput(stdout: string): ParseResult<NpmAuditOutput> {
+  if (stdout.trim().length === 0) { return { value: { vulnerabilities: {} } }; }
+  return parseToolJson<NpmAuditOutput>(
+    stdout, 'npm-audit',
+    (p) => isRecord(p) && isRecord((p as NpmAuditOutput).vulnerabilities),
+    'is missing the "vulnerabilities" object (npm < 7 used "advisories")',
+  );
+}
 
 async function runNpmAuditJson(root: string, timeoutMs: number, diagnostics: ExternalToolDiagnostic[]):
     Promise<NpmAuditOutput | null> {
@@ -123,15 +140,9 @@ async function runNpmAuditJson(root: string, timeoutMs: number, diagnostics: Ext
         resolve(null);
         return;
       }
-      try {
-        resolve(JSON.parse(stdout) as NpmAuditOutput);
-      } catch (err) {
-        diagnostics.push({
-          tool: 'npm-audit', level: 'error',
-          message: `failed to parse npm audit JSON: ${(err as Error).message}`,
-        });
-        resolve(null);
-      }
+      const { value, diagnostic } = parseNpmAuditOutput(stdout);
+      if (diagnostic) { diagnostics.push(diagnostic); }
+      resolve(value);
     });
   });
 }

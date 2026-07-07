@@ -103,7 +103,8 @@ export async function runExternalTools(opts: ExternalToolOptions): Promise<Exter
     // Adapters that already emit an 'info' diagnostic with the word
     // 'skipped' or 'timeout' speak for themselves — don't double-report.
     const alreadySpoken = r.diagnostics.some(d =>
-      d.tool === tool && /skipped|skipping|timeout|not on PATH|spawn failed|exited/i.test(d.message));
+      d.tool === tool && (d.level === 'error'
+        || /skipped|skipping|timeout|not on PATH|spawn failed|exited/i.test(d.message)));
     if (!alreadySpoken) {
       merged.diagnostics.push({
         tool,

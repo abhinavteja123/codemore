@@ -35,6 +35,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import type { ReportIssue, Severity } from '../../shared/report/types';
 import type { ExternalToolResult, ExternalToolDiagnostic } from './index';
+import { parseToolJson, type ParseResult } from './parseShape';
 
 /**
  * Ruff rule codes are prefixed by category. Each prefix maps to a
@@ -86,6 +87,22 @@ interface RuffRunOptions {
 
 /** Run ruff and return its parsed JSON output OR null when the tool is
  *  unavailable / failed before producing output. */
+/**
+ * Parse ruff's `--output-format json` stdout, a top-level array of
+ * diagnostics. Empty output = clean run. Malformed JSON or valid JSON that
+ * isn't an array (version drift) fails loud with an error diagnostic
+ * instead of a silent zero. (ruff has always guarded this; the extraction
+ * keeps that guard testable and regression-locked.)
+ */
+export function parseRuffOutput(stdout: string): ParseResult<RuffDiagnostic[]> {
+  if (stdout.trim().length === 0) { return { value: [] }; }
+  return parseToolJson<RuffDiagnostic[]>(
+    stdout, 'ruff',
+    (p) => Array.isArray(p),
+    'was not a JSON array',
+  );
+}
+
 async function runRuffJson(root: string, opts: RuffRunOptions, diagnostics: ExternalToolDiagnostic[]):
     Promise<RuffDiagnostic[] | null> {
   return new Promise((resolve) => {
@@ -145,25 +162,9 @@ async function runRuffJson(root: string, opts: RuffRunOptions, diagnostics: Exte
         resolve(null);
         return;
       }
-      if (stdout.trim().length === 0) {
-        resolve([]);
-        return;
-      }
-      try {
-        const parsed = JSON.parse(stdout);
-        if (!Array.isArray(parsed)) {
-          diagnostics.push({ tool: 'ruff', level: 'error', message: 'ruff output was not a JSON array' });
-          resolve(null);
-          return;
-        }
-        resolve(parsed as RuffDiagnostic[]);
-      } catch (err) {
-        diagnostics.push({
-          tool: 'ruff', level: 'error',
-          message: `failed to parse ruff JSON output: ${(err as Error).message}`,
-        });
-        resolve(null);
-      }
+      const { value, diagnostic } = parseRuffOutput(stdout);
+      if (diagnostic) { diagnostics.push(diagnostic); }
+      resolve(value);
     });
   });
 }

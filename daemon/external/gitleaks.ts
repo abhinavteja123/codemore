@@ -25,6 +25,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import type { ReportIssue } from '../../shared/report/types';
 import type { ExternalToolResult, ExternalToolDiagnostic } from './index';
+import { parseToolJson, type ParseResult } from './parseShape';
 
 interface GitleaksFinding {
   Description?: string;
@@ -53,6 +54,22 @@ function redact(secret: string): string {
   if (!secret) {return '';}
   if (secret.length <= 8) {return '***';}
   return `${secret.slice(0, 4)}…${secret.slice(-2)}`;
+}
+
+/**
+ * Parse gitleaks' `--report-format json` stdout, a top-level array of
+ * findings. Empty output or the literal `null` = clean run. Malformed JSON,
+ * or valid JSON that isn't an array (renamed/wrapped schema in a new
+ * version), fails loud with an error diagnostic instead of a silent zero.
+ */
+export function parseGitleaksOutput(stdout: string): ParseResult<GitleaksFinding[]> {
+  const text = stdout.trim();
+  if (text.length === 0 || text === 'null') { return { value: [] }; }
+  return parseToolJson<GitleaksFinding[]>(
+    text, 'gitleaks',
+    (p) => Array.isArray(p),
+    'was not a JSON array',
+  );
 }
 
 async function runGitleaksJson(root: string, timeoutMs: number, diagnostics: ExternalToolDiagnostic[]):
@@ -109,18 +126,9 @@ async function runGitleaksJson(root: string, timeoutMs: number, diagnostics: Ext
         resolve(null);
         return;
       }
-      const text = stdout.trim();
-      if (text.length === 0 || text === 'null') { resolve([]); return; }
-      try {
-        const parsed = JSON.parse(text);
-        resolve(Array.isArray(parsed) ? parsed : []);
-      } catch (err) {
-        diagnostics.push({
-          tool: 'gitleaks', level: 'error',
-          message: `failed to parse gitleaks JSON: ${(err as Error).message}`,
-        });
-        resolve(null);
-      }
+      const { value, diagnostic } = parseGitleaksOutput(stdout);
+      if (diagnostic) { diagnostics.push(diagnostic); }
+      resolve(value);
     });
   });
 }

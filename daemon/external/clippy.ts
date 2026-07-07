@@ -55,6 +55,43 @@ function classifySeverity(level: ClippyMessage['level']): Severity {
 
 interface RunOptions { timeoutMs: number }
 
+/**
+ * Parse cargo/clippy's newline-delimited JSON (`--message-format=json`).
+ * Each line is one record; we keep `compiler-message` records. A clean
+ * build legitimately yields JSON records with zero compiler-messages, so
+ * zero findings alone is NOT an error. But if cargo emitted content and
+ * NOT ONE line parsed as JSON (old cargo, a panic, format drift), that is
+ * reported loud with an error diagnostic instead of a silent zero.
+ */
+export function parseClippyOutput(stdout: string): { messages: ClippyMessage[]; diagnostic?: ExternalToolDiagnostic } {
+  const messages: ClippyMessage[] = [];
+  let jsonLines = 0;
+  let failedLines = 0;
+  for (const line of stdout.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) { continue; }
+    try {
+      const rec = JSON.parse(trimmed) as ClippyRecord;
+      jsonLines++;
+      if (rec.reason === 'compiler-message' && rec.message) {
+        messages.push(rec.message);
+      }
+    } catch {
+      failedLines++;
+    }
+  }
+  if (failedLines > 0 && jsonLines === 0) {
+    return {
+      messages,
+      diagnostic: {
+        tool: 'clippy', level: 'error',
+        message: `clippy emitted ${failedLines} non-JSON line(s) and no parseable records (cargo message-format drift?)`,
+      },
+    };
+  }
+  return { messages };
+}
+
 async function runClippyStream(root: string, opts: RunOptions, diagnostics: ExternalToolDiagnostic[]):
     Promise<ClippyMessage[] | null> {
   return new Promise((resolve) => {
@@ -114,19 +151,8 @@ async function runClippyStream(root: string, opts: RunOptions, diagnostics: Exte
         resolve([]);
         return;
       }
-      const messages: ClippyMessage[] = [];
-      for (const line of stdout.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        try {
-          const rec = JSON.parse(trimmed) as ClippyRecord;
-          if (rec.reason === 'compiler-message' && rec.message) {
-            messages.push(rec.message);
-          }
-        } catch {
-          // Cargo emits some non-JSON lines under odd conditions; skip them.
-        }
-      }
+      const { messages, diagnostic } = parseClippyOutput(stdout);
+      if (diagnostic) { diagnostics.push(diagnostic); }
       resolve(messages);
     });
   });

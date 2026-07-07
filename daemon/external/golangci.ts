@@ -32,6 +32,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import type { ReportIssue, Severity } from '../../shared/report/types';
 import type { ExternalToolResult, ExternalToolDiagnostic } from './index';
+import { parseToolJson, isRecord, type ParseResult } from './parseShape';
 
 const LINTER_SEVERITY: Record<string, Severity> = {
   gosec: 'BLOCKER',
@@ -67,6 +68,28 @@ interface GolangciOutput {
 }
 
 interface RunOptions { timeoutMs: number }
+
+/**
+ * Parse golangci-lint's `--out-format json` stdout into the Issues array.
+ * Empty output = clean run. golangci legitimately emits `"Issues": null`
+ * for a clean run (Go marshals an empty slice as null), so present-but-null
+ * is accepted; only a payload with NO `Issues` key at all (renamed schema /
+ * old version) fails loud instead of silently reporting zero findings.
+ */
+export function parseGolangciOutput(stdout: string): ParseResult<GolangciIssue[]> {
+  if (stdout.trim().length === 0) { return { value: [] }; }
+  const res = parseToolJson<GolangciOutput>(
+    stdout, 'golangci',
+    (p) => {
+      if (!isRecord(p) || !('Issues' in p)) { return false; }
+      const iss = (p as Record<string, unknown>).Issues;
+      return iss === null || Array.isArray(iss);
+    },
+    'is missing the "Issues" field',
+  );
+  if (res.value === null) { return { value: null, diagnostic: res.diagnostic }; }
+  return { value: res.value.Issues ?? [] };
+}
 
 async function runGolangciJson(root: string, opts: RunOptions, diagnostics: ExternalToolDiagnostic[]):
     Promise<GolangciIssue[] | null> {
@@ -124,20 +147,9 @@ async function runGolangciJson(root: string, opts: RunOptions, diagnostics: Exte
         resolve(null);
         return;
       }
-      if (stdout.trim().length === 0) {
-        resolve([]);
-        return;
-      }
-      try {
-        const parsed = JSON.parse(stdout) as GolangciOutput;
-        resolve(parsed.Issues ?? []);
-      } catch (err) {
-        diagnostics.push({
-          tool: 'golangci', level: 'error',
-          message: `failed to parse golangci-lint output: ${(err as Error).message}`,
-        });
-        resolve(null);
-      }
+      const { value, diagnostic } = parseGolangciOutput(stdout);
+      if (diagnostic) { diagnostics.push(diagnostic); }
+      resolve(value);
     });
   });
 }

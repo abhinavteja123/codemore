@@ -43,6 +43,7 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import type { ReportIssue, Severity } from '../../shared/report/types';
 import type { ExternalToolResult, ExternalToolDiagnostic } from './index';
+import { parseToolJson, isRecord, type ParseResult } from './parseShape';
 
 interface BiomeDiagnostic {
   category?: string;
@@ -77,6 +78,24 @@ function classifySeverity(category: string | undefined, native: BiomeDiagnostic[
 }
 
 interface RunOptions { timeoutMs: number }
+
+/**
+ * Parse biome's `--reporter=json` stdout into the diagnostics array.
+ * Empty output = clean run. Malformed JSON or a payload missing the
+ * top-level `diagnostics` array (the classic stale-biome-binary case,
+ * where an old biome ignores `--reporter=json` and prints text) fails
+ * loud with an error diagnostic instead of a silent zero.
+ */
+export function parseBiomeOutput(stdout: string): ParseResult<BiomeDiagnostic[]> {
+  if (stdout.trim().length === 0) { return { value: [] }; }
+  const res = parseToolJson<BiomeOutput>(
+    stdout, 'biome',
+    (p) => isRecord(p) && Array.isArray((p as BiomeOutput).diagnostics),
+    'is missing the "diagnostics" array',
+  );
+  if (res.value === null) { return { value: null, diagnostic: res.diagnostic }; }
+  return { value: res.value.diagnostics ?? [] };
+}
 
 async function runBiomeJson(root: string, opts: RunOptions, diagnostics: ExternalToolDiagnostic[]):
     Promise<BiomeDiagnostic[] | null> {
@@ -133,20 +152,9 @@ async function runBiomeJson(root: string, opts: RunOptions, diagnostics: Externa
         resolve(null);
         return;
       }
-      if (stdout.trim().length === 0) {
-        resolve([]);
-        return;
-      }
-      try {
-        const parsed = JSON.parse(stdout) as BiomeOutput;
-        resolve(parsed.diagnostics ?? []);
-      } catch (err) {
-        diagnostics.push({
-          tool: 'biome', level: 'error',
-          message: `failed to parse biome output: ${(err as Error).message}`,
-        });
-        resolve(null);
-      }
+      const { value, diagnostic } = parseBiomeOutput(stdout);
+      if (diagnostic) { diagnostics.push(diagnostic); }
+      resolve(value);
     });
   });
 }

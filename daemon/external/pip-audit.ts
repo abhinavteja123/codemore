@@ -27,6 +27,7 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import type { ReportIssue } from '../../shared/report/types';
 import type { ExternalToolResult, ExternalToolDiagnostic } from './index';
+import { parseToolJson, isRecord, type ParseResult } from './parseShape';
 
 interface PipVuln {
   id?: string;
@@ -46,6 +47,21 @@ interface PipAuditOutput {
 }
 
 function ulidLike(): string { return crypto.randomBytes(8).toString('hex'); }
+
+/**
+ * Parse `pip-audit --format json` stdout. Empty output = clean. Malformed
+ * JSON or a payload missing the top-level `dependencies` array (old
+ * pip-audit emitted a flat vuln array) fails loud with an error diagnostic
+ * instead of silently reporting zero findings.
+ */
+export function parsePipAuditOutput(stdout: string): ParseResult<PipAuditOutput> {
+  if (stdout.trim().length === 0) { return { value: { dependencies: [] } }; }
+  return parseToolJson<PipAuditOutput>(
+    stdout, 'pip-audit',
+    (p) => isRecord(p) && Array.isArray((p as PipAuditOutput).dependencies),
+    'is missing the "dependencies" array',
+  );
+}
 
 async function runPipAuditJson(root: string, timeoutMs: number, diagnostics: ExternalToolDiagnostic[]):
     Promise<PipAuditOutput | null> {
@@ -106,16 +122,9 @@ async function runPipAuditJson(root: string, timeoutMs: number, diagnostics: Ext
         resolve(null);
         return;
       }
-      if (stdout.trim().length === 0) { resolve({ dependencies: [] }); return; }
-      try {
-        resolve(JSON.parse(stdout) as PipAuditOutput);
-      } catch (err) {
-        diagnostics.push({
-          tool: 'pip-audit', level: 'error',
-          message: `failed to parse pip-audit JSON: ${(err as Error).message}`,
-        });
-        resolve(null);
-      }
+      const { value, diagnostic } = parsePipAuditOutput(stdout);
+      if (diagnostic) { diagnostics.push(diagnostic); }
+      resolve(value);
     });
   });
 }
