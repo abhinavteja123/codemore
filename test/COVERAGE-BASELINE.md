@@ -1,15 +1,36 @@
-# Coverage Baseline — PRE-white-box-tests
+# Coverage Baseline — repo-wide (`all: true`)
 
-**Date:** 2026-07-02
+**Date:** 2026-07-07 (PLAN A5) · supersedes the 2026-07-02 `all:false` snapshot
 **Command:** `npm run test:coverage` (`c8 --reporter=text --reporter=text-summary npm run test:unit`)
-**Test run:** 43/43 passing (`npm run test:unit`)
-**Config:** `.c8rc.json` — includes `shared/**`, `daemon/**`, `web/src/lib/**`; excludes `test/**`, `corpus/**`, `out/**`, `dist/**`, `node_modules/**`, `web/.next/**`, `**/*.test.ts`, `**/*.d.ts`, `daemon/dist/**`
+**Test run:** 141/141 passing (`npm run test:unit`)
+**Config:** `.c8rc.json` — includes `shared/**`, `daemon/**`, `web/src/lib/**`; excludes `test/**`, `corpus/**`, `out/**`, `dist/**`, `node_modules/**`, `web/.next/**`, `**/*.test.ts`, `**/*.d.ts`, `daemon/dist/**`. **`"all": true`** as of A5 — every included source file counts, even those no test imports (they land as 0%), so these are honest *repo-wide* numbers, not coverage-of-exercised-files.
 
-This is the baseline captured before the walker/white-box test suite lands. Numbers below are expected to move (mostly up) once those tests are added. Do not use this file to gate CI — no coverage thresholds have been configured yet.
+Do not use this file to gate CI — no coverage thresholds are configured yet. The drop vs the old 54.92% is expected and correct: the `all:false → all:true` flip pulls never-imported files into the denominator.
 
-> **Caveat — `all: false`:** `.c8rc.json` sets `"all": false`, so c8 only counts files actually loaded during the test run. Source files never imported by any test are excluded from both numerator and denominator (not counted as 0%). These percentages therefore measure *coverage of exercised files*, not repo-wide coverage — true repo-wide numbers are lower. Flip to `"all": true` before using coverage to prioritize Phase 3+ test targets.
+## Overall (`all: true`, 2026-07-07)
 
-## Overall
+| Metric | Covered / Total | % |
+|---|---|---|
+| Statements | 14425 / 30982 | 46.55% |
+| Branches | 1311 / 2077 | 63.11% |
+| Functions | 356 / 719 | 49.51% |
+| Lines | 14425 / 30982 | 46.55% |
+
+### `daemon/external/` after A1 (2026-07-07)
+
+| Metric | % | Notes |
+|---|---|---|
+| Statements | 43.2% | Parser logic now tested; `parseShape.ts` = **100%** across the board. The remaining gap is the `runX` spawn orchestration (real-binary paths, not unit-tested). |
+| Branches | 92.3% | Up from the old 0/0 — the new `parseXOutput` guards give the adapters real, well-covered branch points. |
+| Functions | 18.86% | The exported `parseXOutput` fns are covered; the `runX`/`runXJson` spawn entrypoints still aren't (they invoke external processes — A3 territory). |
+
+---
+
+## 2026-07-02 snapshot (`all: false`, 43 tests) — kept for reference, now stale
+
+> The tables below were captured with `"all": false` and only 43 tests, before the white-box suites and A1 landed. They measure coverage-of-exercised-files, not repo-wide, so the percentages read higher than the honest numbers above. Retained only to show the earlier per-directory shape.
+
+## Overall (old `all: false`)
 
 | Metric | Covered / Total | % |
 |---|---|---|

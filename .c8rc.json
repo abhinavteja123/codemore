@@ -17,6 +17,6 @@
     "shared/protocol.js",
     "daemon/dist/**"
   ],
-  "all": false,
+  "all": true,
   "reporter": ["text", "text-summary"]
 }
