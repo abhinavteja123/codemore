@@ -231,7 +231,19 @@ function collectImports(sf: ts.SourceFile): string[] {
  */
 function collectImportedNames(sf: ts.SourceFile): string[] {
   const out: string[] = [];
+  const namespaceLocals = new Set<string>();
   for (const stmt of sf.statements) {
+    // Renamed re-exports: `export { X as Y } from './y'` consumes X from
+    // y without any ImportDeclaration — the consumer later imports Y, so
+    // X would otherwise look unused at its definition site.
+    if (ts.isExportDeclaration(stmt) && stmt.moduleSpecifier
+        && stmt.exportClause && ts.isNamedExports(stmt.exportClause)) {
+      for (const spec of stmt.exportClause.elements) {
+        out.push(spec.name.text);
+        if (spec.propertyName) out.push(spec.propertyName.text);
+      }
+      continue;
+    }
     if (!ts.isImportDeclaration(stmt)) continue;
     const clause = stmt.importClause;
     if (!clause) continue;
@@ -240,6 +252,7 @@ function collectImportedNames(sf: ts.SourceFile): string[] {
     if (bindings) {
       if (ts.isNamespaceImport(bindings)) {
         out.push(bindings.name.text);
+        namespaceLocals.add(bindings.name.text);
       } else {
         for (const spec of bindings.elements) {
           // `import { foo as bar }`: the local alias is `bar` (spec.name).
@@ -251,6 +264,28 @@ function collectImportedNames(sf: ts.SourceFile): string[] {
       }
     }
   }
+  // CommonJS + namespace-member consumption, both invisible to the
+  // statement loop above:
+  //   const { runScan, x: alias } = require('./y')  -> runScan, x
+  //   import * as ns from './y'; ns.parseOutput()   -> parseOutput
+  const visit = (n: ts.Node): void => {
+    if (ts.isVariableDeclaration(n) && n.initializer
+        && ts.isCallExpression(n.initializer)
+        && ts.isIdentifier(n.initializer.expression)
+        && n.initializer.expression.text === 'require'
+        && ts.isObjectBindingPattern(n.name)) {
+      for (const el of n.name.elements) {
+        if (ts.isIdentifier(el.name)) out.push(el.name.text);
+        if (el.propertyName && ts.isIdentifier(el.propertyName)) out.push(el.propertyName.text);
+      }
+    } else if (ts.isPropertyAccessExpression(n)
+        && ts.isIdentifier(n.expression)
+        && namespaceLocals.has(n.expression.text)) {
+      out.push(n.name.text);
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
   return out;
 }
 

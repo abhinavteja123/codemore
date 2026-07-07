@@ -256,6 +256,106 @@ describe('walker: ignore + secret-bypass logic (Part-7 regression)', () => {
     });
   });
 
+  describe('case 5: vendored AI-tooling dirs are skipped, but their secret-carrying configs are not', () => {
+    // Regression for the walker scope leak: scanning a repo containing
+    // AI-assistant tooling dirs (.agents/, .claude/, .cursor/, .github/skills/)
+    // produced 87 BLOCKER innerhtml findings from ONE vendored plugin script
+    // (live-browser.js) and its copies — third-party plugin code, not the
+    // user's product source. Fixed via UNIVERSAL_PATTERNS in
+    // daemon/cli/ignoreResolver.ts.
+    //
+    // Constraint 1: vibe-mcp-config-secret scans .cursor/mcp.json (and
+    // .claude/mcp.json / .cursor/settings.json), so .cursor/.claude ignore
+    // only their SUBDIRS ('.cursor/*/') — a plain '.cursor/' dir pattern
+    // would be pruned by walk() before the file-level secret bypass runs.
+    // Constraint 2: '.github/skills/' must not swallow .github/workflows/
+    // (vibe-cicd-secret-in-yaml scans workflow files).
+    it('does not scan vendored plugin scripts under AI-tooling dirs', () => {
+      const dir = fixture('walker-ai-tooling-');
+      writeFile(dir, '.agents/skills/impeccable/scripts/live-browser.js', 'el.innerHTML = userInput;\n');
+      writeFile(dir, '.claude/skills/impeccable/scripts/live-browser.js', 'el.innerHTML = userInput;\n');
+      writeFile(dir, '.github/skills/impeccable/scripts/live-browser.js', 'el.innerHTML = userInput;\n');
+      writeFile(dir, '.cursor/extensions/vendored.js', 'el.innerHTML = userInput;\n');
+      writeFile(dir, '.codex/plugin.js', 'el.innerHTML = userInput;\n');
+      writeFile(dir, '.windsurf/plugin.js', 'el.innerHTML = userInput;\n');
+      writeFile(dir, '.aider/plugin.js', 'el.innerHTML = userInput;\n');
+      writeFile(dir, 'src/index.ts', 'export const y = 2;\n');
+
+      const files = discoverFiles(dir);
+
+      assert.equal(files.some(f => f.startsWith('.agents/')), false,
+        '.agents/ is vendored AI-tool plugin code and must be skipped');
+      assert.equal(files.some(f => f.startsWith('.claude/')), false,
+        '.claude/ subdirs are vendored AI-tool plugin code and must be skipped');
+      assert.equal(files.some(f => f.startsWith('.github/skills/')), false,
+        '.github/skills/ is vendored AI-tool plugin code and must be skipped');
+      assert.equal(files.some(f => f.startsWith('.cursor/extensions/')), false,
+        '.cursor/ subdirs are vendored AI-tool plugin code and must be skipped');
+      assert.equal(files.some(f => f.startsWith('.codex/')), false, '.codex/ must be skipped');
+      assert.equal(files.some(f => f.startsWith('.windsurf/')), false, '.windsurf/ must be skipped');
+      assert.equal(files.some(f => f.startsWith('.aider/')), false, '.aider/ must be skipped');
+      assert.equal(files.includes('src/index.ts'), true, 'product source is still scanned');
+    });
+
+    it('still scans .cursor/mcp.json and .claude/mcp.json (vibe-mcp-config-secret targets)', () => {
+      const dir = fixture('walker-ai-tooling-mcp-');
+      writeFile(dir, '.cursor/mcp.json', JSON.stringify({
+        mcpServers: { db: { command: 'npx', env: { DATABASE_URL: 'postgres://admin:realpassword123@prod-db:5432/app' } } },
+      }, null, 2));
+      writeFile(dir, '.cursor/settings.json', '{}\n');
+      writeFile(dir, '.claude/mcp.json', '{}\n');
+      writeFile(dir, '.cursor/rules-cache/vendored.js', 'el.innerHTML = x;\n');
+
+      const files = discoverFiles(dir);
+
+      assert.equal(files.includes('.cursor/mcp.json'), true,
+        '.cursor/mcp.json carries MCP env secrets and must still be scanned');
+      assert.equal(files.includes('.cursor/settings.json'), true,
+        '.cursor/settings.json is a vibe-mcp-config-secret target and must still be scanned');
+      assert.equal(files.includes('.claude/mcp.json'), true,
+        '.claude/mcp.json is a vibe-mcp-config-secret target and must still be scanned');
+      assert.equal(files.some(f => f.startsWith('.cursor/rules-cache/')), false,
+        '.cursor/ subdirectories are still skipped');
+    });
+
+    it('scanProject: vibe-mcp-config-secret still fires on a real credential in .cursor/mcp.json', async function () {
+      this.timeout(20000);
+      registerAllPacks();
+
+      const dir = fixture('walker-ai-tooling-mcp-scan-');
+      writeFile(dir, '.cursor/mcp.json', JSON.stringify({
+        mcpServers: { db: { command: 'npx', env: { DATABASE_URL: 'postgres://admin:realpassword123@prod-db:5432/app' } } },
+      }, null, 2));
+      writeFile(dir, '.claude/skills/vendored/script.js', 'el.innerHTML = userInput;\n');
+
+      const report = await scanProject({ root: dir });
+
+      const mcpFinding = report.issues.some(
+        iss => iss.id === 'vibe-mcp-config-secret' && iss.evidence.file.replace(/\\/g, '/') === '.cursor/mcp.json',
+      );
+      assert.equal(mcpFinding, true,
+        'vibe-mcp-config-secret must still flag .cursor/mcp.json after the AI-tooling ignore fix');
+
+      const vendoredFinding = report.issues.some(
+        iss => iss.evidence.file.replace(/\\/g, '/').startsWith('.claude/skills/'),
+      );
+      assert.equal(vendoredFinding, false,
+        'vendored plugin scripts under .claude/skills/ must produce zero findings');
+    });
+
+    it('does not swallow .github/workflows/ (vibe-cicd-secret-in-yaml territory)', () => {
+      const dir = fixture('walker-ai-tooling-gh-');
+      writeFile(dir, '.github/workflows/ci.yml', 'name: ci\non: push\n');
+      writeFile(dir, '.github/skills/x/script.js', 'el.innerHTML = x;\n');
+
+      const files = discoverFiles(dir);
+
+      assert.equal(files.includes('.github/workflows/ci.yml'), true,
+        'the ignore pattern must be .github/skills/, never .github/ — workflows are scanned');
+      assert.equal(files.some(f => f.startsWith('.github/skills/')), false);
+    });
+  });
+
   describe('case 4b: package.json "workspaces" field is not given special treatment', () => {
     // A repo-wide grep (`grep -rn "workspaces" daemon/ shared/`) found no
     // code that reads package.json's `workspaces` field for walking

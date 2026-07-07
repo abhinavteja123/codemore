@@ -152,4 +152,22 @@ describe('ProjectIndex isolation (daemon/cli/projectIndex.ts)', () => {
       assert.equal(reportNoLib.issues.some(i => i.id === 'vibe-no-rate-limit'), true);
     });
   });
+
+  describe('allImportedNames: consumption forms the unused-export rule depends on', () => {
+    it('collects names consumed via renamed re-export, require destructuring, and namespace member access', () => {
+      const dir = fixture('project-index-imported-names-');
+      // Renamed re-export: X consumed from lib without any ImportDeclaration.
+      writeFile(dir, 'barrel.ts', "export { X as Y } from './lib';\n");
+      // CommonJS destructuring: runScan + orig (via alias) consumed.
+      writeFile(dir, 'consume.js', "const { runScan, orig: alias } = require('./lib');\nrunScan(alias);\n");
+      // Namespace member access: parseOutput consumed through ns.*.
+      writeFile(dir, 'ns.ts', "import * as ns from './lib';\nexport const v = ns.parseOutput('');\n");
+
+      const idx = buildProjectIndex(dir);
+
+      for (const name of ['X', 'Y', 'runScan', 'orig', 'parseOutput']) {
+        assert.equal(idx.allImportedNames.has(name), true, `${name} should be collected as imported`);
+      }
+    });
+  });
 });

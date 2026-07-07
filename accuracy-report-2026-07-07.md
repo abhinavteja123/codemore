@@ -41,3 +41,15 @@
 **Security recall is real and the headline works** (100% on planted vulns; real key caught in the wild). **Precision at volume is not publish-ready on TS codebases:** three FP classes (`unused-export`, array-arg `shell-injection`, constant `path-traversal`) plus vendored-dir leakage would greet a new TS-monorepo user with thousands of findings, most noise. Python-repo experience is already excellent (100% precision, NLP).
 
 **Pre-publish blockers (recommended):** fix/demote §3.1-3.4. §3.5-3.6 can ship as known-limitations notes.
+
+## 6. Fixes applied same day (re-measured)
+
+§3.1-3.4 fixed (walker vendored-dir skip with secret-bypass-preserving `.claude/*/`-style patterns; `allImportedNames` now collects renamed re-exports, `require()` destructuring, namespace-member use; shell-injection skips array-arg spawn/execFile without literal truthy `shell:`; path-traversal skips constant-only joins — root cause was `\.json\b` in the user-input-hint regex matching file *extensions* inside string literals). Corpus 58/58+58/58 held; 156 unit tests green.
+
+| Target | Before | After |
+|---|---|---|
+| codemore self | 2,148 findings / 98 BLOCKER / 851 unused-export | **318 / 8 / 110** (-85% total; all 8 BLOCKERs genuine) |
+| open-design | 8,615 / 101 BLOCKER / 25 shell-inj / 16 path-trav | 8,531 / 80 / **3** / 16 |
+| AImentor path-traversal | 3 (all FP) | **0** |
+
+Still open (documented, lower priority): open-design's 16 path-traversal are a *different* shape — test files joining local temp dirs (`path.join(pluginDir, 'x.json')`); its 1,735 remaining `unused-export` are monorepo public-package APIs — the rule needs package.json `exports` awareness (documented v1 gap) or per-package demotion.

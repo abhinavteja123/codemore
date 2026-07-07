@@ -16,6 +16,8 @@ Detects patterns like:
 - `open(f'/uploads/{filename}')` — f-string with user input
 - `res.sendFile(path.join(UPLOADS, req.params.f))` — no inside-base check
 
+Constant-only joins are **not** flagged: if every path component is a string literal or an `UPPER_CASE` module constant (e.g. `os.path.join(FIGURES_DIR, "fig2.json")`), there is no untrusted input and no traversal.
+
 ## Why it matters
 
 An attacker sends a filename like `../../etc/passwd` and the application concatenates it directly into `open()` or `readFile()`. The attacker can now read any file the process can access. The defence is two lines: resolve the candidate path to an absolute path, then refuse anything that doesn't sit inside your designated directory.

@@ -21,8 +21,13 @@
  * Coverage gap:
  *   - We cannot tell whether `exec(cmd)` uses a constant from another file.
  *     Phase-2 cross-file dataflow analysis closes this.
- *   - execFile with an args array but a variable command path is flagged,
- *     because a variable binary path is itself a risk vector.
+ *
+ * NOT flagged (v1.2.0): spawn / spawnSync / execFile / execFileSync called
+ * with a variable command + an args argument and WITHOUT a literal
+ * `shell: <truthy>` in the options. That form never invokes a shell — each
+ * args element is a separate argv entry — so shell injection is impossible.
+ * `spawn(cmd, args, { shell: true })` still fires, as does any command
+ * string built by template/concat passed to ANY of these functions.
  */
 
 /* codemore-ignore-file: core-security-shell-injection */
@@ -48,11 +53,20 @@ function lineForOffset(content: string, offset: number): number {
   return line;
 }
 
-/** Extract the first argument starting at `(`. Returns the raw text. */
-function firstArgAfterParen(content: string, openParenIdx: number): string | null {
+/**
+ * Extract the first argument starting at `(`, plus the [restStart, restEnd)
+ * span of the remaining arguments (empty span when the call has one arg).
+ * Offsets are valid in both original and sanitized content (the sanitizer
+ * is byte-offset-preserving).
+ */
+function splitCallArgs(
+  content: string,
+  openParenIdx: number,
+): { first: string; restStart: number; restEnd: number } | null {
   let depth = 0;
   let i = openParenIdx;
   let start = -1;
+  let firstEnd = -1;
   while (i < content.length) {
     const c = content[i];
     if (c === '(') {
@@ -60,9 +74,15 @@ function firstArgAfterParen(content: string, openParenIdx: number): string | nul
       depth++;
     } else if (c === ')') {
       depth--;
-      if (depth === 0) return content.slice(start, i);
-    } else if (c === ',' && depth === 1) {
-      return content.slice(start, i);
+      if (depth === 0) {
+        return {
+          first: content.slice(start, firstEnd === -1 ? i : firstEnd),
+          restStart: firstEnd === -1 ? i : firstEnd + 1,
+          restEnd: i,
+        };
+      }
+    } else if (c === ',' && depth === 1 && firstEnd === -1) {
+      firstEnd = i;
     } else if (c === '`' || c === '"' || c === "'") {
       // Skip the string literal contents to avoid early termination on a
       // comma / paren inside the string.
@@ -77,6 +97,16 @@ function firstArgAfterParen(content: string, openParenIdx: number): string | nul
   }
   return null;
 }
+
+// spawn/execFile family: an args array is passed straight to argv — no shell
+// parsing — unless the options object opts back in with `shell: true`.
+const NO_SHELL_BY_DEFAULT = new Set(['spawn', 'spawnSync', 'execFile', 'execFileSync']);
+
+// Literal `shell:` option with anything but an explicitly-falsy value.
+// `shell: someVar` counts as truthy — we can't prove the variable is false.
+// Whitespace lives INSIDE the lookahead: with `\s*(?!false)` the `\s*`
+// backtracks to zero and the lookahead passes on " false".
+const SHELL_TRUTHY_RE = /\bshell\s*:(?!\s*(?:false|0|null|undefined)\b)/;
 
 type FirstArgKind = 'pure-literal' | 'template-with-interp' | 'identifier' | 'string-concat' | 'other-dynamic';
 
@@ -107,7 +137,10 @@ export const coreSecurityShellInjection: Rule = {
   // Part 7 §11B Fix 5: now strips string literals (not just comments) before
   // matching, so the rule no longer self-detects in its own whyItMatters
   // strings + Python rule files' multi-line example strings.
-  version: '1.1.0',
+  // 1.2.0: stop flagging array-args spawn/execFile without a literal
+  // `shell: true` — that form never invokes a shell (confirmed FP class on a
+  // 1.35M-LOC scan).
+  version: '1.2.0',
   pack: 'core-security',
   lifecycle: 'beta',
   languages: ['typescript', 'javascript'],
@@ -135,10 +168,27 @@ export const coreSecurityShellInjection: Rule = {
       // Extract the argument from ORIGINAL content so pure string literals
       // are classifiable. We use `sanitized` only to FIND the call site
       // (so the rule doesn't fire on its own JSDoc / string-literal examples).
-      const arg = firstArgAfterParen(ctx.content, openParenIdx);
-      if (arg === null) continue;
+      const args = splitCallArgs(ctx.content, openParenIdx);
+      if (args === null) continue;
+      const arg = args.first;
       const kind = classifyFirstArg(arg);
       if (kind === 'pure-literal') continue;
+
+      // Safe form: spawn/execFile with a variable command + an args argument
+      // does NOT run a shell, so a variable can't inject shell commands —
+      // unless the call site literally opts in with `shell: true`. Command
+      // strings BUILT dynamically (template/concat) still fall through and
+      // fire, as do exec/execSync (always a shell) and single-arg calls like
+      // `spawn(target)`. Check the rest-of-args in SANITIZED content so a
+      // string literal containing "shell:" can't opt us back in.
+      if (
+        NO_SHELL_BY_DEFAULT.has(fnName) &&
+        (kind === 'identifier' || kind === 'other-dynamic') &&
+        args.restStart < args.restEnd &&
+        !SHELL_TRUTHY_RE.test(sanitized.slice(args.restStart, args.restEnd))
+      ) {
+        continue;
+      }
 
       const line = lineForOffset(ctx.content, m.index);
       findings.push({

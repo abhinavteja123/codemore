@@ -45,6 +45,25 @@ const USER_INPUT_HINT_RE = /\b(?:req|request)\b\.|\.(?:params|query|body|formDat
 // the finding because the developer is doing the right thing.
 const GUARD_RE = /(?:path\.resolve|os\.path\.abspath|os\.path\.realpath|secure_filename)[^\n]*?(?:startswith|relative|within)|werkzeug\.utils\.secure_filename/;
 
+// v1.3.0: constant-only joins are not traversal. `os.path.join(FIGURES_DIR,
+// "fig2_bkt_data.json")` tripped the `.json` user-input hint via the literal
+// filename, but when every component is a string literal or an UPPER_CASE
+// module constant there is no untrusted input to traverse with. Identifiers
+// that are pure path machinery (os.path.join, path.resolve, __dirname, the
+// f-string prefix) are trusted too; anything else (name, filename, req, a
+// function parameter) keeps the finding.
+const TRUSTED_IDENT_RE = /^(?:[A-Z][A-Z0-9_]*|os|path|join|resolve|dirname|Path|f|__file__|__dirname)$/;
+
+function isConstantOnlyArg(arg: string): boolean {
+  // Keep f-string / template-literal interpolations visible (they can carry
+  // untrusted vars), then blank string-literal bodies so literals like
+  // "fig2_bkt_data.json" contribute no identifiers.
+  const interps = arg.match(/\$?\{[^}]*\}/g)?.join(' ') ?? '';
+  const noStrings = arg.replace(/(["'`])(?:\\.|(?!\1).)*\1/g, ' ');
+  const idents = `${noStrings} ${interps}`.match(/[A-Za-z_$][A-Za-z0-9_$]*/g);
+  return idents === null || idents.every((id) => TRUSTED_IDENT_RE.test(id));
+}
+
 function lineForOffset(content: string, offset: number): number {
   let line = 1;
   for (let i = 0; i < offset && i < content.length; i++) {
@@ -67,7 +86,9 @@ export const coreSecurityPathTraversal: Rule = {
   // Part 7 §11B Fix 5: strip strings + comments before matching (eliminates
   // self-detection in this file's own JSDoc) AND tightened user-input hint
   // to drop bare `args` (eliminates CLI-arg confusion with HTTP `req.params`).
-  version: '1.2.0',
+  // v1.3.0: skip constant-only path expressions (all components string
+  // literals or UPPER_CASE constants) — see isConstantOnlyArg.
+  version: '1.3.0',
   pack: 'core-security',
   lifecycle: 'beta',
   languages: ['typescript', 'javascript', 'python'],
@@ -105,6 +126,7 @@ export const coreSecurityPathTraversal: Rule = {
         const argEnd = m.index + m[0].lastIndexOf(')');
         const arg = ctx.content.slice(argStart, argEnd);
         if (!USER_INPUT_HINT_RE.test(arg)) continue;
+        if (isConstantOnlyArg(arg)) continue;
         const line = lineForOffset(ctx.content, m.index);
         if (hasNearbyGuard(ctx.lines, line)) continue;
         findings.push({

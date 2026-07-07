@@ -53,6 +53,28 @@ const UNIVERSAL_PATTERNS: ReadonlyArray<string> = [
   '.eggs/',
   '*.egg-info/',
   'site-packages/',
+  // ── AI-assistant tooling dirs — vendored plugin/skill code ───────
+  // (Scanning codemore's own repo produced 87 BLOCKER innerhtml findings,
+  // ALL inside vendored plugin scripts under .agents/.claude/.github/skills
+  // — third-party AI-tool plugin code, not the user's product source. The
+  // walker must skip vendored AI-tooling dirs.)
+  //
+  // .cursor/ and .claude/ ignore only SUBDIRECTORIES ('.cursor/*/'), not
+  // the dir itself: their top-level configs (.cursor/mcp.json,
+  // .cursor/settings.json, .claude/mcp.json) are scanned by
+  // vibe-mcp-config-secret and must keep flowing to the walker. A plain
+  // '.cursor/' dir pattern would be pruned by walk() BEFORE the
+  // secret-shaped file bypass below could ever see the files inside.
+  // Vendored plugin code always lives in subdirs (.claude/skills/…).
+  '.claude/*/',
+  '.cursor/*/',
+  '.agents/',
+  '.codex/',
+  '.windsurf/',
+  '.aider/',
+  // Specific on purpose — '.github/' would break vibe-cicd-secret-in-yaml,
+  // which scans .github/workflows/.
+  '.github/skills/',
   // ── CodeMore-internal — corpus + samples + audit outputs ─────────
   'corpus/',
   '.samples-cache/',
