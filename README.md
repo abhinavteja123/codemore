@@ -1,6 +1,6 @@
 <div align="center">
 
-<img width="1254" height="1254" alt="image" src="https://github.com/user-attachments/assets/d0e5d020-38ce-44f7-9426-f7fb1b931130" />
+<img width="125" height="125" alt="image" src="https://github.com/user-attachments/assets/d0e5d020-38ce-44f7-9426-f7fb1b931130" />
 
 
 # CodeMore
