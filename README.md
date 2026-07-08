@@ -1,6 +1,7 @@
 <div align="center">
 
-<img src="resources/icon.png" alt="CodeMore" width="110" />
+<img width="1254" height="1254" alt="image" src="https://github.com/user-attachments/assets/d0e5d020-38ce-44f7-9426-f7fb1b931130" />
+
 
 # CodeMore
 
