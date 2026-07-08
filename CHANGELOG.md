@@ -2,6 +2,28 @@
 
 All notable changes to CodeMore. Semantic Versioning.
 
+## [0.2.6] — 2026-07-08 — open-source hygiene + case-insensitive rc severities
+
+### Added
+
+- `.github/ISSUE_TEMPLATE/` (bug report, rule false-positive, rule proposal) and a PR template. FP reports feed the beta→stable promotion pipeline.
+- `web/.env.example` now documents every env var the web app actually reads (`GEMINI_API_KEY`, `CODEMORE_AI_PROVIDER`, `CODEMORE_AI_API_KEY`, `NEXT_PUBLIC_SITE_URL`, `LOG_LEVEL`).
+
+### Fixed
+
+- **`.codemorerc.json` severities are now case-insensitive** (`"minor"` == `"MINOR"`); previously lowercase values were silently dropped with a warning.
+- Broken `.gitignore` glob `*/vsix` → `*.vsix`; untracked stray build artifacts (`report.json`, `codemore-0.2.2.vsix`) from git.
+- Stale `codemore.dev` link in the GitHub Action PR comment footer → `codemore.tech`.
+- README: live npm version badge (replaces hardcoded stale badge), versionless VSIX install instructions, Action pinned to `@v1`.
+
+## [0.2.3 – 0.2.5] — 2026-07-08 — first npm publishes + CLI/MCP UX overhaul
+
+- `codemore` published to npm (first public release chain; `npx codemore` works).
+- New `codemore mcp` command: prints per-client MCP config (Cursor, Claude Desktop, Claude Code, Codex); `codemore mcp install --client …` does a merge-safe config write with `.bak` backup and `--dry-run`.
+- Interactive arrow-key menu on bare `codemore` in a real terminal (TTY-gated both ways — never blocks piped/CI/agent invocations). New dep: `prompts`.
+- Colorized, file-grouped scan output (`NO_COLOR`-aware); zero-args quickstart; domain/org rebrand `codemore.dev` → `codemore.tech`, `codemore-dev` → `abhinavteja123/codemore` across 74 files.
+- Fixed npm `bin` entry dropped on publish (leading `./`), broken `repository.url`/`homepage`, VSIX packaging shipping 18 MB of dev artifacts (874 → 24 files).
+
 ## [0.2.2] — 2026-07-07 — pre-publish hardening: adapter drift guards, precision fixes, tester-pass defects
 
 ### Added

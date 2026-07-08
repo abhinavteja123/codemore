@@ -1,0 +1,40 @@
+name: Rule proposal
+description: Propose a new detector. Project rule — every rule must map to a measured real-world incident, not a style opinion. Read CONTRIBUTING-RULES.md before filing.
+labels: [rule-proposal]
+body:
+  - type: input
+    id: rule-id
+    attributes:
+      label: Proposed rule id
+      description: Kebab-case, namespaced by pack, e.g. `vibe-frontend-<short-description>`.
+    validations:
+      required: true
+  - type: textarea
+    id: pattern
+    attributes:
+      label: What it detects
+      description: The code shape that should trigger, and a snippet that should NOT trigger (this becomes the TP/FP fixture pair).
+    validations:
+      required: true
+  - type: textarea
+    id: incident
+    attributes:
+      label: Real-world incident / citation
+      description: The measured incident this maps to — a CVE, a breach writeup, an audit stat, a post-mortem. "It seems bad" doesn't clear the bar; every rule in the catalog cites something real.
+    validations:
+      required: true
+  - type: textarea
+    id: fix-shape
+    attributes:
+      label: Agent-actionable fix
+      description: What should `suggestedFix.instructions` say, and how does an agent verify the fix worked (the `verificationCriteria`)?
+    validations:
+      required: true
+  - type: checkboxes
+    id: contributing
+    attributes:
+      label: Contribution
+      options:
+        - label: I've read [CONTRIBUTING-RULES.md](https://github.com/abhinavteja123/codemore/blob/main/CONTRIBUTING-RULES.md)
+          required: true
+        - label: I intend to implement this rule myself (module + TP/FP fixtures + docs page)

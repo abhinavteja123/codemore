@@ -7,7 +7,7 @@
 **The static analyzer your AI agent reads.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-4ef2ca.svg?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.3-836ef3.svg?style=flat-square)](CHANGELOG.md)
+[![npm](https://img.shields.io/npm/v/codemore)](https://www.npmjs.com/package/codemore)
 [![Catalog](https://img.shields.io/badge/rules-58-success.svg?style=flat-square)](docs/rules)
 [![Adapters](https://img.shields.io/badge/external%20adapters-8-blueviolet.svg?style=flat-square)](docs/external-tools.md)
 [![Audit](https://img.shields.io/badge/audit-2026--07--07-pink.svg?style=flat-square)](accuracy-report-2026-07-07.md)
@@ -110,8 +110,11 @@ Six tools exposed: `scan_project`, `scan_file`, `explain_issue`, `suggest_fix`, 
 ### VS Code extension
 
 ```bash
-code --install-extension codemore-0.2.3.vsix
+npm run vsce:package                             # builds codemore-<version>.vsix
+code --install-extension codemore-<version>.vsix
 ```
+
+Marketplace listing coming — until then, install from the packaged `.vsix`.
 
 Inline diagnostics. Code-action quick-fix calls the agentic loop (planner → generator → validator → retry, max 3 attempts).
 
@@ -130,7 +133,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: abhinavteja123/codemore@main
+      - uses: abhinavteja123/codemore@v1
         with:
           fail-on: BLOCKER
 ```

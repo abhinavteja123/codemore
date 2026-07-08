@@ -1,0 +1,33 @@
+name: Rule false positive
+description: A rule fired on code that is actually fine. FP reports directly drive rule lifecycle — beta rules need a low measured FP rate to be promoted to stable, and stable rules with rising FP rates get demoted.
+labels: [false-positive]
+body:
+  - type: input
+    id: rule-id
+    attributes:
+      label: Rule id
+      description: The `id` field on the finding, e.g. `vibe-supabase-rls-disabled`.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: CodeMore version
+      description: "`npx codemore --version`"
+    validations:
+      required: true
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Code that falsely fires
+      description: The smallest snippet (plus filename/path if it matters — some rules are path-sensitive) that triggers the finding.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: why-wrong
+    attributes:
+      label: Why this is a false positive
+      description: Why is this code actually safe/correct? A good answer here often becomes the FP fixture under `corpus/rules/<rule-id>/fp/`.
+    validations:
+      required: true

@@ -1,0 +1,48 @@
+name: Bug report
+description: Something broke — a crash, wrong output, a surface behaving differently from the others.
+labels: [bug]
+body:
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      description: Where did it break?
+      options:
+        - CLI
+        - MCP server
+        - VS Code extension
+        - GitHub Action
+        - Web (codemore.tech)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: CodeMore version
+      description: "`npx codemore --version`"
+      placeholder: "0.2.6"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Smallest possible repro — the exact command, the file(s) scanned, OS. If it's rule-specific, include the code snippet.
+      placeholder: |
+        1. `npx codemore scan . --fail-on BLOCKER`
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include the error output or the relevant slice of `codemore-report.json`.
+    validations:
+      required: true
