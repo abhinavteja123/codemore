@@ -49,7 +49,8 @@ function printUsage(): void {
     `  Requires ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.\n\n` +
     `Flags (scan):\n` +
     `  --json                       Emit the full report as JSON on stdout.\n` +
-    `  --out <file>                 Also write the JSON report to <file>.\n` +
+    `  --format <json|sarif>        Machine-output format for --json/--out. SARIF uploads to GitHub code scanning.\n` +
+    `  --out <file>                 Also write the report to <file> (in --format).\n` +
     `  --fail-on <severity>         Exit non-zero if any issue >= severity (BLOCKER, CRITICAL, MAJOR, MINOR, INFO).\n` +
     `  --baseline <file>            Compare against a baseline; only NEW issues count toward --fail-on.\n` +
     `  --packs <a,b,...>            Run only these packs (default: all).\n` +

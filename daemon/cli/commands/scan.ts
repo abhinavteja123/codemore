@@ -16,6 +16,7 @@ import { scanProject, reportExceeds } from '../projectScanner';
 import { sendTelemetry } from '../telemetry';
 import type { CodeMoreReport, Severity } from '../../../shared/report/types';
 import { applyBaseline, isBaselineFile, isCountedForFailOn } from '../baselineDiff';
+import { toSarif } from '../../../shared/report/sarif';
 import { color, severityColor, scoreColor } from '../colors';
 
 export type ExternalToolId =
@@ -29,6 +30,8 @@ const VALID_EXTERNAL_TOOLS: ReadonlyArray<ExternalToolId> = [
 export interface ScanArgs {
   path: string;
   json: boolean;
+  /** Machine output format for --json / --out. Default 'json'. */
+  format: 'json' | 'sarif';
   out?: string;
   failOn?: Severity;
   packs?: string[];
@@ -57,6 +60,7 @@ function isSeverity(value: string): value is Severity {
 export function parseScanArgs(argv: string[]): ScanArgs {
   let positional: string | undefined;
   let json = false;
+  let format: 'json' | 'sarif' = 'json';
   let out: string | undefined;
   let failOn: Severity | undefined;
   let packs: string[] | undefined;
@@ -74,6 +78,13 @@ export function parseScanArgs(argv: string[]): ScanArgs {
       case '--json':
         json = true;
         break;
+      case '--format': {
+        const v = (argv[++i] ?? '').toLowerCase();
+        if (v !== 'json' && v !== 'sarif') throw new Error(`--format expects "json" or "sarif"; got "${v}"`);
+        format = v;
+        if (v === 'sarif') json = true; // SARIF is machine output; implies non-human stdout
+        break;
+      }
       case '--out':
         out = argv[++i];
         break;
@@ -142,6 +153,7 @@ export function parseScanArgs(argv: string[]): ScanArgs {
   return {
     path: positional,
     json,
+    format,
     out,
     failOn,
     packs,
@@ -270,15 +282,18 @@ export async function runScan(args: ScanArgs): Promise<number> {
     );
   }
 
+  const machineOutput = () =>
+    JSON.stringify(args.format === 'sarif' ? toSarif(report) : report, null, 2);
+
   if (args.json) {
-    process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+    process.stdout.write(machineOutput() + '\n');
   } else {
     printHumanSummary(report);
   }
 
   if (args.out) {
-    fs.writeFileSync(args.out, JSON.stringify(report, null, 2));
-    process.stderr.write(`Report written to ${args.out}\n`);
+    fs.writeFileSync(args.out, machineOutput());
+    process.stderr.write(`${args.format === 'sarif' ? 'SARIF report' : 'Report'} written to ${args.out}\n`);
   }
 
   if (args.failOn) {
