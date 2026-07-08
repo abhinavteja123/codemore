@@ -17,6 +17,7 @@ import { runMcp } from './commands/mcp';
 import { runBaseline } from './commands/baseline';
 import { toolVersion } from '../../shared/toolVersion';
 import { color } from './colors';
+import { runInteractiveMenu, isInteractiveTty } from './interactiveMenu';
 
 const VERSION = toolVersion();
 
@@ -60,8 +61,16 @@ function printUsage(): void {
 async function main(argv: string[]): Promise<number> {
   const args = argv.slice(2);
   if (args.length === 0) {
-    printQuickstart();
-    return 0;
+    if (!isInteractiveTty()) {
+      printQuickstart();
+      return 0;
+    }
+    const result = await runInteractiveMenu();
+    if (result === -1) {
+      printUsage();
+      return 0;
+    }
+    return result;
   }
   if (args[0] === '--help' || args[0] === '-h') {
     printUsage();

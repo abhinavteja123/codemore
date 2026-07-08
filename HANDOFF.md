@@ -54,6 +54,69 @@ Task this session: make the hero WebGL portal (the vortex globe) *dive* smoothly
 
 ---
 
+## 0.7 Update — 2026-07-08 (VSIX rebuild, npm publish live, CLI/MCP UX overhaul, domain rebrand)
+
+Long session, four distinct chunks. Read in order if picking this up cold.
+
+### A. VSIX rebuild + packaging bug fix
+
+Rebuilt the extension (`npm run package`) and ran `vsce package`. Two real bugs found and fixed, not just a rebuild:
+
+1. **`vsce` 2.32+ hard-errors** when both `package.json`'s `files` array and `.vscodeignore` exist — this repo needs both (`files` is the npm CLI-publish allowlist, `.vscodeignore` is the VSIX denylist; they ship different things, e.g. `bin/**` must be in the npm tarball but NOT the VSIX). Fix: `scripts/vsce-package.js` — strips `files` from `package.json` only for the duration of the `vsce` call, restores it after (success or fail). `vsce:package`/`vsce:publish` npm scripts now route through it.
+2. **`.vscodeignore` predated several new artifact dirs** and was shipping them into the VSIX: `coverage/` (18.58 MB), `graphify-out/` (668 files), `.agents/` (111 files), and **`triage-results/`** — the dir this same file's earlier section says was scrubbed from git history for containing a real-shaped Stripe key. `.vscodeignore` didn't know about any of it because vsce ignores `.gitignore` once `.vscodeignore` exists. Fixed by syncing the ignore list. Result: VSIX went from 874 files / 6.62 MB → 24 files / 2.79 MB (matches the last known-good build size).
+
+VSIX is packaged locally (`codemore-0.2.4.vsix` after the version bumps below) but **not yet published to the VS Code Marketplace** (Track B2, still pending — needs an Azure DevOps PAT + `vsce login codemore`, which nobody has run yet this session).
+
+### B. npm publish — went live, three real bugs found along the way
+
+`codemore` published to npm for the first time this session (was previously unpublished, per §0.5). Confirmed live: `npm view codemore version`, and a real `npx --yes codemore --version` from a clean scratch dir returned the right version.
+
+Three bugs surfaced and fixed, all in `package.json`:
+
+1. **`bin: {"codemore": "./cli.js"}` was silently dropped on publish.** npm 11.13's bin normalizer treats a leading `./` as an invalid-path signal on Windows and deletes the entry rather than erroring loudly — `npm publish --dry-run` showed `bin[codemore] script name cli.js was invalid and removed` only on the real publish path, not on `npm pack --dry-run`. Fix (via `npm pkg fix`, then verified): `"codemore": "cli.js"` — no leading `./`, npm's own documented convention. Confirmed fixed on the registry after publish (`npm view codemore bin` → `{ codemore: 'cli.js' }`).
+2. **`--provenance` fails locally** (`Automatic provenance generation not supported for provider: null`) — that flag needs Sigstore/OIDC from a supported CI provider (GitHub Actions with `id-token: write`, which `.github/workflows/release.yml` already has wired). It cannot run from an interactive terminal. Manual publishes should drop the flag; the tag-push CI path gets provenance for free.
+3. **`repository.url` was a placeholder that 404s** — `github.com/codemore/codemore-vscode`, confirmed dead via `gh api` (404). Real repo is `github.com/abhinavteja123/codemore` (confirmed live, and its GitHub homepage field is already set to `codemore.tech`). No `homepage` field existed, so npm derived the broken "Homepage" link on the npm package page as `repository.url + "#readme"` — same root cause, both links wrong together. Fixed: added explicit `homepage: "https://codemore.tech"`, `bugs.url`, and corrected `repository.url`.
+
+**Version timeline this session:** 0.2.2 published (bugs 1–3 above fixed along the way) → user separately bumped/published **0.2.3** in their own terminal mid-session (outside this conversation's direct actions, discovered via `npm view codemore version` returning 0.2.3 unexpectedly) → this session bumped to **0.2.4** (`npm version patch`, tag `v0.2.4`, commit `7b0abf6`) to ship the CLI/MCP UX work in section C below.
+
+**0.2.4 publish is BLOCKED, not done.** `npm publish --access public` failed with 401/404 from this session's Bash shell — the earlier browser-OTP `npm login` was completed in the user's own PowerShell terminal, which has a different `$HOME`/`.npmrc` than the Git Bash shell tools run in. `npm whoami` confirms 401 (not authenticated) in this shell. Asked the user twice (via AskUserQuestion) whether to log in here or publish themselves — no response both times (AFK). **Next step: either run `npm login` in a shell Claude's Bash tool can reach, or run `npm publish --access public` manually** (proven to work from the user's PowerShell — that's how 0.2.2/0.2.3 got out). `package.json` is already at 0.2.4, tagged, committed — publish is the only remaining step.
+
+### C. CLI/MCP UX overhaul + domain/repo rebrand
+
+User asked to make the CLI/MCP/npm package more user-friendly, add CLI "UI" and a "proper" MCP command, and update README/docs/website. Used `/plan` (ecc:plan skill); asked 4 clarifying questions (canonical domain, CLI scope, MCP command shape, auto-publish-after); **user was AFK for the full 60s window both times this session** (this and the 0.2.4 publish question) — proceeded on the recommended defaults both times, flagged exactly what was picked so it's redirectable.
+
+**Grounding turned up a much bigger bug than expected**: `codemore.dev` (a domain that was never deployed to) was hardcoded into all 58 rule pack citation URLs (`shared/packs/**/*.ts`), the JSON schema example, docs, README, and the website — not just 3 files as first estimated. Also found two real dead references while grepping: README described a `uses: codemore-dev/codemore-action@v1` GitHub Action that never existed (checked: no such org, no version tag) — the *real* fix is `abhinavteja123/codemore@main`, since `action.yml` genuinely lives at that repo's root (confirmed via `gh api` + reading the file), it just never had a `v1` tag cut. And README's "Web Scanner (hosted)" claim — initially assumed vaporware, corrected after finding `web/src/app/dashboard/page.tsx` (734 lines) and `/api/analyze`, `/api/github`, `/project/[id]` routes actually exist and are substantial — real feature, just undeployed (same B3 blocker as the docs site), not fictional.
+
+**What shipped** (all committed by the user mid-session as `6000096 "fixes"`, then version-bumped as described above):
+
+- **Domain/org rebrand, 74 files**: `codemore.dev` → `codemore.tech` (the real, live domain — GitHub repo homepage already agreed with this), `codemore-dev/codemore` → `abhinavteja123/codemore` everywhere (clone URLs, raw.githubusercontent links, footer links). Scripted (`node` one-off, not 74 manual edits) since it was a pure mechanical substitution; verified via `git diff --stat` + `tsc --noEmit` + full test suite after.
+- **Version badges synced** across README/website to whatever was actually live at edit time (caught the 0.2.3 bump mid-edit and corrected a first pass that had written 0.2.2).
+- **New `daemon/cli/colors.ts`**: TTY + `NO_COLOR`-aware ANSI helper, zero new dependency (hand-rolled — codebase had no color lib and the need was ~15 lines).
+- **`scan.ts` output**: colorized severity/score, issues now grouped by file (was a flat top-25 list sorted only by severity).
+- **`index.ts`**: zero-args now shows a short quickstart instead of the full flag dump (`--help` still shows full reference); errors colorized red.
+- **New `daemon/cli/commands/mcp.ts`** — the "proper MCP command": `codemore mcp` prints a copy-paste config snippet plus every known client's real config path (Cursor, Claude Desktop, Claude Code, Codex). `codemore mcp install --client cursor|claude-desktop` does a real read-merge-write: reads existing config if present, merges in a `codemore` entry under `mcpServers` (does not clobber other entries), backs up the original to `.bak` before writing, supports `--dry-run`. Claude Code / Codex intentionally do NOT get auto-file-write — their config schema/location wasn't something I had a confident source for, so they get the documented `claude mcp add …` / `codex mcp add …` command printed instead of a guessed file write. **Verified live, not just typechecked**: dry-run against the user's actual `~/.cursor/mcp.json` (which has a real pre-existing "Figma" MCP entry) correctly showed it would merge and preserve that entry.
+- **`serve-mcp` unchanged** — `codemore mcp` is a config-writer only, never speaks the MCP protocol itself; the actual stdio server is still `codemore serve-mcp` underneath.
+- **README**: Install section now features `codemore mcp` / `codemore mcp install` as the primary path.
+
+**Update, same session, right after this**: user came back and explicitly asked for the deferred option — the real interactive menu. Built it:
+
+- **New dependency: `prompts` (^2.4.2, runtime) + `@types/prompts` (dev).** Checked `npm audit` before/after — all 12 existing vulnerabilities trace to pre-existing deps (`@typescript-eslint/*`, `@vscode/vsce`, `mocha`, `uuid`, `minimatch`); `prompts` itself introduced zero new findings. Chose `prompts` over `ink` (no React reconciler in the terminal, smaller, simpler, lower cross-platform risk — this matters since the user is on Windows).
+- **New `daemon/cli/interactiveMenu.ts`**: `codemore` with no args, run from a real terminal, now shows an arrow-key menu (Scan / Set up MCP / Manage baseline / full --help / Exit) instead of the static quickstart text. It does NOT reimplement any command — every menu choice builds an argv array and calls straight into the existing `runScan`/`parseScanArgs`, `runMcp`, `runBaseline` functions, so there's exactly one implementation of each command's behavior, menu and flags both.
+- **The critical invariant, gated correctly**: `isInteractiveTty()` requires **both** `process.stdin.isTTY` and `process.stdout.isTTY`. `prompts` reads raw keystrokes from stdin — stdout can be a TTY while stdin isn't (piped input, CI, an agent spawning the process), and gating on stdout alone would hang there. Any non-interactive context still gets the old static `printQuickstart()`. This is load-bearing: "the analyzer your AI agent reads" must never block on input when invoked programmatically.
+- **Verified, not assumed**: ran `node`/`ts-node` on the actual CLI with stdin explicitly redirected from `/dev/null` in this session's own (non-TTY) Bash shell — printed the static quickstart and exited 0 immediately, no hang. This is the single most important check for this feature and it passed. `tsc --noEmit` clean, all 160 unit tests still pass.
+- **Honest gap**: the interactive picker's actual rendering (colors, arrow-key nav, the real prompts UI) was **not** eyeballed live this session — this Bash tool is itself non-TTY, so there's no way to drive or see the interactive path from here. Next person with a real terminal should just run `codemore` (or `node cli.js` / `npx ts-node daemon/cli/index.ts`) with no args and confirm the menu looks and feels right, and that Ctrl-C/ESC cancels cleanly (handled via `onCancel` in `interactiveMenu.ts`, not yet manually confirmed).
+- **Not shipped yet** — same as everything else in this update, this needs the 0.2.4 (or a new 0.2.5) npm publish to reach real users; see the blocked-publish note above.
+
+**Verified before calling this done**: `npx tsc -p tsconfig.publish.json --noEmit` clean, `npm run test:unit` → 160/160 passing, `cd web && npm run build` → 27.6 kB / 137 kB First Load JS on `/` (matches the documented Part-8 baseline, confirming content edits didn't bloat the bundle), and both new CLI commands run for real via `ts-node` against live source (not just the stale compiled `lib/`) — actual terminal output captured and checked, including the real `~/.cursor/mcp.json` merge dry-run above.
+
+**Confirmed isolated from the VS Code extension**: grepped `daemon/index.ts` and `src/extension.ts` for any import of `daemon/cli/*` — zero matches. The extension's daemon RPC entry point is a fully separate tree from the CLI entry point, so none of section C's changes require a VSIX rebuild. (Section A's VSIX rebuild was a separate, prior task in this same session.)
+
+**Loose end**: a stray `report.json` (10,330-line scan output artifact, was untracked/gitignored-in-spirit) got swept into the user's `6000096 "fixes"` commit — probably a broad `git add`. Not touched or cleaned up this session; flagging so nobody mistakes it for intentional.
+
+**Next up, in order**: (1) unblock and complete the 0.2.4 npm publish (section B), (2) VSIX Marketplace publish — B2, still nobody's run `vsce login` (3) docs site deploy — B3, `web/` builds clean but has never been deployed, (4) decide whether the real interactive TUI is wanted.
+
+---
+
 ## 1. Why this exists — the actual problem
 
 AI coding agents (Cursor, Claude Code, Copilot, Codex) ship code fast and ship *bugs* fast. The data driving this project:

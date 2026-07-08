@@ -196,7 +196,8 @@
       "PowerShell($lock = Get-Content package-lock.json -Raw | ConvertFrom-Json; $p = $lock.packages.'node_modules/@biomejs/cli-darwin-arm64'; if \\($p\\) { \"present. optional=$\\($p.optional\\) os=$\\($p.os\\) cpu=$\\($p.cpu\\)\" } else { \"absent from lockfile\" }; \"lockfile version field: $\\($lock.version\\)\")",
       "PowerShell(node -e \"const l=require\\('./package-lock.json'\\); const p=l.packages['node_modules/@biomejs/cli-darwin-arm64']; console.log\\('version:',l.version\\); console.log\\(p?JSON.stringify\\({optional:p.optional,os:p.os,cpu:p.cpu}\\):'absent'\\); const d=l.packages['']; console.log\\('direct deps mention darwin:', JSON.stringify\\(Object.keys\\({...d.dependencies,...d.devDependencies}\\).filter\\(k=>k.includes\\('darwin'\\)\\)\\)\\)\")",
       "PowerShell(npm run *)",
-      "mcp__plugin_ecc_chrome-devtools__new_page"
+      "mcp__plugin_ecc_chrome-devtools__new_page",
+      "Bash(npm version *)"
     ]
   },
   "enabledPlugins": {
