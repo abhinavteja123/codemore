@@ -8,7 +8,9 @@
 
 ## What it catches
 
-The same string literal repeated **≥ 3 times** in the same file. Pivot-debris signal: the AI generated similar code in three places, the developer restructured one or two, and now the remaining copies drift independently.
+The same string literal repeated **≥ 5 times** in the same file. Pivot-debris signal: the AI generated similar code in several places, the developer restructured some, and now the remaining copies drift independently.
+
+> Recalibrated after the Part 7 accuracy audit (was ≥ 3 occurrences / ≥ 4 chars): threshold raised to 5, minimum length to 8, and test/spec files are skipped entirely — the old settings made this rule one of the two worst false-positive sources on real TypeScript.
 
 ## Why this matters for vibe-coded apps
 
@@ -18,17 +20,19 @@ The next AI fix will see N copies of the same string and assume they represent t
 
 ```ts
 function emit(kind: string): string {
-  if (kind === 'a') return 'pending-rls-review';   // ← 1st
-  if (kind === 'b') return 'pending-rls-review';   // ← 2nd
-  if (kind === 'c') return 'pending-rls-review';   // ← 3rd → flag
+  if (kind === 'pending-rls-review') return 'pending-rls-review';  // ← 1st, 2nd
+  if (kind === 'b') return 'pending-rls-review';   // ← 3rd
+  if (kind === 'c') return 'pending-rls-review';   // ← 4th
+  if (kind === 'd') return 'pending-rls-review';   // ← 5th → flag
   return 'idle';
 }
 ```
 
 ## Example — not flagged
 
-- String appears **only 1 or 2 times** in the file (the rule's threshold is `>= 3`).
-- String is **shorter than 4 characters** after trim (`'x'`, `'/'`, `''`).
+- String appears **fewer than 5 times** in the file.
+- String is **shorter than 8 characters** after trim (`'utf8'`, `'error'`, `'/'`).
+- File is a **test/spec file** (`*.test.*`, `*.spec.*`, `__tests__/`, `tests/`, `fixtures/`) — repeated literals in tests are deliberate fixtures, not drift.
 - String is **whitespace / punctuation only**.
 - String is on the **common-noise list**: `'default'`, `'true'`, `'false'`, `'null'`, `'undefined'`, HTTP verbs (`'GET'`, `'POST'`, …), `'utf-8'`.
 - String is an **import path** — `import 'x'`, `require('x')`, `import('x')`, `export from 'x'`.

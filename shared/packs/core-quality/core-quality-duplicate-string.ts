@@ -1,11 +1,17 @@
 /**
  * Rule: core-quality-duplicate-string
  *
- * Detects the same magic-string literal repeated >= 3 times in the
+ * Detects the same magic-string literal repeated >= 5 times in the
  * same file. Pure pivot-debris signal in vibe-coded apps: the AI
- * generated similar code in three places, the developer (or the AI)
- * later restructured one or two of them, and the third copy quietly
+ * generated similar code in several places, the developer (or the AI)
+ * later restructured some of them, and the remaining copies quietly
  * drifted out of sync.
+ *
+ * Recalibrated after the Part 7 accuracy audit (was >= 3 occurrences,
+ * >= 4 chars, all files): threshold raised to 5, minimum trimmed length
+ * raised to 8 (short strings like 'utf8'/'none'/'error' are idiomatic
+ * repeats), and test/spec files are skipped entirely (repeated literals
+ * in tests are deliberate fixtures, not drift).
  *
  * Severity: MINOR. Not a security risk on its own — the cost is that
  * the AI will see N copies of the same string and assume they're the
@@ -14,10 +20,11 @@
  *
  * Detection (AST):
  *   - Walk every StringLiteral / NoSubstitutionTemplateLiteral.
- *   - Tally by exact text. After the walk, any text whose tally >= 3
+ *   - Tally by exact text. After the walk, any text whose tally >= 5
  *     emits a single finding pointing at the FIRST occurrence.
  *   - Skip:
- *       short strings (< 4 chars trim length)
+ *       test/spec files (*.test.*, *.spec.*, __tests__/, tests/)
+ *       short strings (< 8 chars trim length)
  *       whitespace / punctuation-only strings
  *       common framework tokens we know are noise: '', ' ', '/', '.',
  *         'default', 'true', 'false', 'GET', 'POST', etc.
@@ -37,8 +44,18 @@
 import * as ts from 'typescript';
 import type { Rule, RuleContext, RuleFinding } from '../../rules/Rule';
 
-const MIN_LENGTH = 4;
-const MIN_OCCURRENCES = 3;
+const MIN_LENGTH = 8;
+const MIN_OCCURRENCES = 5;
+
+// Same convention as core-quality-leftover-print / core-typescript-as-any.
+// Repeated literals in tests are deliberate fixtures, not pivot debris.
+const TEST_PATH_RE = /(?:^|\/)(?:__tests__|tests?|spec|fixtures?|examples?|mocks?)\//i;
+const TEST_FILE_RE = /\.(?:test|spec)\.[jt]sx?$/i;
+
+function isTestFile(filePath: string): boolean {
+  const norm = filePath.replace(/\\/g, '/');
+  return TEST_PATH_RE.test(norm) || TEST_FILE_RE.test(norm);
+}
 
 const COMMON_NOISE = new Set([
   '', ' ', '/', '.', '..', ',', ':', ';', '-', '_', '=', '*', '#',
@@ -96,16 +113,17 @@ export const coreQualityDuplicateString: Rule = {
   category: 'code-smell',
   defaultSeverity: 'MINOR',
   defaultConfidence: 0.7,
-  title: 'Same string literal appears >= 3 times in this file',
+  title: 'Same string literal appears >= 5 times in this file',
   whyItMatters:
-    'A magic string repeated three or more times in the same file is the canonical "pivot debris" ' +
-    'smell: the AI generated copies for three call sites, the developer restructured one or two, ' +
+    'A magic string repeated five or more times in the same file is the canonical "pivot debris" ' +
+    'smell: the AI generated copies for several call sites, the developer restructured some, ' +
     'and now the remaining copies drift independently. The next AI fix will assume they\'re all ' +
     'the same concept and "improve" them together — masking the drift. Extract a single constant.',
   citation: 'https://codemore.tech/rules/core-quality-duplicate-string',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];
+    if (isTestFile(ctx.filePath)) return [];
 
     interface Counter { count: number; first: ts.Node }
     const counters = new Map<string, Counter>();

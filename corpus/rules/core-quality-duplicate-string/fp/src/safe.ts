@@ -1,4 +1,4 @@
-// FP fixture: no string appears >= 3 times, plus exempt patterns.
+// FP fixture: no string appears >= 5 times, plus exempt patterns.
 
 // Each unique constant — silent.
 const A = 'first';
@@ -22,7 +22,14 @@ export function method(): string {
   return a + b + c;
 }
 
-// Short strings (< 4 chars) are silent regardless of count.
+// Short strings (< 8 chars) are silent regardless of count.
 export function shortReps(): string {
-  return 'x' + 'x' + 'x' + 'x';
+  return 'token62' + 'token62' + 'token62' + 'token62' + 'token62' + 'token62';
+}
+
+// FOUR occurrences of a long string — below the >= 5 threshold, silent.
+export function fourTimes(kind: string): string {
+  if (kind === 'pending-rls-review') return 'pending-rls-review';
+  if (kind === 'b') return 'pending-rls-review';
+  return 'pending-rls-review';
 }

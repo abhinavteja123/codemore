@@ -12,6 +12,7 @@ import { coreSecurityEval } from './core-security-eval';
 import { coreSecurityInnerhtmlAssignment } from './core-security-innerhtml-assignment';
 import { coreSecurityShellInjection } from './core-security-shell-injection';
 import { coreSecurityHardcodedSecretPattern } from './core-security-hardcoded-secret-pattern';
+import { coreSecurityHardcodedPassword } from './core-security-hardcoded-password';
 import { vibeSsrfFetchUserInput } from './vibe-ssrf-fetch-user-input';
 import { vibeDbWriteWithoutWhere } from './vibe-db-write-without-where';
 import { vibeDbSelectStarFromUserTable } from './vibe-db-select-star-from-user-table';
@@ -41,6 +42,7 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   coreSecurityInnerhtmlAssignment,
   coreSecurityShellInjection,
   coreSecurityHardcodedSecretPattern,
+  coreSecurityHardcodedPassword,
   vibeSsrfFetchUserInput,
   vibeDbWriteWithoutWhere,
   vibeDbSelectStarFromUserTable,
