@@ -52,7 +52,7 @@ export const coreQualityUnusedImport: Rule = {
     'was rebuilt or removed and the import line was forgotten. Worse, it keeps the dependency ' +
     'name in `package.json` "alive" — which means the next slopsquatting attack on that name ' +
     'still hits this project. Delete unused imports first, audit dependencies second.',
-  citation: 'https://codemore.dev/rules/core-quality-unused-import',
+  citation: 'https://codemore.tech/rules/core-quality-unused-import',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

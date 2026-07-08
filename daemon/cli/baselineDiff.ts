@@ -140,7 +140,7 @@ export function applyBaseline(report: CodeMoreReport, baseline: BaselineFileV1):
         snippet: '(no longer present)',
       },
       whyItMatters: 'This finding was in the baseline but is no longer reported. Nothing to do.',
-      citation: `https://codemore.dev/rules/${ruleId}`,
+      citation: `https://codemore.tech/rules/${ruleId}`,
       baselineStatus: 'resolved' satisfies BaselineStatus,
     };
     report.issues.push(synthetic);

@@ -157,7 +157,7 @@ export const coreQualityUnusedExport: Rule = {
     'auth checks, prior validators, forgotten admin helpers) that the AI may try to re-import ' +
     'when working on a future fix, locking in obsolete behaviour. Delete the export or wire ' +
     'it back into a consumer.',
-  citation: 'https://codemore.dev/rules/core-quality-unused-export',
+  citation: 'https://codemore.tech/rules/core-quality-unused-export',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

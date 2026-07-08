@@ -111,7 +111,7 @@ export const coreQualityPyUnusedImport: Rule = {
     'An import that the file never references is bundle bloat AND supply-chain surface ' +
     'that serves no purpose. In vibe-coded Python apps it usually means a feature was ' +
     'rebuilt and the import got left behind.',
-  citation: 'https://codemore.dev/rules/core-quality-py-unused-import',
+  citation: 'https://codemore.tech/rules/core-quality-py-unused-import',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.pythonAst) return [];

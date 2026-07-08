@@ -183,7 +183,7 @@ export const vibePySecretInLog: Rule = {
     'GitGuardian SOSS 2026 top finding: a stray `logger.info({"apiKey": api_key})` or ' +
     '`print(token)` leaks a credential to Datadog / Sentry / CloudWatch / stdout where it ' +
     'stays grep-able for everyone with log access. Wrap with a redaction helper or drop the line.',
-  citation: 'https://codemore.dev/rules/vibe-py-secret-in-log',
+  citation: 'https://codemore.tech/rules/vibe-py-secret-in-log',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.pythonAst) return [];

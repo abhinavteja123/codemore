@@ -73,7 +73,7 @@ export const vibeLlmOutputToSink: Rule = {
     'this is a remote-code-execution primitive even without classical injection. The defence is ' +
     'to treat LLM output as untrusted text — parse via JSON.parse / schema validator, never pass ' +
     'directly to eval / exec / spawn / SQL template.',
-  citation: 'https://codemore.dev/rules/vibe-llm-output-to-sink',
+  citation: 'https://codemore.tech/rules/vibe-llm-output-to-sink',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const findings: RuleFinding[] = [];

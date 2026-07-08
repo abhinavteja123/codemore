@@ -15,13 +15,13 @@
  *     silently. We DO NOT block the scan or surface noisy stderr.
  *
  * Endpoint: process.env.CODEMORE_TELEMETRY_URL override OR the default
- * `https://codemore.dev/api/telemetry`. The override is how staging /
+ * `https://codemore.tech/api/telemetry`. The override is how staging /
  * tests redirect.
  */
 
 import type { CodeMoreReport } from '../../shared/report/types';
 
-const DEFAULT_ENDPOINT = 'https://codemore.dev/api/telemetry';
+const DEFAULT_ENDPOINT = 'https://codemore.tech/api/telemetry';
 
 interface TelemetryRulePing {
   id: string;

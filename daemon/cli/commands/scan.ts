@@ -16,6 +16,7 @@ import { scanProject, reportExceeds } from '../projectScanner';
 import { sendTelemetry } from '../telemetry';
 import type { CodeMoreReport, Severity } from '../../../shared/report/types';
 import { applyBaseline, isBaselineFile, isCountedForFailOn } from '../baselineDiff';
+import { color, severityColor, scoreColor } from '../colors';
 
 export type ExternalToolId =
   | 'ruff' | 'golangci' | 'clippy' | 'biome'
@@ -157,34 +158,46 @@ export function parseScanArgs(argv: string[]): ScanArgs {
 function printHumanSummary(report: CodeMoreReport): void {
   const s = report.summary;
   const w = (n: number) => String(n).padStart(4);
+  const sevLabel = (sev: Severity, n: number) => severityColor(sev)(`${sev}=${w(n)}`);
 
   process.stderr.write(
-    `\nCodeMore scan: ${report.project.root}\n` +
-    `  Score:       ${s.score}/100\n` +
+    `\n${color.bold('CodeMore scan')}: ${report.project.root}\n` +
+    `  Score:       ${scoreColor(s.score)(`${s.score}/100`)}\n` +
     `  Files:       ${s.filesAnalyzed}  (${s.linesOfCode} LOC)\n` +
     `  Tech debt:   ${Math.round(s.technicalDebtMinutes)} min\n` +
-    `  Severity:    BLOCKER=${w(s.bySeverity.BLOCKER)} CRITICAL=${w(s.bySeverity.CRITICAL)} MAJOR=${w(s.bySeverity.MAJOR)} MINOR=${w(s.bySeverity.MINOR)} INFO=${w(s.bySeverity.INFO)}\n` +
+    `  Severity:    ${sevLabel('BLOCKER', s.bySeverity.BLOCKER)} ${sevLabel('CRITICAL', s.bySeverity.CRITICAL)} ${sevLabel('MAJOR', s.bySeverity.MAJOR)} ${sevLabel('MINOR', s.bySeverity.MINOR)} ${sevLabel('INFO', s.bySeverity.INFO)}\n` +
     `  Rules run:   ${report.meta?.rulesEnabled ?? '?'}  Packs: ${(report.meta?.packsLoaded ?? []).join(', ') || '(none)'}\n\n`,
   );
 
   if (report.issues.length === 0) {
-    process.stderr.write('No issues found.\n');
+    process.stderr.write(`${color.green('✓ No issues found.')}\n`);
     return;
   }
 
   const max = 25;
-  process.stderr.write(`Top ${Math.min(max, report.issues.length)} of ${report.issues.length} issues:\n`);
-  const sorted = report.issues
+  const shown = report.issues
     .slice()
-    .sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
-  for (const iss of sorted.slice(0, max)) {
-    process.stderr.write(
-      `  [${iss.severity.padEnd(8)}] ${iss.evidence.file}:${iss.evidence.line}  ${iss.id}\n` +
-      `             ${iss.title}\n`,
-    );
+    .sort((a, b) => severityRank(b.severity) - severityRank(a.severity))
+    .slice(0, max);
+
+  const byFile = new Map<string, typeof shown>();
+  for (const iss of shown) {
+    const list = byFile.get(iss.evidence.file) ?? [];
+    list.push(iss);
+    byFile.set(iss.evidence.file, list);
+  }
+
+  process.stderr.write(`Top ${shown.length} of ${report.issues.length} issues, by file:\n`);
+  for (const [file, issues] of byFile) {
+    process.stderr.write(`\n  ${color.bold(file)} ${color.gray(`(${issues.length})`)}\n`);
+    for (const iss of issues) {
+      process.stderr.write(
+        `    ${severityColor(iss.severity)(iss.severity.padEnd(8))} :${iss.evidence.line}  ${iss.title} ${color.gray(`[${iss.id}]`)}\n`,
+      );
+    }
   }
   if (report.issues.length > max) {
-    process.stderr.write(`  ... and ${report.issues.length - max} more (use --json for full output)\n`);
+    process.stderr.write(`\n  ${color.gray(`... and ${report.issues.length - max} more (use --json for full output)`)}\n`);
   }
 }
 

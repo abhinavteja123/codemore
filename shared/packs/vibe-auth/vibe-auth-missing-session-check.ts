@@ -140,7 +140,7 @@ export const vibeAuthMissingSessionCheck: Rule = {
     'happily accepts requests from anyone. Anonymous callers can mutate other users\' data, ' +
     'enumerate IDs, or run up your costs. This rule fires when the file IS a route handler, ' +
     'IS state-changing, and neither references nor imports any common auth helper.',
-  citation: 'https://codemore.dev/rules/vibe-auth-missing-session-check',
+  citation: 'https://codemore.tech/rules/vibe-auth-missing-session-check',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const idx = ctx.projectIndex;

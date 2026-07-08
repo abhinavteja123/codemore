@@ -69,7 +69,7 @@ export const coreQualityLeftoverConsole: Rule = {
     'show up in DevTools and frequently leak structured data (user objects, tokens) attackers ' +
     'can scrape. Server-side they pollute logs at high volume and obscure real signal. ' +
     'console.error and console.warn are NOT flagged — they\'re usually intentional logging.',
-  citation: 'https://codemore.dev/rules/core-quality-leftover-console',
+  citation: 'https://codemore.tech/rules/core-quality-leftover-console',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const sanitized = stripCommentsAndStrings(ctx.content);

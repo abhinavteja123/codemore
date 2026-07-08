@@ -60,7 +60,7 @@ export const vibeCicdSecretInYaml: Rule = {
     'public; on private repos the log is still accessible to anyone with read access. Replace ' +
     'literal keys with `${{ secrets.NAME }}`; remove echo/curl-with-bare-token steps; mask ' +
     'sensitive output via the `add-mask` workflow command.',
-  citation: 'https://codemore.dev/rules/vibe-cicd-secret-in-yaml',
+  citation: 'https://codemore.tech/rules/vibe-cicd-secret-in-yaml',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!isWorkflowFile(ctx.filePath)) return [];

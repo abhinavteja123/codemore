@@ -25,7 +25,7 @@ separately (different output shape, different IaC scope) and emits
 ```bash
 mkdir -p .github/workflows
 curl -sSL \
-  https://raw.githubusercontent.com/codemore-dev/codemore/main/templates/.github/workflows/codemore-security-gate.yml \
+  https://raw.githubusercontent.com/abhinavteja123/codemore/main/templates/.github/workflows/codemore-security-gate.yml \
   > .github/workflows/codemore-security-gate.yml
 git add .github/workflows/codemore-security-gate.yml
 git commit -m "ci: add codemore security gate"
@@ -82,6 +82,6 @@ pre-existing findings are recorded but pass.
 
 ## See also
 
-- [CodeMore CLI docs](https://codemore.dev/docs/cli)
-- [Rule reference](https://codemore.dev/docs/rules)
+- [CodeMore CLI docs](https://codemore.tech/docs/cli)
+- [Rule reference](https://codemore.tech/docs/rules)
 - [What we don't catch](limitations.md)

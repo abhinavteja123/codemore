@@ -67,7 +67,7 @@ export const coreTypescriptNonNullAssertionAbuse: Rule = {
     'access — the exact bug class TypeScript was supposed to prevent. AI-generated code reaches ' +
     'for `!.` reflexively when the compiler complains, so each one is a place the type system ' +
     'pushed back and got ignored.',
-  citation: 'https://codemore.dev/rules/core-typescript-non-null-assertion-abuse',
+  citation: 'https://codemore.tech/rules/core-typescript-non-null-assertion-abuse',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const testCtx = isTestContext(ctx.filePath);

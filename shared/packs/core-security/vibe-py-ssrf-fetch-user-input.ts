@@ -192,7 +192,7 @@ export const vibePySsrfFetchUserInput: Rule = {
     'endpoints (169.254.169.254), internal services, or anywhere on your private network. ' +
     'Parse the URL with `urllib.parse.urlparse` and enforce a host allowlist before issuing ' +
     'the request.',
-  citation: 'https://codemore.dev/rules/vibe-py-ssrf-fetch-user-input',
+  citation: 'https://codemore.tech/rules/vibe-py-ssrf-fetch-user-input',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.pythonAst) return [];

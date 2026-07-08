@@ -71,7 +71,7 @@ export const coreSecurityEval: Rule = {
     'vm.Script with a curated context, dynamic import()). If you genuinely need a sandboxed ' +
     'eval, the suppression directive plus a one-line comment is the right answer — not turning ' +
     'this rule off project-wide.',
-  citation: 'https://codemore.dev/rules/core-security-eval',
+  citation: 'https://codemore.tech/rules/core-security-eval',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const sanitized = stripJsCommentsPreservingPositions(ctx.content);

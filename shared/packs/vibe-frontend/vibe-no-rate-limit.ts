@@ -68,7 +68,7 @@ export const vibeNoRateLimit: Rule = {
     'and stops. The fix is one import and one wrapper call — but it has to happen BEFORE the ' +
     'endpoint goes live. This rule fires when the project has at least one detected API route ' +
     'AND zero rate-limit libraries in its dependency tree.',
-  citation: 'https://codemore.dev/rules/vibe-no-rate-limit',
+  citation: 'https://codemore.tech/rules/vibe-no-rate-limit',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const idx = ctx.projectIndex;

@@ -24,14 +24,14 @@ export default function ContributingPage() {
       <ul>
         <li>
           <strong>Rule contributions</strong> (new detectors). Read{" "}
-          <a href="https://github.com/codemore-dev/codemore/blob/main/CONTRIBUTING-RULES.md">
+          <a href="https://github.com/abhinavteja123/codemore/blob/main/CONTRIBUTING-RULES.md">
             CONTRIBUTING-RULES.md
           </a>. The PR validator gates every submission.
         </li>
         <li>
           <strong>Everything else</strong> (CLI, MCP server, extension, daemon,
           web, docs, scripts). Read{" "}
-          <a href="https://github.com/codemore-dev/codemore/blob/main/CONTRIBUTING.md">
+          <a href="https://github.com/abhinavteja123/codemore/blob/main/CONTRIBUTING.md">
             CONTRIBUTING.md
           </a>.
         </li>
@@ -86,7 +86,7 @@ npm run test:unit`}</CodeBlock>
       <h2 id="security">Security disclosures</h2>
       <p>
         Read{" "}
-        <Link href="https://github.com/codemore-dev/codemore/blob/main/SECURITY.md">
+        <Link href="https://github.com/abhinavteja123/codemore/blob/main/SECURITY.md">
           SECURITY.md
         </Link>
         . Don&apos;t open public GitHub issues for security findings — use the
@@ -96,7 +96,7 @@ npm run test:unit`}</CodeBlock>
       <h2 id="conduct">Code of conduct</h2>
       <p>
         By participating you agree to abide by our{" "}
-        <a href="https://github.com/codemore-dev/codemore/blob/main/CODE_OF_CONDUCT.md">
+        <a href="https://github.com/abhinavteja123/codemore/blob/main/CODE_OF_CONDUCT.md">
           Code of Conduct
         </a>
         .

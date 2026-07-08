@@ -106,7 +106,7 @@ export const vibeNoInputValidation: Rule = {
     'shape-confusion, and prototype-pollution attacks. Vibe-coded apps almost always skip ' +
     'this step because the AI moves straight from "parse" to "store". The fix is one import ' +
     '+ a `.parse(body)` call per route.',
-  citation: 'https://codemore.dev/rules/vibe-no-input-validation',
+  citation: 'https://codemore.tech/rules/vibe-no-input-validation',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const idx = ctx.projectIndex;

@@ -66,7 +66,7 @@ export const coreQualityEmptyCatch: Rule = {
     'execution continues as if everything succeeded. The exact bug class that produces silent ' +
     'data loss in production. AI tools insert empty catches to satisfy lints or types without ' +
     'thinking about the actual failure mode.',
-  citation: 'https://codemore.dev/rules/core-quality-empty-catch',
+  citation: 'https://codemore.tech/rules/core-quality-empty-catch',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const sanitized = stripCommentsAndStrings(ctx.content);

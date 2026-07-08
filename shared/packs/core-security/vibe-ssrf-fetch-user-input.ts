@@ -340,7 +340,7 @@ export const vibeSsrfFetchUserInput: Rule = {
     'and admin dashboards behind the gateway. Tenzai 2025 found this pattern in every one ' +
     'of 5 AI coding agents on the same feature type — it\'s the most reliable SSRF source ' +
     'in vibe-coded apps.',
-  citation: 'https://codemore.dev/rules/vibe-ssrf-fetch-user-input',
+  citation: 'https://codemore.tech/rules/vibe-ssrf-fetch-user-input',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

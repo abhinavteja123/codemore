@@ -138,7 +138,7 @@ export const coreQualityAsyncWithoutAwait: Rule = {
     'lies about whether I/O happens, and any caller that forgets the `await` silently gets a ' +
     'Promise object instead of the value. AI-generated code marks helpers async "to be safe" ' +
     'when it has no idea whether the helper does I/O — this rule surfaces those.',
-  citation: 'https://codemore.dev/rules/core-quality-async-without-await',
+  citation: 'https://codemore.tech/rules/core-quality-async-without-await',
 
   detect(ctx: RuleContext): RuleFinding[] {
     // AST path — exact, no regex edge cases. Skips nested function bodies

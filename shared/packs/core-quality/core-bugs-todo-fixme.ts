@@ -60,7 +60,7 @@ export const coreBugsTodoFixme: Rule = {
     'sitting in the codebase without blocking merges. AI-generated code adds these at a high ' +
     'rate when the LLM hits a "this might need more thought" branch — many of them are real ' +
     'open questions that should be tracked or resolved before launch.',
-  citation: 'https://codemore.dev/rules/core-bugs-todo-fixme',
+  citation: 'https://codemore.tech/rules/core-bugs-todo-fixme',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const findings: RuleFinding[] = [];

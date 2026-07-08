@@ -51,7 +51,7 @@ export const coreQualityUnreachableCode: Rule = {
     'changed direction (or asked the AI to) and left the old code below the new exit. The risk: ' +
     'the AI now thinks logic exists that runs in production. The fix it suggests for the next ' +
     'bug may try to "improve" code that never actually executes.',
-  citation: 'https://codemore.dev/rules/core-quality-unreachable-code',
+  citation: 'https://codemore.tech/rules/core-quality-unreachable-code',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

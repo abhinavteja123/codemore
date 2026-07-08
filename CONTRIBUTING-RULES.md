@@ -44,7 +44,7 @@ export const vibeSupabaseRlsDisabled: Rule = {
     'The Supabase anon key shipped to the client can read or write any row in ' +
     'a table without RLS. 70% of audited Lovable apps leak data this way ' +
     '(see CVE-2025-48757).',
-  citation: 'https://codemore.dev/rules/vibe-supabase-rls-disabled',
+  citation: 'https://codemore.tech/rules/vibe-supabase-rls-disabled',
 
   detect(ctx: RuleContext): RuleFinding[] {
     // pure detection logic

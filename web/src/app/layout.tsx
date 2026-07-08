@@ -4,7 +4,7 @@ import { ClientProviders } from "./client-providers";
 import { GrainOverlay } from "@/components/landing/GrainOverlay";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://codemore.dev"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://codemore.tech"),
   title: {
     default: "CodeMore — the static analyzer your AI agent reads",
     template: "%s · CodeMore",

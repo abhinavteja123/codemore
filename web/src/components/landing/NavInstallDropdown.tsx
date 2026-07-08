@@ -15,9 +15,9 @@ const SURFACES: Array<{
   icon: React.ReactNode;
 }> = [
   { id: "cli",    label: "CLI",           blurb: "One-off scan · CI gate",          cmd: "npx codemore@latest scan .",         href: "/docs/install#cli",    icon: <Terminal className="w-4 h-4" /> },
-  { id: "mcp",    label: "MCP server",    blurb: "Cursor · Claude Code · Codex",    cmd: "npx codemore serve-mcp",             href: "/docs/install#mcp",    icon: <Boxes className="w-4 h-4" /> },
-  { id: "vscode", label: "VS Code",       blurb: "Inline diagnostics · code action", cmd: "code --install-extension codemore-0.2.1.vsix", href: "/docs/install#vscode", icon: <Code2 className="w-4 h-4" /> },
-  { id: "action", label: "GitHub Action", blurb: "PR comment · auto-fix branch",     cmd: "uses: codemore-dev/codemore-action@v1", href: "/docs/install#action", icon: <GitPullRequest className="w-4 h-4" /> },
+  { id: "mcp",    label: "MCP server",    blurb: "Cursor · Claude Code · Codex",    cmd: "npx codemore mcp install --client cursor", href: "/docs/install#mcp",    icon: <Boxes className="w-4 h-4" /> },
+  { id: "vscode", label: "VS Code",       blurb: "Inline diagnostics · code action", cmd: "code --install-extension codemore-0.2.3.vsix", href: "/docs/install#vscode", icon: <Code2 className="w-4 h-4" /> },
+  { id: "action", label: "GitHub Action", blurb: "PR comment · auto-fix branch",     cmd: "uses: abhinavteja123/codemore@main", href: "/docs/install#action", icon: <GitPullRequest className="w-4 h-4" /> },
   { id: "web",    label: "Web Scanner",   blurb: "Sign in · scan a repo URL",        cmd: "sign-in to scan via web",            href: "/dashboard",            icon: <Globe className="w-4 h-4" /> },
 ];
 
@@ -115,7 +115,7 @@ export default function NavInstallDropdown({ onWebScanner }: Props) {
 
           <div className="nav__dropdown-footer">
             <Link href="/docs/install" onClick={() => setOpen(false)}>Full install guide →</Link>
-            <span>v0.2.1 · MIT</span>
+            <span>v0.2.3 · MIT</span>
           </div>
         </div>
       )}

@@ -74,7 +74,7 @@ export const vibeHardcodedJwt: Rule = {
     'Supabase service-role JWT hardcoded in a Next.js client component. Once shipped in a ' +
     'browser bundle or pushed to a public repo, the token must be rotated; deleting the line ' +
     'does not retroactively rotate the credential.',
-  citation: 'https://codemore.dev/rules/vibe-hardcoded-jwt',
+  citation: 'https://codemore.tech/rules/vibe-hardcoded-jwt',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const findings: RuleFinding[] = [];

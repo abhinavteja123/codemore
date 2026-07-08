@@ -172,7 +172,7 @@ export const vibeDbWriteWithoutWhere: Rule = {
     'when asked for a "clean" SQL example, and the developer pastes them into a migration. ' +
     'One run, one table gone. This is the highest-impact statically-detectable database bug; ' +
     'BLOCKER severity is deliberate.',
-  citation: 'https://codemore.dev/rules/vibe-db-write-without-where',
+  citation: 'https://codemore.tech/rules/vibe-db-write-without-where',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const findings: RuleFinding[] = [];

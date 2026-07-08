@@ -155,7 +155,7 @@ export const vibeDbSelectStarFromUserTable: Rule = {
     'including columns the response shouldn\'t return. (b) When the schema grows — and it ' +
     'will — newly added columns like `stripe_id`, `refresh_token`, or `last_ip` start flowing ' +
     'through silently. List the columns you actually need; let schema growth fail loudly.',
-  citation: 'https://codemore.dev/rules/vibe-db-select-star-from-user-table',
+  citation: 'https://codemore.tech/rules/vibe-db-select-star-from-user-table',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const findings: RuleFinding[] = [];

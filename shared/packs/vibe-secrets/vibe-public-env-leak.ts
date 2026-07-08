@@ -139,7 +139,7 @@ export const vibePublicEnvLeak: Rule = {
     'SERVICE_ROLE, SECRET, PRIVATE_KEY, or DATABASE_URL ships your secret to every visitor. ' +
     'The Moltbook leak (Feb 2026) exposed 1.5M API tokens this way via a single misnamed ' +
     'NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY in production.',
-  citation: 'https://codemore.dev/rules/vibe-public-env-leak',
+  citation: 'https://codemore.tech/rules/vibe-public-env-leak',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (ctx.language !== 'env') return [];

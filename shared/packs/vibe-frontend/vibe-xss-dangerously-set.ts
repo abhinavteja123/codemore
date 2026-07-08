@@ -90,7 +90,7 @@ export const vibeXssDangerouslySet: Rule = {
     'study found 86% of AI-generated samples failed XSS defenses, and dangerouslySetInnerHTML ' +
     'is the single React API most often used as the unsafe sink. Even a one-off "render this ' +
     'markdown to HTML" prompt that flows here is enough to ship a stored-XSS bug.',
-  citation: 'https://codemore.dev/rules/vibe-xss-dangerously-set',
+  citation: 'https://codemore.tech/rules/vibe-xss-dangerously-set',
 
   detect(ctx: RuleContext): RuleFinding[] {
     // Quick reject — most TS/JS files don't contain JSX at all.

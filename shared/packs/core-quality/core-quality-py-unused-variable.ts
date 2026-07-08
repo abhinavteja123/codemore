@@ -26,7 +26,7 @@ export const coreQualityPyUnusedVariable: Rule = {
     'A local assignment whose target name is never referenced in the file is the cleanest ' +
     'signal of a pivot: the developer rewired the code around it and forgot to delete the ' +
     'leftover. The dead name often reveals what the removed concept was.',
-  citation: 'https://codemore.dev/rules/core-quality-py-unused-variable',
+  citation: 'https://codemore.tech/rules/core-quality-py-unused-variable',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.pythonAst) return [];

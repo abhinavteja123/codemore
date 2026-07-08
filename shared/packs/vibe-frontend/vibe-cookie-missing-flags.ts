@@ -54,7 +54,7 @@ export const vibeCookieMissingFlags: Rule = {
     'sent over HTTP without httpOnly + secure + sameSite unless the config explicitly sets each. ' +
     'AI-generated apps almost never bother. Result: any XSS becomes a session-token exfiltrate; ' +
     'any HTTP fallback becomes a sniff; any third-party POST is a CSRF.',
-  citation: 'https://codemore.dev/rules/vibe-cookie-missing-flags',
+  citation: 'https://codemore.tech/rules/vibe-cookie-missing-flags',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const findings: RuleFinding[] = [];

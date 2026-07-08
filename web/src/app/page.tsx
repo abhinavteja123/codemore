@@ -374,7 +374,7 @@ export default function Landing() {
           <Link href="/docs">Docs</Link>
           <Link href="/docs/rules">Rules</Link>
           <NavInstallDropdown onWebScanner={onSignIn} />
-          <a href="https://github.com/codemore-dev/codemore" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="https://github.com/abhinavteja123/codemore" target="_blank" rel="noreferrer">GitHub</a>
         </nav>
         <button onClick={onSignIn} className="nav__cta">Sign in</button>
       </header>
@@ -393,7 +393,7 @@ export default function Landing() {
           <div className="hero-vignette" />
 
           <div ref={heroCopyRef} className="hero-copy">
-            <span className="kicker">v0.2.1 · 58 rules · 8 adapters · MIT</span>
+            <span className="kicker">v0.2.3 · 58 rules · 8 adapters · MIT</span>
             <h1 className="hero-title">
               The static analyzer<br />
               <span className="glow">your AI agent reads.</span>
@@ -586,7 +586,7 @@ export default function Landing() {
           <div className="meta reveal">
             <div className="rule" />
             CODEMORE / MANIFESTO<br />
-            v0.2.1 · 2026-07-07<br />
+            v0.2.3 · 2026-07-08<br />
             MIT-LICENSED · OPT-IN TELEMETRY
           </div>
 
@@ -720,7 +720,7 @@ export default function Landing() {
             </div>
             <div className="fcol">
               <b>Community</b>
-              <a href="https://github.com/codemore-dev/codemore" target="_blank" rel="noreferrer">GitHub</a>
+              <a href="https://github.com/abhinavteja123/codemore" target="_blank" rel="noreferrer">GitHub</a>
               <Link href="/docs/github-action">GitHub Action</Link>
               <button onClick={onSignIn} className="text-left">Web scanner</button>
             </div>
@@ -734,7 +734,7 @@ export default function Landing() {
 
           <div className="footer__legal">
             <span>© 2026 CodeMore · MIT-licensed</span>
-            <span>v0.2.1 · 58 rules · 8 adapters · ~90% TP</span>
+            <span>v0.2.3 · 58 rules · 8 adapters · ~90% TP</span>
             <span>opt-in telemetry · runs entirely in your repo</span>
           </div>
         </div>

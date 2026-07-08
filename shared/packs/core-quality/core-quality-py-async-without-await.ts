@@ -33,7 +33,7 @@ export const coreQualityPyAsyncWithoutAwait: Rule = {
     'meant `await something()` but wrote `something()`. The coroutine returns a Coroutine object ' +
     'that nobody schedules, the side effect silently never happens, and FastAPI / asyncio carry ' +
     'on as if the work succeeded. Either add the missing `await` or drop the `async` keyword.',
-  citation: 'https://codemore.dev/rules/core-quality-py-async-without-await',
+  citation: 'https://codemore.tech/rules/core-quality-py-async-without-await',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.pythonAst) return [];

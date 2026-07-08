@@ -73,7 +73,7 @@ export const coreSecuritySqlInjectionConcat: Rule = {
     'pattern (OWASP A03). If any concatenated value is reachable from user input — req.body, ' +
     'route param, form, URL query — an attacker can rewrite the query. The fix is parameterised ' +
     'queries: every driver supports `?` / `$1` / `%s` placeholders that bind values out of band.',
-  citation: 'https://codemore.dev/rules/core-security-sql-injection-concat',
+  citation: 'https://codemore.tech/rules/core-security-sql-injection-concat',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const isPy = ctx.language === 'python';

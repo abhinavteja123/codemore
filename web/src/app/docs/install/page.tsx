@@ -42,7 +42,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: codemore-dev/codemore-action@v1
+      - uses: abhinavteja123/codemore@main
         with:
           fail-on: BLOCKER`;
 

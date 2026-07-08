@@ -30,7 +30,7 @@ export const coreQualityPyCyclomaticComplexity: Rule = {
     'A function with > 15 decision points has usually accumulated paths across several pivots — ' +
     'the developer no longer mentally models all of them, and neither will the AI fixing the ' +
     'next bug. Any "improvement" it suggests is likely to break a path neither of you remembered.',
-  citation: 'https://codemore.dev/rules/core-quality-py-cyclomatic-complexity',
+  citation: 'https://codemore.tech/rules/core-quality-py-cyclomatic-complexity',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.pythonAst) return [];

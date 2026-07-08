@@ -105,7 +105,7 @@ export const coreQualityLeftoverPrint: Rule = {
     'forgot to remove. In a vibe-coded FastAPI / Streamlit / Modal app it lands in stdout, ' +
     'sometimes carrying sensitive payload, and contributes nothing to structured logging. ' +
     'Switch to `logging.<level>(...)` (with redaction) or remove the line.',
-  citation: 'https://codemore.dev/rules/core-quality-leftover-print',
+  citation: 'https://codemore.tech/rules/core-quality-leftover-print',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.pythonAst) return [];

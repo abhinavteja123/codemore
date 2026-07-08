@@ -63,7 +63,7 @@ export const coreBugsLooseEquality: Rule = {
     'almost always meant. AI-generated code reaches for `==` at a much higher rate than ' +
     'human-written code in modern style guides, so flagging it surfaces a systemic quality ' +
     'gap rather than one-off mistakes.',
-  citation: 'https://codemore.dev/rules/core-bugs-loose-equality',
+  citation: 'https://codemore.tech/rules/core-bugs-loose-equality',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const sanitized = stripCommentsAndStrings(ctx.content);

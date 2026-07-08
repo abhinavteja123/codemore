@@ -66,7 +66,7 @@ export const vibeFileUploadNoValidation: Rule = {
     'the user chose, under a webroot directory. An attacker uploads shell.php (or shell.aspx, or ' +
     'a polyglot SVG) and visits /uploads/shell.php to execute code. The defence is: allowlist ' +
     'extensions AND MIME types, rewrite the filename to a UUID, store outside the webroot.',
-  citation: 'https://codemore.dev/rules/vibe-file-upload-no-validation',
+  citation: 'https://codemore.tech/rules/vibe-file-upload-no-validation',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const isPy = ctx.language === 'python';

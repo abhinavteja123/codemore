@@ -31,7 +31,7 @@ export const coreQualityEmptyExcept: Rule = {
     'invisible, and the AI fixing the next bug has no diagnostic to read. At minimum log the ' +
     'exception; better, narrow the except clause to the specific exception type you mean to ' +
     'recover from.',
-  citation: 'https://codemore.dev/rules/core-quality-empty-except',
+  citation: 'https://codemore.tech/rules/core-quality-empty-except',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.pythonAst) return [];

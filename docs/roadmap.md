@@ -24,7 +24,7 @@ Today, new rules ship experimental and are manually promoted. v0.3 automates thi
 - Rules in `beta` lifecycle gain promotion eligibility after 30 days of real-world telemetry
 - If the opt-in telemetry shows FP rate < 5% over 30 days AND the rule passes canary projects clean, auto-promote to `stable`
 - Conversely, `stable` rules whose downvote rate crosses 10% over 14 days trigger auto-demotion PR
-- Dashboard at `codemore.dev/rules` shows live promotion/demotion status per rule
+- Dashboard at `codemore.tech/rules` shows live promotion/demotion status per rule
 
 This keeps the < 5% false-positive bar without blocking new detectors.
 
@@ -82,7 +82,7 @@ Each rule ships with the standard 3+ fixture pair + telemetry-driven promotion p
 
 ### Demo video + case study
 
-- **Video:** open a real Lovable app from codemore.dev, run the scanner, send findings to Claude Code, watch BLOCKERs close automatically
+- **Video:** open a real Lovable app from codemore.tech, run the scanner, send findings to Claude Code, watch BLOCKERs close automatically
 - **Case study:** audit + fix cycle on 5 public open-source projects, document the before/after, time-to-fix per finding type
 
 ---

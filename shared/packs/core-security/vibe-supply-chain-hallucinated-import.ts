@@ -247,7 +247,7 @@ export const vibeSupplyChainHallucinatedImport: Rule = {
     '`import` of a package not declared in your package.json is the canonical pre-install ' +
     'signal — it will either fail at runtime (forgotten install) OR succeed in delivering ' +
     'attacker code (slopsquatting). Either case deserves a BLOCKER before merge.',
-  citation: 'https://codemore.dev/rules/vibe-supply-chain-hallucinated-import',
+  citation: 'https://codemore.tech/rules/vibe-supply-chain-hallucinated-import',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

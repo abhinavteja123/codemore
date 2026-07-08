@@ -118,7 +118,7 @@ Each finding has this shape:
     "matchedPattern":  "create-table-without-rls"
   },
   "whyItMatters":   "Public Supabase client can read/write all rows. 70% of Lovable apps leak data through this.",
-  "citation":       "https://codemore.dev/rules/vibe-supabase-rls-disabled",
+  "citation":       "https://codemore.tech/rules/vibe-supabase-rls-disabled",
   "suggestedFix": {
     "type":                 "code-patch",
     "instructions":         "Add `ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;` plus at least one policy scoped to authenticated users.",
@@ -315,7 +315,7 @@ Structured hints to guide the LLM through the fix loop:
         "matchedPattern": "create-table-without-rls"
       },
       "whyItMatters": "Public Supabase client can read/write all rows without RLS enforcement. This is the #1 vulnerability in Lovable apps.",
-      "citation": "https://codemore.dev/rules/vibe-supabase-rls-disabled",
+      "citation": "https://codemore.tech/rules/vibe-supabase-rls-disabled",
       "suggestedFix": {
         "type": "code-patch",
         "instructions": "Add ENABLE ROW LEVEL SECURITY and a policy scoped to authenticated users.",
@@ -347,7 +347,7 @@ Structured hints to guide the LLM through the fix loop:
         "matchedPattern": "unused-const"
       },
       "whyItMatters": "Unused variables are often a sign of incomplete refactoring or copy-paste errors.",
-      "citation": "https://codemore.dev/rules/core-quality-unused-variable"
+      "citation": "https://codemore.tech/rules/core-quality-unused-variable"
     }
   ],
   "agentInstructions": {
@@ -375,5 +375,5 @@ Structured hints to guide the LLM through the fix loop:
 
 - [External tool adapters](./external-tools.md) — namespace and severity translation for ruff, biome, etc.
 - [Security gate](./security-gate.md) — layered scanning workflow using the report.
-- [CLI reference](https://codemore.dev/docs/cli) — scan options and output formats.
+- [CLI reference](https://codemore.tech/docs/cli) — scan options and output formats.
 - [Rule catalog](./rules) — docs for all 58+ native rules.

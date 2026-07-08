@@ -73,7 +73,7 @@ export const coreTypescriptAsAny: Rule = {
     'that protects every downstream usage of this value silently disappears. Each cast is a place ' +
     'a future refactor can introduce a runtime error that the compiler would otherwise catch. ' +
     'AI tools default to `as any` when the type system pushes back; the cost compounds over time.',
-  citation: 'https://codemore.dev/rules/core-typescript-as-any',
+  citation: 'https://codemore.tech/rules/core-typescript-as-any',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const sanitized = stripCommentsAndStrings(ctx.content);

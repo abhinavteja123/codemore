@@ -173,7 +173,7 @@ export const vibeAuthInverted: Rule = {
     '`session.user` shape. The bug is full data exfiltration to unauthenticated callers. ' +
     'Usually it\'s placeholder code ("this is what we return while auth is incomplete") that ' +
     'never got replaced.',
-  citation: 'https://codemore.dev/rules/vibe-auth-inverted',
+  citation: 'https://codemore.tech/rules/vibe-auth-inverted',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

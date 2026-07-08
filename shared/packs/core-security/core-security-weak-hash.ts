@@ -66,7 +66,7 @@ export const coreSecurityWeakHash: Rule = {
     'table can crack at billions of guesses per second on consumer GPUs. Use bcrypt / argon2id / ' +
     'scrypt (per-row salt, configurable work factor) for any secret hash. For non-security ' +
     'checksums, the rule still fires (suppress inline if MD5 is genuinely the right choice).',
-  citation: 'https://codemore.dev/rules/core-security-weak-hash',
+  citation: 'https://codemore.tech/rules/core-security-weak-hash',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const isPy = ctx.language === 'python';

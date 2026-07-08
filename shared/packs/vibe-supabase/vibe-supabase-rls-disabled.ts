@@ -69,7 +69,7 @@ export const vibeSupabaseRlsDisabled: Rule = {
     'The Supabase anon key is shipped to the client. Any reader of the bundled JS can use it ' +
     'to query tables that have no RLS policy. CVE-2025-48757 affected 170+ Lovable apps via this ' +
     'class of bug in a single weekend; an audit of 50 vibe-coded apps found 70% had RLS off.',
-  citation: 'https://codemore.dev/rules/vibe-supabase-rls-disabled',
+  citation: 'https://codemore.tech/rules/vibe-supabase-rls-disabled',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (ctx.extension !== '.sql') return [];

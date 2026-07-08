@@ -61,7 +61,7 @@ export const vibeCorsWildcardCredentials: Rule = {
     'It is also a strong tell that the CORS layer was authored by trial-and-error: AI tools ' +
     'commonly emit this exact pair when prompted to "fix a CORS error". Either tighten the ' +
     'origin to a specific allowlist, or drop credentials.',
-  citation: 'https://codemore.dev/rules/vibe-cors-wildcard-credentials',
+  citation: 'https://codemore.tech/rules/vibe-cors-wildcard-credentials',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const content = ctx.content;

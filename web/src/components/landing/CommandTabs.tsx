@@ -67,7 +67,7 @@ const TABS: Tab[] = [
     Icon: Workflow,
     desc: "PR-comment bot. Fails the build on new BLOCKERs since baseline.",
     code: `# .github/workflows/codemore.yml
-- uses: codemore-dev/codemore-action@v1
+- uses: abhinavteja123/codemore@main
   with:
     fail-on: BLOCKER`,
     href: "/docs/install#gh",

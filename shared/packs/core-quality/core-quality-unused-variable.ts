@@ -47,7 +47,7 @@ export const coreQualityUnusedVariable: Rule = {
     'The dead name (`oldServiceRoleKey`, `legacyAuthToken`, `tempCtx`) misleads the next reader ' +
     'about what state actually exists at runtime. A future AI fix may try to "use" the dead ' +
     'binding, locking the bug in place. Delete it or wire it in — do not leave it hanging.',
-  citation: 'https://codemore.dev/rules/core-quality-unused-variable',
+  citation: 'https://codemore.tech/rules/core-quality-unused-variable',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

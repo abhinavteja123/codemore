@@ -68,7 +68,7 @@ export const vibeAgentToolNoConfirm: Rule = {
     'transfer_*) and the tool registration has no human-in-the-loop or confirmation step. The ' +
     'agent will eventually call it under prompt-injection. Add a confirmation hook or scope the ' +
     'tool down to non-destructive operations.',
-  citation: 'https://codemore.dev/rules/vibe-agent-tool-no-confirm',
+  citation: 'https://codemore.tech/rules/vibe-agent-tool-no-confirm',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const isPy = ctx.language === 'python';

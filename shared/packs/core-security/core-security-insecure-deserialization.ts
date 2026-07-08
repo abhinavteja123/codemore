@@ -60,7 +60,7 @@ export const coreSecurityInsecureDeserialization: Rule = {
     'objects from bytes. Any byte stream an attacker can influence becomes a remote code execution ' +
     'primitive — this is OWASP A08 and one of the most cited Python CVE classes. Switch to JSON ' +
     '(or yaml.safe_load) for anything coming over the network.',
-  citation: 'https://codemore.dev/rules/core-security-insecure-deserialization',
+  citation: 'https://codemore.tech/rules/core-security-insecure-deserialization',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (ctx.language !== 'python') return [];

@@ -106,7 +106,7 @@ export const coreSecurityPyShellInjection: Rule = {
     'argument boundaries, redirections, and command substitution. With anything user-controlled ' +
     'in the string this is command injection. Use the argv-list form: `subprocess.run([...])` ' +
     'with `shell=False` (the default).',
-  citation: 'https://codemore.dev/rules/core-security-py-shell-injection',
+  citation: 'https://codemore.tech/rules/core-security-py-shell-injection',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.pythonAst) return [];

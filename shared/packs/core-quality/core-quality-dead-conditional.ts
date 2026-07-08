@@ -50,7 +50,7 @@ export const coreQualityDeadConditional: Rule = {
     'wrapper. The branch either ALWAYS runs (so the wrapper is noise, hiding the intent) or ' +
     'NEVER runs (so the code inside is silently dead). Either case misleads the next reader — ' +
     'AI agent or human — about which logic is actually live.',
-  citation: 'https://codemore.dev/rules/core-quality-dead-conditional',
+  citation: 'https://codemore.tech/rules/core-quality-dead-conditional',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

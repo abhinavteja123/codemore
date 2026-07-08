@@ -138,7 +138,7 @@ export const vibeSupabaseAnonKeyBundled: Rule = {
     'pasted the wrong key, the build silently shipped it. Even if it IS the anon key, hardcoding ' +
     'bypasses env-var indirection and locks future rotations behind code edits. Always read the ' +
     'key from `process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY` (or your framework\'s equivalent).',
-  citation: 'https://codemore.dev/rules/vibe-supabase-anon-key-bundled',
+  citation: 'https://codemore.tech/rules/vibe-supabase-anon-key-bundled',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

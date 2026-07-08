@@ -65,7 +65,7 @@ export const vibeSupabaseRlsPermissive: Rule = {
     'lets every row through the write filter. Either is functionally equivalent to having no RLS — ' +
     'the table appears protected to anyone reading the migration but is publicly accessible at ' +
     'runtime. An audit of 50 vibe-coded apps found 24% had permissive RLS of this shape.',
-  citation: 'https://codemore.dev/rules/vibe-supabase-rls-permissive',
+  citation: 'https://codemore.tech/rules/vibe-supabase-rls-permissive',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (ctx.language !== 'sql') return [];

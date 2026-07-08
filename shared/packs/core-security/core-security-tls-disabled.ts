@@ -57,7 +57,7 @@ export const coreSecurityTlsDisabled: Rule = {
     'into a man-in-the-middle attack vector. The "fix later" comment people leave next to these ' +
     'lines never gets revisited. Fix the underlying cert issue (pin the right CA, regenerate the ' +
     'dev cert) instead of bypassing verification.',
-  citation: 'https://codemore.dev/rules/core-security-tls-disabled',
+  citation: 'https://codemore.tech/rules/core-security-tls-disabled',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const findings: RuleFinding[] = [];

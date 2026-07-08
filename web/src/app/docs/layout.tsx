@@ -86,7 +86,7 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
             <Link href="/docs/rules" className="hover:text-white">rules ({ruleIds.length})</Link>
             <NavInstallDropdown />
             <Link href="/" className="hover:text-white">↗ home</Link>
-            <a className="hover:text-white" href="https://github.com/codemore-dev/codemore" target="_blank" rel="noreferrer">
+            <a className="hover:text-white" href="https://github.com/abhinavteja123/codemore" target="_blank" rel="noreferrer">
               github
             </a>
           </nav>

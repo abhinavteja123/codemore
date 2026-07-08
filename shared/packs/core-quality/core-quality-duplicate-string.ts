@@ -102,7 +102,7 @@ export const coreQualityDuplicateString: Rule = {
     'smell: the AI generated copies for three call sites, the developer restructured one or two, ' +
     'and now the remaining copies drift independently. The next AI fix will assume they\'re all ' +
     'the same concept and "improve" them together — masking the drift. Extract a single constant.',
-  citation: 'https://codemore.dev/rules/core-quality-duplicate-string',
+  citation: 'https://codemore.tech/rules/core-quality-duplicate-string',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

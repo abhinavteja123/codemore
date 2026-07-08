@@ -145,7 +145,7 @@ export const vibeSecretInLog: Rule = {
     'apiKey })` leaks a token to Datadog / Sentry / Vercel logs / CloudWatch where every team ' +
     'member with log access can read it. AI-generated code reaches for `console.log(token)` ' +
     'during debugging and leaves it in. The fix is one line per call site: redact before log.',
-  citation: 'https://codemore.dev/rules/vibe-secret-in-log',
+  citation: 'https://codemore.tech/rules/vibe-secret-in-log',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

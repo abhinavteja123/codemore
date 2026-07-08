@@ -27,7 +27,7 @@ export const coreSecurityPyEval: Rule = {
     '`eval()` and `exec()` parse and execute their string argument as Python code. With any ' +
     'attacker-influenced data flowing in — a config field, a request body, an LLM response — ' +
     'this is arbitrary code execution at the privilege of the running process.',
-  citation: 'https://codemore.dev/rules/core-security-py-eval',
+  citation: 'https://codemore.tech/rules/core-security-py-eval',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.pythonAst) return [];

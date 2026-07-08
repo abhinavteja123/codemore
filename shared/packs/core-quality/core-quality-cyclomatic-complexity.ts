@@ -46,7 +46,7 @@ export const coreQualityCyclomaticComplexity: Rule = {
     'feature iterations and the developer no longer mentally models all of them. The AI agent ' +
     'won\'t either: any "improvement" it suggests is likely to break a path neither of you ' +
     'remembered. Decompose into smaller named helpers before adding new branches.',
-  citation: 'https://codemore.dev/rules/core-quality-cyclomatic-complexity',
+  citation: 'https://codemore.tech/rules/core-quality-cyclomatic-complexity',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

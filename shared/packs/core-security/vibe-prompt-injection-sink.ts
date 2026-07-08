@@ -291,7 +291,7 @@ export const vibePromptInjectionSink: Rule = {
     'into emitting `\'); DROP TABLE users; --` or `process.exit()` — and the sink does the ' +
     'rest. This is an emerging class as agentic apps proliferate; the cost of getting it ' +
     'wrong is the same as any other RCE / SQL injection.',
-  citation: 'https://codemore.dev/rules/vibe-prompt-injection-sink',
+  citation: 'https://codemore.tech/rules/vibe-prompt-injection-sink',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

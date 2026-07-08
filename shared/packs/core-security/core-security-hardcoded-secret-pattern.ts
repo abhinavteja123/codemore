@@ -131,7 +131,7 @@ export const coreSecurityHardcodedSecretPattern: Rule = {
     'AI-generated apps reach for pasting tokens inline when env-var wiring is incomplete — this ' +
     'rule catches the canonical provider shapes (Stripe / GitHub / OpenAI / Anthropic / AWS / ' +
     'Slack / Supabase / Google / Discord) by their issued prefix.',
-  citation: 'https://codemore.dev/rules/core-security-hardcoded-secret-pattern',
+  citation: 'https://codemore.tech/rules/core-security-hardcoded-secret-pattern',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const findings: RuleFinding[] = [];

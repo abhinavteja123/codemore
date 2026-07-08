@@ -7,7 +7,7 @@
 **The static analyzer your AI agent reads.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-4ef2ca.svg?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.2-836ef3.svg?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.3-836ef3.svg?style=flat-square)](CHANGELOG.md)
 [![Catalog](https://img.shields.io/badge/rules-58-success.svg?style=flat-square)](docs/rules)
 [![Adapters](https://img.shields.io/badge/external%20adapters-8-blueviolet.svg?style=flat-square)](docs/external-tools.md)
 [![Audit](https://img.shields.io/badge/audit-2026--07--07-pink.svg?style=flat-square)](accuracy-report-2026-07-07.md)
@@ -87,8 +87,14 @@ codemore scan . --external-tools all       # ruff · golangci-lint · clippy · 
 
 ### MCP server — Cursor, Claude Code, Codex, Claude Desktop
 
+```bash
+npx codemore mcp                              # print the config snippet + every client's config path
+npx codemore mcp install --client cursor      # or claude-desktop — merges into your existing config, backs up first
+```
+
+`codemore mcp` never touches MCP itself — it's a config-writer only. The actual server is `codemore serve-mcp`, run under the hood by whatever it wires up:
+
 ```jsonc
-// ~/.cursor/mcp.json — or ~/.claude/mcp.json, ~/.codex/mcp.json, etc.
 {
   "mcpServers": {
     "codemore": {
@@ -104,7 +110,7 @@ Six tools exposed: `scan_project`, `scan_file`, `explain_issue`, `suggest_fix`, 
 ### VS Code extension
 
 ```bash
-code --install-extension codemore-0.2.1.vsix
+code --install-extension codemore-0.2.3.vsix
 ```
 
 Inline diagnostics. Code-action quick-fix calls the agentic loop (planner → generator → validator → retry, max 3 attempts).
@@ -124,7 +130,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: codemore-dev/codemore-action@v1
+      - uses: abhinavteja123/codemore@main
         with:
           fail-on: BLOCKER
 ```
@@ -133,7 +139,7 @@ PR-comment bot. Only fails the build on findings new since the committed `.codem
 
 ### Web Scanner (hosted)
 
-Sign in to **codemore.dev**, paste a public GitHub URL or upload a ZIP — same report, same fingerprint, no install required.
+Sign in to **codemore.tech**, paste a public GitHub URL or upload a ZIP — same report, same fingerprint, no install required.
 
 ---
 
@@ -204,7 +210,7 @@ Full per-rule docs: [`docs/rules`](docs/rules) (49 markdown pages, one per rule)
         "matchedPattern": "create-table-without-rls"
       },
       "whyItMatters": "Public Supabase client can read/write all rows. 70 % of Lovable apps leak data through this.",
-      "citation":     "https://codemore.dev/rules/vibe-supabase-rls-disabled",
+      "citation":     "https://codemore.tech/rules/vibe-supabase-rls-disabled",
       "suggestedFix": {
         "type":             "code-patch",
         "instructions":     "Add `ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;` plus at least one policy scoped to authenticated users.",
@@ -343,7 +349,7 @@ Off by default. Enable per-scan with `--telemetry`. Persistent opt-in stored in 
 }
 ```
 
-**What we do NOT collect:** file paths, file contents, code snippets, evidence text, sources, bodies. The endpoint at `codemore.dev/api/telemetry` enforces a Zod `strict()` schema and **rejects any payload containing those keys** with HTTP 400.
+**What we do NOT collect:** file paths, file contents, code snippets, evidence text, sources, bodies. The endpoint at `codemore.tech/api/telemetry` enforces a Zod `strict()` schema and **rejects any payload containing those keys** with HTTP 400.
 
 **Storage hardening:** 64 KB payload cap · 10-min per-`fingerprintHash` rate limit · service-role Supabase writes only · RLS denies all reads to authenticated and anon roles.
 
@@ -393,7 +399,7 @@ codemore/
 
 ```bash
 # 1. Clone + install (skip binary downloads in dev — they download on first scan)
-git clone https://github.com/codemore-dev/codemore
+git clone https://github.com/abhinavteja123/codemore
 cd codemore
 CODEMORE_SKIP_BINARY_DOWNLOAD=1 npm ci
 
@@ -499,6 +505,6 @@ CodeMore is open-source from line one and will stay that way. The wedge is the r
 
 **The static analyzer your AI agent reads.**
 
-[Docs](https://codemore.dev/docs) · [Rules](https://codemore.dev/docs/rules) · [Schema](https://codemore.dev/docs/schema) · [GitHub](https://github.com/codemore-dev/codemore) · [npm](https://www.npmjs.com/package/codemore)
+[Docs](https://codemore.tech/docs) · [Rules](https://codemore.tech/docs/rules) · [Schema](https://codemore.tech/docs/schema) · [GitHub](https://github.com/abhinavteja123/codemore) · [npm](https://www.npmjs.com/package/codemore)
 
 </div>

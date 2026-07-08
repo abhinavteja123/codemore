@@ -154,7 +154,7 @@ export const coreSecurityShellInjection: Rule = {
     '`;`, or `&&` in user input becomes attacker-controlled command execution. The structured ' +
     'alternative is execFile (or spawn) with an args ARRAY: each element is passed as a separate ' +
     'argv entry, with no shell interpretation.',
-  citation: 'https://codemore.dev/rules/core-security-shell-injection',
+  citation: 'https://codemore.tech/rules/core-security-shell-injection',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const sanitized = stripJsCommentsAndStrings(ctx.content);

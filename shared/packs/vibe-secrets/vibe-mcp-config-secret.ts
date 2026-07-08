@@ -113,7 +113,7 @@ export const vibeMcpConfigSecret: Rule = {
     'straight to child processes. Hardcoded credentials here are committed to git verbatim. ' +
     'GitGuardian SOSS 2026 traced >24,000 exposed credentials to this exact pattern — ' +
     'developers paste a real key while wiring up an MCP integration, intending to clean it up later.',
-  citation: 'https://codemore.dev/rules/vibe-mcp-config-secret',
+  citation: 'https://codemore.tech/rules/vibe-mcp-config-secret',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (ctx.language !== 'json') return [];

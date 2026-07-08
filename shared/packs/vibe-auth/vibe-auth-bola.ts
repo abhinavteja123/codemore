@@ -228,7 +228,7 @@ export const vibeAuthBola: Rule = {
     'a route-supplied id (`params.id`) without filtering by the authenticated user. Any ' +
     'logged-in user can then read or mutate any other user\'s record by guessing IDs. The ' +
     'AI generated the auth check correctly — it just forgot to scope the query.',
-  citation: 'https://codemore.dev/rules/vibe-auth-bola',
+  citation: 'https://codemore.tech/rules/vibe-auth-bola',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.sourceFile) return [];

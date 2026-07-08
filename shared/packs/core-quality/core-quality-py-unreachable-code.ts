@@ -35,7 +35,7 @@ export const coreQualityPyUnreachableCode: Rule = {
     'A statement after `return` / `raise` / `sys.exit()` / `continue` / `break` in the same ' +
     'block can never run. The risk is that the AI now thinks logic exists where it doesn\'t, ' +
     'and the next fix it suggests may try to "improve" code that never executes.',
-  citation: 'https://codemore.dev/rules/core-quality-py-unreachable-code',
+  citation: 'https://codemore.tech/rules/core-quality-py-unreachable-code',
 
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.pythonAst) return [];

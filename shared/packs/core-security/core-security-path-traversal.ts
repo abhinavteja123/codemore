@@ -101,7 +101,7 @@ export const coreSecurityPathTraversal: Rule = {
     'send "../../etc/passwd" and read arbitrary files the process can access. The defence is two ' +
     'lines: resolve the candidate path to an absolute path, then refuse anything that does not ' +
     'sit inside your designated directory.',
-  citation: 'https://codemore.dev/rules/core-security-path-traversal',
+  citation: 'https://codemore.tech/rules/core-security-path-traversal',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const isPy = ctx.language === 'python';

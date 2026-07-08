@@ -75,7 +75,7 @@ export const coreSecurityInnerhtmlAssignment: Rule = {
     'normally give you. This is the vanilla-JS counterpart to React\'s dangerouslySetInnerHTML ' +
     'and accounts for a large share of stored-XSS reports in non-framework code. Even a fix that ' +
     'looks tidy today becomes a vulnerability the next time someone pipes a variable through it.',
-  citation: 'https://codemore.dev/rules/core-security-innerhtml-assignment',
+  citation: 'https://codemore.tech/rules/core-security-innerhtml-assignment',
 
   detect(ctx: RuleContext): RuleFinding[] {
     const sanitized = stripJsComments(ctx.content);
