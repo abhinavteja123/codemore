@@ -15,6 +15,7 @@ import { runScan, parseScanArgs } from './commands/scan';
 import { runServeMcp } from './commands/serve-mcp';
 import { runMcp } from './commands/mcp';
 import { runBaseline } from './commands/baseline';
+import { runFix } from './commands/fix';
 import { toolVersion } from '../../shared/toolVersion';
 import { color } from './colors';
 import { runInteractiveMenu, isInteractiveTty } from './interactiveMenu';
@@ -37,8 +38,15 @@ function printUsage(): void {
     `Usage:\n` +
     `  codemore scan <path> [flags]\n` +
     `  codemore baseline <create|update|drop|show> [path]\n` +
+    `  codemore fix [path] [--rule <id>] [--all] [--write] [--max-attempts N]\n` +
     `  codemore mcp [install --client <cursor|claude-desktop|claude-code|codex>]\n` +
     `  codemore serve-mcp\n\n` +
+    `Flags (fix):\n` +
+    `  --rule <id>                  Only fix findings of this rule.\n` +
+    `  --all                        Fix every finding (default: just the most severe one).\n` +
+    `  --write                      Patch files in place (backs up to .bak). Default: write .codemore-fix sidecars.\n` +
+    `  --max-attempts <n>           Generator/validator retries per finding (default 3).\n` +
+    `  Requires ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.\n\n` +
     `Flags (scan):\n` +
     `  --json                       Emit the full report as JSON on stdout.\n` +
     `  --out <file>                 Also write the JSON report to <file>.\n` +
@@ -90,6 +98,8 @@ async function main(argv: string[]): Promise<number> {
         return await runScan(parseScanArgs(rest));
       case 'baseline':
         return await runBaseline(rest);
+      case 'fix':
+        return await runFix(rest);
       case 'mcp':
         return await runMcp(rest);
       case 'serve-mcp':
