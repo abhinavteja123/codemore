@@ -13,7 +13,7 @@ AI agents ship code fast — and ship bugs fast. CodeMore scans the code, then h
 
 [![npm](https://img.shields.io/npm/v/codemore?style=flat-square&color=cb3837&logo=npm)](https://www.npmjs.com/package/codemore)
 [![License: MIT](https://img.shields.io/badge/license-MIT-4ef2ca.svg?style=flat-square)](LICENSE)
-[![Rules](https://img.shields.io/badge/native%20rules-58-success.svg?style=flat-square)](docs/rules)
+[![Rules](https://img.shields.io/badge/native%20rules-59-success.svg?style=flat-square)](docs/rules)
 [![Adapters](https://img.shields.io/badge/external%20adapters-8-blueviolet.svg?style=flat-square)](docs/external-tools.md)
 [![Audit](https://img.shields.io/badge/last%20audit-2026--07--07-ff69b4.svg?style=flat-square)](accuracy-report-2026-07-07.md)
 [![BLOCKER TP rate](https://img.shields.io/badge/BLOCKER%20TP%20rate-~90%25-4ef2ca.svg?style=flat-square)](accuracy-report-2026-07-07.md)
@@ -22,7 +22,7 @@ AI agents ship code fast — and ship bugs fast. CodeMore scans the code, then h
 npx codemore@latest scan .
 ```
 
-**58 native rules · 8 external adapters · CLI · MCP server · VS Code extension · GitHub Action — one report, byte-identical on every surface.**
+**59 native rules · 8 external adapters · CLI · MCP server · VS Code extension · GitHub Action — one report, byte-identical on every surface.**
 
 </div>
 
@@ -76,6 +76,8 @@ Emits [`codemore-report.json`](docs/schema.md): every finding pinned to `file:li
 codemore scan . --fail-on BLOCKER              # CI gate: non-zero exit on any BLOCKER
 codemore scan . --external-tools ruff,biome    # opt in to external tools
 codemore scan . --external-tools all           # ruff · golangci-lint · clippy · biome · bandit · gitleaks · npm-audit · pip-audit
+codemore scan . --format sarif --out codemore.sarif   # GitHub code scanning (upload-sarif)
+codemore fix . --rule <id> --write             # agentic fix loop from the CLI (needs an LLM API key)
 codemore baseline create                       # adopt on an existing repo without drowning in legacy findings
 ```
 
@@ -143,11 +145,11 @@ Sign in at [**codemore.tech**](https://codemore.tech), paste a public GitHub URL
 
 ## What it catches
 
-**58 native rules** across **6 packs**, every rule mapped to a *cited real-world incident class* — not a hypothetical:
+**59 native rules** across **6 packs**, every rule mapped to a *cited real-world incident class* — not a hypothetical:
 
 | Pack | Rules | Highlights |
 |---|---:|---|
-| `core-security` | 19 | SQL injection (concat), path traversal, weak crypto, insecure deserialization, `eval`, shell injection, TLS-off, hardcoded secret patterns |
+| `core-security` | 20 | SQL injection (concat), path traversal, weak crypto, insecure deserialization, `eval`, shell injection, TLS-off, hardcoded secret patterns, hardcoded passwords (B105-class) |
 | `core-quality` | 22 | Unused vars/imports/exports, cyclomatic complexity, dead conditionals, leftover prints, async-without-await, unreachable code |
 | `vibe-frontend` | 5 | XSS (`dangerouslySetInnerHTML`), CORS-with-credentials, missing rate limit, missing cookie flags, file-upload validation |
 | `vibe-secrets` | 4 | Public env leaks (`NEXT_PUBLIC_*` / `VITE_*` / `REACT_APP_*`), hardcoded JWTs, MCP config secrets, CI/CD YAML secrets |
