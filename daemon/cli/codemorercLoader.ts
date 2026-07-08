@@ -64,8 +64,11 @@ function tryParseJson(raw: string): unknown {
   try { return JSON.parse(stripped); } catch { return null; }
 }
 
-function isSeverity(v: unknown): v is Severity {
-  return typeof v === 'string' && (VALID_SEVERITIES as ReadonlyArray<string>).includes(v);
+/** Validate + normalize: severities are case-insensitive in the file, uppercase everywhere else. */
+function asSeverity(v: unknown): Severity | null {
+  if (typeof v !== 'string') return null;
+  const upper = v.toUpperCase();
+  return (VALID_SEVERITIES as ReadonlyArray<string>).includes(upper) ? (upper as Severity) : null;
 }
 
 function asStringArray(v: unknown, warnings: string[], field: string): string[] {
@@ -115,10 +118,11 @@ export function loadCodemorerc(root: string): CodemorerCLoaded {
       warnings.push('rules must be an object { <rule-id>: "off" | Severity }');
     } else {
       for (const [k, v] of Object.entries(cfg.rules)) {
-        if (v === 'off') {
+        const sev = asSeverity(v);
+        if (typeof v === 'string' && v.toLowerCase() === 'off') {
           ruleOverrides[k] = { state: 'off' };
-        } else if (isSeverity(v)) {
-          ruleOverrides[k] = { state: v };
+        } else if (sev !== null) {
+          ruleOverrides[k] = { state: sev };
         } else {
           warnings.push(`rules.${k}: must be "off" or a Severity (BLOCKER/CRITICAL/MAJOR/MINOR/INFO); got ${JSON.stringify(v)}`);
         }

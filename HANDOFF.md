@@ -65,7 +65,7 @@ Rebuilt the extension (`npm run package`) and ran `vsce package`. Two real bugs 
 1. **`vsce` 2.32+ hard-errors** when both `package.json`'s `files` array and `.vscodeignore` exist — this repo needs both (`files` is the npm CLI-publish allowlist, `.vscodeignore` is the VSIX denylist; they ship different things, e.g. `bin/**` must be in the npm tarball but NOT the VSIX). Fix: `scripts/vsce-package.js` — strips `files` from `package.json` only for the duration of the `vsce` call, restores it after (success or fail). `vsce:package`/`vsce:publish` npm scripts now route through it.
 2. **`.vscodeignore` predated several new artifact dirs** and was shipping them into the VSIX: `coverage/` (18.58 MB), `graphify-out/` (668 files), `.agents/` (111 files), and **`triage-results/`** — the dir this same file's earlier section says was scrubbed from git history for containing a real-shaped Stripe key. `.vscodeignore` didn't know about any of it because vsce ignores `.gitignore` once `.vscodeignore` exists. Fixed by syncing the ignore list. Result: VSIX went from 874 files / 6.62 MB → 24 files / 2.79 MB (matches the last known-good build size).
 
-VSIX is packaged locally (`codemore-0.2.4.vsix` after the version bumps below) but **not yet published to the VS Code Marketplace** (Track B2, still pending — needs an Azure DevOps PAT + `vsce login codemore`, which nobody has run yet this session).
+VSIX was packaged locally at the 0.2.4-era version (`codemore-0.2.4.vsix`, before the later 0.2.5 npm bump in section D) but **not yet published to the VS Code Marketplace** (Track B2, still pending — needs an Azure DevOps PAT + `vsce login codemore`, which nobody has run yet). Rebuild it at 0.2.5 before publishing — `package.json`'s version has moved on since that VSIX was packaged.
 
 ### B. npm publish — went live, three real bugs found along the way
 
@@ -79,7 +79,7 @@ Three bugs surfaced and fixed, all in `package.json`:
 
 **Version timeline this session:** 0.2.2 published (bugs 1–3 above fixed along the way) → user separately bumped/published **0.2.3** in their own terminal mid-session (outside this conversation's direct actions, discovered via `npm view codemore version` returning 0.2.3 unexpectedly) → this session bumped to **0.2.4** (`npm version patch`, tag `v0.2.4`, commit `7b0abf6`) to ship the CLI/MCP UX work in section C below.
 
-**0.2.4 publish is BLOCKED, not done.** `npm publish --access public` failed with 401/404 from this session's Bash shell — the earlier browser-OTP `npm login` was completed in the user's own PowerShell terminal, which has a different `$HOME`/`.npmrc` than the Git Bash shell tools run in. `npm whoami` confirms 401 (not authenticated) in this shell. Asked the user twice (via AskUserQuestion) whether to log in here or publish themselves — no response both times (AFK). **Next step: either run `npm login` in a shell Claude's Bash tool can reach, or run `npm publish --access public` manually** (proven to work from the user's PowerShell — that's how 0.2.2/0.2.3 got out). `package.json` is already at 0.2.4, tagged, committed — publish is the only remaining step.
+**0.2.4's publish attempt from this session's Bash shell was blocked** (401 — different `$HOME`/`.npmrc` than the user's PowerShell where `npm login` had actually run). **Resolved by 0.2.5 — see section D below**, which covers the whole publish saga's actual ending.
 
 ### C. CLI/MCP UX overhaul + domain/repo rebrand
 
@@ -105,7 +105,7 @@ User asked to make the CLI/MCP/npm package more user-friendly, add CLI "UI" and 
 - **The critical invariant, gated correctly**: `isInteractiveTty()` requires **both** `process.stdin.isTTY` and `process.stdout.isTTY`. `prompts` reads raw keystrokes from stdin — stdout can be a TTY while stdin isn't (piped input, CI, an agent spawning the process), and gating on stdout alone would hang there. Any non-interactive context still gets the old static `printQuickstart()`. This is load-bearing: "the analyzer your AI agent reads" must never block on input when invoked programmatically.
 - **Verified, not assumed**: ran `node`/`ts-node` on the actual CLI with stdin explicitly redirected from `/dev/null` in this session's own (non-TTY) Bash shell — printed the static quickstart and exited 0 immediately, no hang. This is the single most important check for this feature and it passed. `tsc --noEmit` clean, all 160 unit tests still pass.
 - **Honest gap**: the interactive picker's actual rendering (colors, arrow-key nav, the real prompts UI) was **not** eyeballed live this session — this Bash tool is itself non-TTY, so there's no way to drive or see the interactive path from here. Next person with a real terminal should just run `codemore` (or `node cli.js` / `npx ts-node daemon/cli/index.ts`) with no args and confirm the menu looks and feels right, and that Ctrl-C/ESC cancels cleanly (handled via `onCancel` in `interactiveMenu.ts`, not yet manually confirmed).
-- **Not shipped yet** — same as everything else in this update, this needs the 0.2.4 (or a new 0.2.5) npm publish to reach real users; see the blocked-publish note above.
+- **Shipped in 0.2.5 — see section D.**
 
 **Verified before calling this done**: `npx tsc -p tsconfig.publish.json --noEmit` clean, `npm run test:unit` → 160/160 passing, `cd web && npm run build` → 27.6 kB / 137 kB First Load JS on `/` (matches the documented Part-8 baseline, confirming content edits didn't bloat the bundle), and both new CLI commands run for real via `ts-node` against live source (not just the stale compiled `lib/`) — actual terminal output captured and checked, including the real `~/.cursor/mcp.json` merge dry-run above.
 
@@ -113,7 +113,26 @@ User asked to make the CLI/MCP/npm package more user-friendly, add CLI "UI" and 
 
 **Loose end**: a stray `report.json` (10,330-line scan output artifact, was untracked/gitignored-in-spirit) got swept into the user's `6000096 "fixes"` commit — probably a broad `git add`. Not touched or cleaned up this session; flagging so nobody mistakes it for intentional.
 
-**Next up, in order**: (1) unblock and complete the 0.2.4 npm publish (section B), (2) VSIX Marketplace publish — B2, still nobody's run `vsce login` (3) docs site deploy — B3, `web/` builds clean but has never been deployed, (4) decide whether the real interactive TUI is wanted.
+### D. The publish saga's actual ending — 0.2.5 is live
+
+Section B above described 0.2.4 stuck behind a Bash-shell auth mismatch. Here's how it actually resolved, since three more attempts happened after that was written:
+
+1. User published **0.2.4 themselves**, in their own PowerShell, while this session's Bash shell was still stuck on it. Confirmed via `npm view codemore version` unexpectedly returning `0.2.4`.
+2. Bumped `package.json` to **0.2.5** directly (a plain field edit, not `npm version`, specifically to avoid forcing a git commit the user hadn't asked for — `npm publish` packs from disk, not from git state, so no commit was needed to publish).
+3. Tried publishing 0.2.5 from this session's Bash shell (now `npm whoami` showed logged in as `abhinav12`) — hit **`EOTP`**: npm's registry requires a one-time-password/browser confirmation for publish on this account, and **npm deliberately redacts the browser auth URL when stdout isn't a real interactive TTY** (a security measure on npm's side, not a bug here). Two attempts from Bash both failed this way — nothing was written to the registry either time (`npm view` stayed at 0.2.4 after both).
+4. Handed it to the user to run in their real PowerShell. **Their first attempt got a real auth URL but hit `E404` on the polling callback** (`/-/v1/done?authId=...`) — most likely because this session's Bash shell had *also* just triggered its own pending auth sessions moments earlier for the same npm account, and the sessions collided. Told the user to stop, run a clean `npm login` first (fully confirmed), then `npm publish --access public` right after, with nothing else touching npm concurrently.
+5. **That worked.** `npm view codemore version` → `0.2.5`. Independently verified end-to-end in a fresh scratch directory: `npx --yes codemore@latest --version` → `0.2.5`, and `npm view codemore@0.2.5 bin` → `{ codemore: 'cli.js' }` (the bin-path fix from section B held through the whole version chain).
+
+**Git state at end of session**: clean. `git log -3`: `a207cd3 "2.5"` (the version-bump-to-0.2.5 commit, presumably made by the user alongside their successful publish) → `7b0abf6 "0.2.4"` → `6000096 "fixes"` (the big CLI/MCP/domain-rebrand commit from section C). **One gap**: no `v0.2.5` git tag exists (`git tag -l` stops at `v0.2.4`) — cosmetic, doesn't block anything, but worth a `git tag v0.2.5 a207cd3 && git push --tags` if the tag convention matters going forward.
+
+**Everything from this entire session is now live on npm as `codemore@0.2.5`**: the VSIX-adjacent scripting fix (section A, VSIX itself still not Marketplace-published), all three `package.json` bugs (section B), the full CLI/MCP UX overhaul and 74-file domain rebrand (section C), and the interactive menu (section C's update). Nothing from this session is stuck in a "built but not shipped" state anymore.
+
+**Next up, in true current-state order**:
+1. **VSIX → VS Code Marketplace (Track B2)** — still nobody has run `vsce login codemore` (needs an Azure DevOps PAT). The VSIX itself packages cleanly and locally (`codemore-0.2.5.vsix` would be the name after a rebuild — last verified rebuild was tagged 0.2.4-era, rebuild before publishing since `package` version bumps affect the manifest).
+2. **Docs site deploy (Track B3)** — `web/` builds clean (27.6 kB / 137 kB on `/`) but has never been deployed anywhere. Blocks flipping on telemetry (Track C1) and makes the README's "Web Scanner (hosted)" section literally true instead of just code-complete.
+3. **Manually verify the interactive menu's actual look/feel** in a real terminal — the mechanics are proven (TTY-gate tested, delegation to existing commands unchanged, typecheck/tests green) but nobody has eyeballed the live rendering, colors, or a Ctrl-C cancel yet. The user tested a scan-and-exit run mid-session and it worked; the cancel path specifically is still unconfirmed.
+4. **Minor, not urgent**: `.codemorerc.json` in this repo's own root has lowercase severity values (`"info"`, `"minor"`) that `codemorercLoader.ts` rejects as invalid (expects uppercase `INFO`/`MINOR`/etc.) — surfaced as three warnings during the user's live test run. Not a crash, just noise; case-insensitive parsing would be a small, low-risk fix if anyone wants it.
+5. **`v0.2.5` git tag** is missing (see above) — five-second fix, not blocking.
 
 ---
 

@@ -4,7 +4,7 @@ node_modules/
 # Build outputs
 dist/
 out/
-*/vsix
+*.vsix
 
 # Binaries (downloaded, not committed)
 bin/**/*
@@ -54,3 +54,6 @@ graphify-out/
 
 # Triage results — local-only audit output. Must never be committed.
 triage-results/
+
+# Root scan artifact
+report.json

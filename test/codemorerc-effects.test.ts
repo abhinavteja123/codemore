@@ -23,6 +23,7 @@ import * as path from 'path';
 
 import { scanProject } from '../daemon/cli/projectScanner';
 import { registerAllPacks } from '../daemon/cli/registerPacks';
+import { loadCodemorerc } from '../daemon/cli/codemorercLoader';
 
 function mkTempDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -62,6 +63,19 @@ describe('.codemorerc.json effects + secret-bypass suffix (2026-07-07 regression
     assert.ok(finding, 'console finding must exist');
     assert.equal(finding!.severity, 'BLOCKER',
       'user rc remap must win over the per-finding severity the detector sets');
+  });
+
+  it('lowercase severity in rc rules is accepted and normalized to uppercase', () => {
+    const dir = fixture('rc-lowercase-');
+    writeFile(dir, '.codemorerc.json', JSON.stringify({
+      rules: { 'ts-non-null': 'minor' },
+    }));
+
+    const loaded = loadCodemorerc(dir);
+
+    assert.deepEqual(loaded.ruleOverrides['ts-non-null'], { state: 'MINOR' },
+      'lowercase severities (as used by this repo\'s own .codemorerc.json) must be accepted and stored uppercase');
+    assert.equal(loaded.warnings.length, 0, `expected no warnings, got: ${loaded.warnings.join('; ')}`);
   });
 
   it('malformed .codemorerc.json produces a visible stderr warning', async () => {
