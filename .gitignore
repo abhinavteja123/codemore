@@ -57,3 +57,6 @@ triage-results/
 
 # Root scan artifact
 report.json
+
+# Local production env hand-off (never commit)
+.env.vercel-production
