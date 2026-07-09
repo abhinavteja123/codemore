@@ -107,3 +107,20 @@ export function _resetPythonParserForTests(): void {
   cached = null;
   initPromise = null;
 }
+
+/**
+ * Free the WASM parser explicitly. Node 24 on Windows dies with
+ * `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` when the
+ * process tears down while emscripten's async handles are still open —
+ * AFTER all output is written, so the only symptom is a bogus non-zero
+ * exit code. CLI entry points call this once scanning is done.
+ */
+export function disposePythonParser(): void {
+  try {
+    if (cached?.parser && typeof cached.parser.delete === 'function') {
+      cached.parser.delete();
+    }
+  } catch { /* teardown must never fail the run */ }
+  cached = null;
+  initPromise = null;
+}

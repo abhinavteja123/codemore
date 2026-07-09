@@ -1,3 +1,4 @@
+/* codemore-ignore-file: core-security-hardcoded-secret-pattern, core-security-hardcoded-password */ // intentional demo-vulnerability strings for the linter sandbox UI
 import React, { useState, useEffect } from "react";
 import WebGLHoloScope from "./WebGLHoloScope";
 import { 

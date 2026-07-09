@@ -1,3 +1,4 @@
+<!-- codemore-ignore-file: vibe-cicd-secret-in-yaml, core-security-hardcoded-secret-pattern -->
 # vibe-cicd-secret-in-yaml
 
 **Pack:** `vibe-secrets`

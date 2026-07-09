@@ -15,10 +15,10 @@ import { runScan, parseScanArgs } from './commands/scan';
 import { runServeMcp } from './commands/serve-mcp';
 import { runMcp } from './commands/mcp';
 import { runBaseline } from './commands/baseline';
-import { runFix } from './commands/fix';
 import { toolVersion } from '../../shared/toolVersion';
 import { color } from './colors';
 import { runInteractiveMenu, isInteractiveTty } from './interactiveMenu';
+import { disposePythonParser } from '../../shared/rules/pythonAst';
 
 const VERSION = toolVersion();
 
@@ -99,8 +99,12 @@ async function main(argv: string[]): Promise<number> {
         return await runScan(parseScanArgs(rest));
       case 'baseline':
         return await runBaseline(rest);
-      case 'fix':
+      case 'fix': {
+        // Lazy require: the fix command pulls in the agentic-fixer chain,
+        // which non-fix invocations should not pay for at startup.
+        const { runFix } = require('./commands/fix') as typeof import('./commands/fix');
         return await runFix(rest);
+      }
       case 'mcp':
         return await runMcp(rest);
       case 'serve-mcp':
@@ -117,8 +121,16 @@ async function main(argv: string[]): Promise<number> {
 }
 
 // Run when executed directly. Imported usages must call main() explicitly.
+// process.exitCode (not process.exit) — a hard exit races the tree-sitter
+// WASM worker's handle teardown on Windows/Node 24 and dies with
+// `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` AFTER the report
+// has already been written. Letting the loop drain exits with the right
+// code once the parser handles close.
 if (require.main === module) {
-  main(process.argv).then(code => process.exit(code));
+  main(process.argv).then(code => {
+    disposePythonParser();
+    process.exitCode = code;
+  });
 }
 
 export { main };

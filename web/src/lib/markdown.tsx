@@ -113,7 +113,10 @@ function renderTable(lines: string[]): ReactNode {
 }
 
 export function renderMarkdown(md: string): ReactNode {
-  const lines = md.split('\n');
+  // \r?\n — CRLF files leave a trailing \r on every line otherwise, and
+  // JS regex `.` does not match \r, so `/^(#{1,6})\s+(.+)$/` stops matching
+  // headings and the paragraph fallback below loops forever on the '#' line.
+  const lines = md.split(/\r?\n/);
   const out: ReactNode[] = [];
   let key = 0;
   const k = () => key++;
@@ -218,6 +221,12 @@ export function renderMarkdown(md: string): ReactNode {
     }
     if (buf.length > 0) {
       out.push(<p key={k()}>{renderInline(buf.join(' '))}</p>);
+    } else {
+      // A line the paragraph loop refuses to consume (e.g. '#' with no
+      // space) would otherwise never advance i — emit it raw instead of
+      // hanging the whole static build.
+      out.push(<p key={k()}>{renderInline(line)}</p>);
+      i++;
     }
   }
 
