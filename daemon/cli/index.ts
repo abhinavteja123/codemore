@@ -102,6 +102,7 @@ async function main(argv: string[]): Promise<number> {
       case 'fix': {
         // Lazy require: the fix command pulls in the agentic-fixer chain,
         // which non-fix invocations should not pay for at startup.
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { runFix } = require('./commands/fix') as typeof import('./commands/fix');
         return await runFix(rest);
       }

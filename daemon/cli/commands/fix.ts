@@ -85,6 +85,7 @@ const GUIDANCE =
   '          CODEMORE_LLM_MODEL=<model-id> to override the default model.\n' +
   'No key is stored or sent anywhere except the provider you choose.';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- provider JSON shapes differ; callers use optional chaining
 async function postJson(url: string, headers: Record<string, string>, body: unknown): Promise<any> {
   const response = await fetch(url, {
     method: 'POST',
