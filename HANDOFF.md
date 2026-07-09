@@ -136,6 +136,86 @@ Section B above described 0.2.4 stuck behind a Bash-shell auth mismatch. Here's 
 
 ---
 
+## 0.8 Update — 2026-07-08/09 (OSS publish push + catalog 59 + release-gate hardening)
+
+Two back-to-back sessions rolled into one update: OSS-readiness hygiene, a new rule + two new CLI surfaces, a release-gate dry-run that caught two real blockers, a monolith autopsy, and a live probe of what's actually deployed. Everything below was verified this session unless flagged otherwise. Read A→G in order if picking this up cold.
+
+### A. OSS publish push (commits `6a0b77e` → `80f5c84` → `41c953b`)
+
+Repo hygiene for the public push, all landed on main:
+
+- **`.gitignore` typo fixed**: `*/vsix` → `*.vsix`. The old pattern matched nothing — which is why VSIX artifacts kept appearing untracked.
+- **Untracked from git**: `report.json` (the 623 KB scan artifact §0.7's "loose end" flagged as accidentally committed) and `codemore-0.2.2.vsix`.
+- **§0.7's "minor, not urgent" item 4 is done**: `.codemorerc.json` severities are now case-insensitive. Root cause was in `codemorercLoader.ts`; +1 test.
+- **`web/.env.example` synced** to the env vars the code actually reads (it had drifted).
+- **One stale `codemore.dev`** the 74-file rebrand missed, fixed in `scripts/format-pr-comment.js`.
+- **README fully rewritten.** A broken unclosed `<div>` had wrecked GitHub's rendering of the entire page; it's now hero + TOC + collapsed `<details>` sections. The user then added their own logo image via GitHub web edits — so the remote README carries a commit made outside this tree.
+- **Issue templates** (bug / rule-FP / rule-proposal) + PR template added; GitHub repo description + 10 topics set.
+- **Version bumped to 0.2.6**; CHANGELOG backfilled for 0.2.3–0.2.5.
+
+### B. Catalog 58 → 59, plus `codemore fix` and SARIF output (commits `7bcaea5`, `22501cc`, `69d0a6a`, `7bb1d84`)
+
+- **NEW RULE `core-security-hardcoded-password`** — B105-class: `password = "..."`, `config['SECRET_KEY'] = '...'`, `pw === "..."` backdoor comparisons. CRITICAL / beta. Suffix-anchored CRED_NAME matching plus placeholder/comment filters keep it quiet. TP 9/9, FP 0 on the corpus. This fills the recall gap the 2026-07-07 bandit audit exposed. **Catalog is now 59 rules.**
+- **`duplicate-string` recalibrated to v1.1.0** (≥5 occurrences, ≥8 chars, test files skipped) but **stays experimental**: self-scan still yields 51 idiomatic hits (HTTP header names, TS string-literal-type comparisons). Promotion needs AST-level type context, not more threshold tuning.
+- **NEW `codemore fix`** — the agentic fix loop, now reachable from the CLI. Wraps the *existing* `runAgenticFix`/`validatorHarness`; no new fix engine was written. Generator is env-keyed: `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`, with `CODEMORE_LLM_PROVIDER`/`CODEMORE_LLM_MODEL` overrides. Dry-run by default (writes a `.codemore-fix` sidecar); `--write` applies with `.bak` backups; no key present → exit 1 with guidance, never a hang. 7 tests.
+- **NEW `codemore scan --format sarif`** — SARIF 2.1.0 emitted via `shared/report/sarif.ts` (shared module, not CLI-local, so other surfaces can reuse it). Severity map: BLOCKER/CRITICAL → error, MAJOR → warning, MINOR/INFO → note. `instanceId` is carried in `partialFingerprints`. 4 tests.
+- **Test totals**: 172 unit tests passing; corpus 59/59 + 59/59.
+
+### C. Release-gate simulation caught two real blockers (commit `bdf1748`)
+
+Ran the release gates as if shipping for real. Two failed, one long-standing crash got diagnosed:
+
+1. **Self-scan `--fail-on BLOCKER` had 8 BLOCKERs** — every one of them intentional demo/docs data that had simply never been suppressed: the linter-sandbox demo strings (both the `src/` and `web/` copies), the InteractiveDiff demo, `vibe-cicd-secret-in-yaml.md`'s own example snippet, and the static JSON-LD `dangerouslySetInnerHTML` in web's `layout.tsx`. Each now carries a scoped `codemore-ignore-file` directive with an inline reason explaining why it's exempt. Gate exits 0.
+2. **The web docs static build hung FOREVER on CRLF markdown.** `web/src/lib/markdown.tsx` split on `'\n'` only; JS regex `.` doesn't match `\r`, so the heading regex failed to match and the paragraph fallback never advanced past a `#` line → infinite loop. Fixed with a `/\r?\n/` split plus a fallthrough guard. **The trigger**: this repo has NO `.gitattributes`, so git autocrlf converts files to CRLF on any Windows checkout — the same source that builds fine on Linux CI hung locally. Build is back at the exact 27.6 kB / 137 kB baseline.
+3. **Diagnosed but pre-existing — NOT this session's code (repros at `b27e0b9`)**: Node 24 on Windows can hit a libuv teardown assert (`src\win\async.c:94`) on some corpus scans, *after* complete valid output has already been written. It's stdio-timing dependent — `execFileSync` passes, bash-redirect crashes — and Linux CI is unaffected. Practical impact: local `validate-rule-pr.js` runs can flake-fail 2–3 directories from it. Exit hygiene was added anyway: `process.exitCode` instead of `process.exit`, `disposePythonParser()` at CLI exit, and the fix-command chain is now lazy-required.
+
+### D. Monolith autopsy — VERDICT (read-only, no code changed)
+
+`staticAnalyzer.ts` (2,683 LOC) and `aiService.ts` (1,827 LOC) are **NOT deletable**. Live paths that still route through them:
+
+- `daemon/index.ts:218` — the extension daemon RPC → AiService → SuggestionEngine → analysisQueue.
+- `web/src/lib/productionAnalyzer.ts` → `/api/analyze` + `scanJobRunner`.
+- `web/src/lib/fixSuggestions.ts` → `/api/projects/[id]/suggestions`.
+
+"One brain" is true only for CLI / MCP / Action — the extension and the web app still run the legacy analyzer internally. Deletion requires migrating both consumers to `registryAdapter` first; that's a separate future project, not a cleanup task.
+
+### E. Deployment state (user-side actions, live-probed this session)
+
+- **npm registry = 0.2.5.** 0.2.6 is bumped in-repo but NOT published (see G.1 for the unblock).
+- **VS Code Marketplace**: the user published *some* VSIX version — the exact version is unconfirmed. This matters for section F's caveat.
+- **Vercel**: web is deployed and `codemore.tech` is live. Probed against the live site: NEXTAUTH secret is set (session endpoint 200), GitHub OAuth works end-to-end (real client_id `Ov23liEiJ0K91qTOhCmm`, correct callback), Google OAuth works (PKCE), `/dashboard` returns 200, `/api/analyze` is alive with proper input validation.
+- **Missing env (probable — inferred from live behavior, not read off the Vercel dashboard)**:
+  - the Supabase trio (`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`) — without it, sign-in works but tokens aren't stored; "No database connection" in logs;
+  - `GEMINI_API_KEY` — fix suggestions dead;
+  - `CODEMORE_JOB_ENCRYPTION_KEY` — currently falls back to `NEXTAUTH_SECRET` per `scanArtifacts.ts:51`;
+  - `NEXT_PUBLIC_SITE_URL` and `LOG_LEVEL=info`.
+- **Vercel CLI gotcha**: the local `vercel` CLI is logged in as `abhinavteja123` but sees ZERO projects — the deploy lives under a *different* Vercel login. The user must `npx vercel login` with GitHub before the CLI can manage env vars for the real project.
+
+### F. VSIX 0.2.6 built + packaging bug fixed (commit `2dc5246`)
+
+`.vscodeignore` had no `*.tgz` rule; a stray `codemore-0.2.2.tgz` (a 121 MB npm-pack artifact) ballooned the VSIX to 118.72 MB. Rule added, stray deleted, rebuilt: **`codemore-0.2.6.vsix` at repo root, 2.84 MB / 25 files** — matches the known-good build profile. Ready to upload. **CAVEAT**: if the Marketplace listing already shows 0.2.6 (see E — version unconfirmed), the manifest must bump to 0.2.7 first; the Marketplace refuses to republish an existing version.
+
+### G. What's left, in priority order
+
+1. **npm 0.2.6**: set the CI secret (`gh secret set NPM_TOKEN -R abhinavteja123/codemore`), then `git push codemore v0.2.6` — CI was verified passing all gates this session. Local tags `v0.2.6`/`v1` need retagging to the final HEAD before pushing. The MCP server ships inside the same package; nothing separate to publish.
+2. **Upload `codemore-0.2.6.vsix`** to the Marketplace (mind F's version caveat).
+3. **Vercel env vars** from E, then redeploy.
+4. **Remote `v1` tag is one commit behind** — `git push codemore v1 --force` (the permission classifier blocked the assistant from running it; user must).
+5. **A4 multi-IDE verification matrix** — Cursor / Claude Code / Claude Desktop / Codex, with screen recordings.
+6. **Manual eyeballs still owed**: interactive menu Ctrl-C cancel (§0.7 next-up item 3, still unconfirmed) and the hero scroll-dive in a real browser (§0.6, still unconfirmed).
+7. **MCP registry submissions** (server.json + modelcontextprotocol registry + Smithery) — after npm 0.2.6 is live.
+8. **Track C flywheel**: telemetry on (needs the Vercel env above) → 30 days of FP data → first beta→stable promotions → `auto-demote-rules.yml` nightly.
+9. **Python rule parity** — ~12 py rules vs ~46 TS, the biggest catalog asymmetry; est. 2–3 sessions.
+10. **A3 remainder**: biome JS config; clippy/gitleaks/golangci recall audit (env-blocked on 2026-07-07 by missing tool binaries).
+11. **Monolith migration** to `registryAdapter`, then delete (see D).
+12. **A7 StrykerJS mutation testing.**
+13. **Consider `.gitattributes`** (`* text=auto eol=lf`) — kills the entire CRLF landmine class that C.2 came from.
+14. **Dashboard Playwright smoke** — upload ZIP → report renders.
+
+PLAN.md remains the live plan of record (Tracks A/B/C unchanged); the list above is the current cross-track execution order.
+
+---
+
 ## 1. Why this exists — the actual problem
 
 AI coding agents (Cursor, Claude Code, Copilot, Codex) ship code fast and ship *bugs* fast. The data driving this project:

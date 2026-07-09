@@ -6,11 +6,19 @@ All notable changes to CodeMore. Semantic Versioning.
 
 ### Added
 
+- **`core-security-hardcoded-password`** (CRITICAL, beta) — B105-class hardcoded credential assignments (`password = "hunter2"`) and comparisons (`if token == "abc"`), the recall gap bandit caught in the A3 audit. Catalog: 58 → 59 rules.
+- **`codemore fix`** — the agentic fix loop from the command line. Generator keyed off `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`; dry-run by default (proposed content written to a `.codemore-fix` sidecar), `--write` patches in place with a `.bak` backup.
+- **`codemore scan --format sarif`** — SARIF 2.1.0 output for GitHub code scanning upload (`shared/report/sarif.ts`).
 - `.github/ISSUE_TEMPLATE/` (bug report, rule false-positive, rule proposal) and a PR template. FP reports feed the beta→stable promotion pipeline.
 - `web/.env.example` now documents every env var the web app actually reads (`GEMINI_API_KEY`, `CODEMORE_AI_PROVIDER`, `CODEMORE_AI_API_KEY`, `NEXT_PUBLIC_SITE_URL`, `LOG_LEVEL`).
 
 ### Fixed
 
+- **`core-quality-duplicate-string` recalibrated (v1.1.0)** — now requires ≥ 5 occurrences of strings ≥ 8 chars and skips test files; stays `experimental` (real-world precision was ~10% at the old ≥ 3 threshold).
+- **Web docs renderer infinite loop on CRLF markdown** — line splitting is now `/\r?\n/` plus a fallthrough guard in `web/src/lib/markdown.tsx`; CRLF-checked-out rule docs no longer hang the page.
+- 8 intentional demo/docs BLOCKERs suppressed with scoped `codemore-ignore-file` directives so the release self-scan gate passes at 0 BLOCKERs.
+- CLI exit hygiene: `process.exitCode` instead of hard `process.exit()`, `disposePythonParser()` on completion, and the fix command is `require`d lazily.
+- `.vscodeignore` was missing a `*.tgz` rule — VSIX back down from 118.72 MB to 2.84 MB.
 - **`.codemorerc.json` severities are now case-insensitive** (`"minor"` == `"MINOR"`); previously lowercase values were silently dropped with a warning.
 - Broken `.gitignore` glob `*/vsix` → `*.vsix`; untracked stray build artifacts (`report.json`, `codemore-0.2.2.vsix`) from git.
 - Stale `codemore.dev` link in the GitHub Action PR comment footer → `codemore.tech`.
