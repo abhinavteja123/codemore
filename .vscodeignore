@@ -66,6 +66,7 @@ PUBLISHING.md
 vsc-extension-quickstart.md
 codemore-issues-*.json
 ai mentor bugs.json
+*.tgz
 verify-*.mjs
 analyze.mjs
 webaccuracy.mjs
