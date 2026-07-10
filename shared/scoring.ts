@@ -53,7 +53,35 @@ export function calculateFileHealthScore(
 }
 
 /**
+ * Project-level severity cap.
+ *
+ * The per-file average alone is misleading on large codebases: hundreds of
+ * clean files dilute the average, so a project with 300 findings — including
+ * live BLOCKERs — can still read 96/100. A codebase with a BLOCKER anywhere
+ * is not "excellent" no matter how many clean files surround it, so the
+ * aggregate score is capped by the worst severity present:
+ *
+ *   any BLOCKER:   cap 59, −3 per additional BLOCKER, floor 25
+ *   else CRITICAL: cap 79, −2 per additional CRITICAL, floor 45
+ *   else:          no cap (MAJOR/MINOR/INFO density is already priced into
+ *                  the per-file average)
+ */
+export function severityCap(totals: Pick<IssueSeverityCounts, 'BLOCKER' | 'CRITICAL'>): number {
+  if (totals.BLOCKER > 0) {
+    return Math.max(25, 59 - (totals.BLOCKER - 1) * 3);
+  }
+  if (totals.CRITICAL > 0) {
+    return Math.max(45, 79 - (totals.CRITICAL - 1) * 2);
+  }
+  return 100;
+}
+
+/**
  * Calculate the overall health score across all analyzed files.
+ *
+ * Base score is the per-file average (scales with codebase size); the
+ * result is then capped by `severityCap` so BLOCKERs/CRITICALs anywhere
+ * always pull the headline number out of the "healthy" range.
  *
  * @param issuesByFile - Map of file paths to their issue counts
  * @param filesAnalyzed - Total number of files analyzed
@@ -73,8 +101,14 @@ export function calculateHealthScore(
   const totalFilesInScore = Math.max(filesAnalyzed, issuesByFile.size);
   const cleanFiles = totalFilesInScore - fileScores.length;
   const sumScores = fileScores.reduce((a, b) => a + b, 0) + (cleanFiles * 100);
+  const base = Math.round(sumScores / totalFilesInScore);
 
-  return Math.round(sumScores / totalFilesInScore);
+  const totals = { BLOCKER: 0, CRITICAL: 0 };
+  for (const counts of issuesByFile.values()) {
+    totals.BLOCKER += counts.BLOCKER ?? 0;
+    totals.CRITICAL += counts.CRITICAL ?? 0;
+  }
+  return Math.min(base, severityCap(totals));
 }
 
 /**
@@ -103,7 +137,7 @@ export function calculateHealthScoreFromTotals(
     MINOR:    Math.ceil(counts.MINOR    / filesAnalyzed),
     INFO:     Math.ceil(counts.INFO     / filesAnalyzed),
   };
-  return calculateFileHealthScore(normalized);
+  return Math.min(calculateFileHealthScore(normalized), severityCap(counts));
 }
 
 /**

@@ -10,6 +10,10 @@ import {
   IssueCategory,
   ProjectFile,
 } from "./types";
+import {
+  calculateHealthScoreFromTotals,
+  calculateTechnicalDebt,
+} from "../../../shared/scoring";
 
 // ============================================================================
 // Language Detection
@@ -734,21 +738,11 @@ export function analyzeProject(files: ProjectFile[]): {
     0
   );
 
-  // Calculate health score
-  let overallScore = 100;
-  overallScore -= issuesBySeverity.BLOCKER * 15;
-  overallScore -= issuesBySeverity.CRITICAL * 10;
-  overallScore -= issuesBySeverity.MAJOR * 5;
-  overallScore -= issuesBySeverity.MINOR * 2;
-  overallScore -= issuesBySeverity.INFO * 1;
-  overallScore = Math.max(0, Math.min(100, overallScore));
-
-  const technicalDebtMinutes =
-    issuesBySeverity.BLOCKER * 120 +
-    issuesBySeverity.CRITICAL * 60 +
-    issuesBySeverity.MAJOR * 30 +
-    issuesBySeverity.MINOR * 10 +
-    issuesBySeverity.INFO * 5;
+  // One brain: score/debt come from shared/scoring.ts. This function used to
+  // hardcode its own diverging weights here — that's how "300 findings but
+  // 96/100" class bugs are born. Never inline scoring math again.
+  const overallScore = calculateHealthScoreFromTotals(issuesBySeverity, files.length);
+  const technicalDebtMinutes = calculateTechnicalDebt(issuesBySeverity);
 
   const metrics: CodeHealthMetrics = {
     overallScore,
