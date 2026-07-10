@@ -2,7 +2,9 @@
 
 All notable changes to CodeMore. Semantic Versioning.
 
-## [0.2.6] — 2026-07-08 — open-source hygiene + case-insensitive rc severities
+## [0.2.7] — 2026-07-10 — severity-capped scoring, serverless scan fix, new rule + CLI surfaces
+
+(0.2.6 was never published; everything below ships as 0.2.7.)
 
 ### Added
 
@@ -14,6 +16,8 @@ All notable changes to CodeMore. Semantic Versioning.
 
 ### Fixed
 
+- **Health score severity caps** — the per-file average diluted on large codebases ("300 findings but 96/100"). The aggregate is now capped by the worst severity present: any BLOCKER → ≤59 (−3 each additional, floor 25); else any CRITICAL → ≤79 (−2 each, floor 45). One brain in `shared/scoring.ts`; all four surfaces (CLI, MCP, extension, web) inherit it.
+- **Hosted web scans 500'd on Vercel** (`ENOENT mkdir /var/task/web/.scan-artifacts`) — the serverless filesystem is read-only and per-invocation. Scan-job artifacts (encrypted GitHub token, uploaded zips) moved to a new `scan_artifacts` Supabase table (migration 006); disk remains only as the no-DB dev fallback.
 - **`core-quality-duplicate-string` recalibrated (v1.1.0)** — now requires ≥ 5 occurrences of strings ≥ 8 chars and skips test files; stays `experimental` (real-world precision was ~10% at the old ≥ 3 threshold).
 - **Web docs renderer infinite loop on CRLF markdown** — line splitting is now `/\r?\n/` plus a fallthrough guard in `web/src/lib/markdown.tsx`; CRLF-checked-out rule docs no longer hang the page.
 - 8 intentional demo/docs BLOCKERs suppressed with scoped `codemore-ignore-file` directives so the release self-scan gate passes at 0 BLOCKERs.
