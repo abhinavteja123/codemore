@@ -1,7 +1,6 @@
 "use client";
-/* codemore-ignore-file: core-security-hardcoded-secret-pattern, core-security-hardcoded-password */ // intentional demo-vulnerability strings for the linter sandbox UI
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import WebGLHoloScope from "./WebGLHoloScope";
 import { 
   Terminal, 
@@ -95,6 +94,7 @@ async function processTransaction(req, res) {
 };
 
 export default function CodeMoreLinterSandbox() {
+  const lineNumbersRef = useRef<HTMLDivElement>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("mongodb");
   const [editorCode, setEditorCode] = useState<string>(TEMPLATES.mongodb.code);
   const [findings, setFindings] = useState<any[]>([]);
@@ -310,17 +310,13 @@ export default function CodeMoreLinterSandbox() {
           <div className="lg:col-span-8 flex flex-col gap-6">
             
             {/* Quick selectors bar */}
-            <div className="flex flex-wrap items-center gap-2.5 p-1 bg-gray-950/60 rounded-xl border border-gray-900">
-              <span className="text-[10px] font-mono text-gray-500 uppercase tracking-wider px-3 py-1">Vulnerabilities:</span>
+            <div className="flex items-center gap-2.5 p-1 bg-gray-950/60 rounded-xl border border-gray-900 overflow-x-auto whitespace-nowrap scrollbar-none md:flex-wrap md:overflow-x-visible md:whitespace-normal">
+              <span className="text-[10px] font-mono text-gray-500 uppercase tracking-wider px-3 py-1 shrink-0">Vulnerabilities:</span>
               {Object.entries(TEMPLATES).map(([id, item]) => (
                 <button
                   key={id}
                   onClick={() => setSelectedTemplateId(id)}
-                  className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-all ${
-                    selectedTemplateId === id 
-                      ? "bg-teal-500/10 border border-teal-500/22 text-teal-300" 
-                      : "text-gray-400 hover:text-white border border-transparent hover:bg-white/5"
-                  }`}
+                  className="px-3 py-1.5 text-xs font-mono rounded-lg transition-all text-gray-400 hover:text-white border border-transparent hover:bg-white/5 shrink-0"
                 >
                   {item.name}
                 </button>
@@ -345,9 +341,12 @@ export default function CodeMoreLinterSandbox() {
               {/* Dynamic typing core textarea */}
               <div className="relative flex-1 flex overflow-hidden">
                 {/* Visual margin lines indicator */}
-                <div className="w-12 bg-gray-950/40 border-r border-gray-900/60 flex flex-col items-center py-4 font-mono text-[10px] text-gray-600 select-none">
+                <div 
+                  ref={lineNumbersRef}
+                  className="w-12 bg-gray-950/40 border-r border-gray-900/60 flex flex-col items-center py-4 font-mono text-[10px] text-gray-600 select-none overflow-hidden h-full"
+                >
                   {editorCode.split("\n").map((_, i) => (
-                    <span key={i} className="leading-6 h-6">{i + 1}</span>
+                    <span key={i} className="leading-6 h-6 shrink-0">{i + 1}</span>
                   ))}
                 </div>
 
@@ -355,6 +354,11 @@ export default function CodeMoreLinterSandbox() {
                   className="flex-1 p-4 bg-transparent font-mono text-xs text-gray-300 resize-none outline-none focus:ring-0 leading-6 overflow-y-auto"
                   value={editorCode}
                   onChange={(e) => setEditorCode(e.target.value)}
+                  onScroll={(e) => {
+                    if (lineNumbersRef.current) {
+                      lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop;
+                    }
+                  }}
                   placeholder="// Paste your node.js / typescript code snippet here to scan instantly..."
                   spellCheck="false"
                 />

@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useRef, useState, useMemo } from "react";
+import Lenis from "lenis";
 import Link from "next/link";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -97,6 +98,52 @@ export default function Landing() {
   useEffect(() => {
     const t = setTimeout(() => setIsLoaded(true), 2400);
     return () => clearTimeout(t);
+  }, []);
+
+  // ── Window width and responsive spacing ──────────────────────────
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize, { passive: true });
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const cardSpacing = useMemo(() => {
+    if (windowWidth < 480) {
+      return Math.min(windowWidth * 0.42, 180);
+    }
+    if (windowWidth < 760) {
+      return Math.min(windowWidth * 0.35, 200);
+    }
+    if (windowWidth < 1024) {
+      return Math.min(windowWidth * 0.25, 215);
+    }
+    return Math.min(windowWidth * 0.17, 215);
+  }, [windowWidth]);
+
+  const dropOffset = useMemo(() => {
+    return windowWidth < 760 ? 20 : 60;
+  }, [windowWidth]);
+
+  const rotationStep = 7;
+
+  // ── Initialize Lenis Smooth Scroll ──────────────────────────────
+  useEffect(() => {
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      smoothWheel: true,
+    });
+
+    const raf = (time: number) => {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    };
+    requestAnimationFrame(raf);
+
+    return () => {
+      lenis.destroy();
+    };
   }, []);
 
   // ── Scroll-driven portal animations ──────────────────────────────
@@ -452,9 +499,9 @@ export default function Landing() {
               const delta = i - cardIdx;
               const abs = Math.abs(delta);
               const isCenter = delta === 0;
-              const xOffset = delta * 240;
-              const yOffset = abs * 18;
-              const rotate = delta * 6;
+              const xOffset = delta * cardSpacing;
+              const yOffset = abs * dropOffset;
+              const rotate = delta * rotationStep;
               const opacity = abs > 2 ? 0 : 1 - abs * 0.22;
               return (
                 <div

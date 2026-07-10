@@ -1,4 +1,3 @@
-/* codemore-ignore-file: vibe-xss-dangerously-set */ // sole use is static JSON-LD structured data via JSON.stringify — no user input
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { ClientProviders } from "./client-providers";

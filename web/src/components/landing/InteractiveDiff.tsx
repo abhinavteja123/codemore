@@ -1,5 +1,4 @@
 "use client";
-/* codemore-ignore-file: core-security-hardcoded-secret-pattern */ // intentional demo secret shapes in the before/after diff data
 
 import React, { useState } from "react";
 import { motion } from "framer-motion";

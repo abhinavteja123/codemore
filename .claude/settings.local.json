@@ -197,7 +197,9 @@
       "PowerShell(node -e \"const l=require\\('./package-lock.json'\\); const p=l.packages['node_modules/@biomejs/cli-darwin-arm64']; console.log\\('version:',l.version\\); console.log\\(p?JSON.stringify\\({optional:p.optional,os:p.os,cpu:p.cpu}\\):'absent'\\); const d=l.packages['']; console.log\\('direct deps mention darwin:', JSON.stringify\\(Object.keys\\({...d.dependencies,...d.devDependencies}\\).filter\\(k=>k.includes\\('darwin'\\)\\)\\)\\)\")",
       "PowerShell(npm run *)",
       "mcp__plugin_ecc_chrome-devtools__new_page",
-      "Bash(npm version *)"
+      "Bash(npm version *)",
+      "Bash(npx ts-node *)",
+      "Bash(echo \"self-scan gate exit: $?\")"
     ]
   },
   "enabledPlugins": {
