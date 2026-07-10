@@ -4,8 +4,10 @@
    replacement; rules will re-apply per-component after the rewrite. */
 
 import { promises as fs } from "fs";
+import os from "os";
 import path from "path";
 import crypto from "crypto";
+import { supabaseAdmin, isDbEnabled } from "./supabase";
 
 type GitHubArtifactPayload = {
   kind: "github";
@@ -18,12 +20,21 @@ type GitHubArtifactPayload = {
 
 type ZipArtifactPayload = {
   kind: "zip";
-  archivePath: string;
+  /** Dev/disk fallback only. */
+  archivePath?: string;
+  /** DB-backed storage: the archive itself, base64-encoded. */
+  archiveBase64?: string;
 };
 
 type ScanArtifactPayload = GitHubArtifactPayload | ZipArtifactPayload;
 
-const ARTIFACT_DIR = path.join(process.cwd(), ".scan-artifacts");
+// Artifacts live in Supabase (`scan_artifacts` table) when the DB is
+// configured. The filesystem is only a dev fallback: on Vercel the deploy
+// bundle is read-only (mkdir under process.cwd() throws ENOENT) AND each
+// invocation may land on a different lambda, so a disk artifact written by
+// the enqueue request is invisible to the poll request that processes the
+// job. os.tmpdir() keeps the no-DB local dev path working.
+const ARTIFACT_DIR = path.join(os.tmpdir(), "codemore-scan-artifacts");
 
 /**
  * Validate jobId to prevent path traversal attacks.
@@ -103,37 +114,61 @@ function decryptText(ciphertext: string, iv: string, authTag: string): string {
   return plaintext.toString("utf8");
 }
 
-export async function saveZipArtifact(jobId: string, archiveBuffer: Buffer): Promise<void> {
+async function savePayload(jobId: string, payload: ScanArtifactPayload): Promise<void> {
+  validateJobId(jobId);
+  if (isDbEnabled() && supabaseAdmin) {
+    const { error } = await supabaseAdmin
+      .from("scan_artifacts")
+      .upsert({ job_id: jobId, payload }, { onConflict: "job_id" });
+    if (error) {
+      throw new Error(`Failed to store scan artifact: ${error.message}`);
+    }
+    return;
+  }
   await ensureArtifactDir();
+  await fs.writeFile(getMetadataPath(jobId), JSON.stringify(payload), "utf8");
+}
 
+export async function saveZipArtifact(jobId: string, archiveBuffer: Buffer): Promise<void> {
+  if (isDbEnabled() && supabaseAdmin) {
+    await savePayload(jobId, { kind: "zip", archiveBase64: archiveBuffer.toString("base64") });
+    return;
+  }
+
+  await ensureArtifactDir();
   const archivePath = getArchivePath(jobId);
   await fs.writeFile(archivePath, archiveBuffer);
-
-  const payload: ZipArtifactPayload = {
-    kind: "zip",
-    archivePath,
-  };
-
-  await fs.writeFile(getMetadataPath(jobId), JSON.stringify(payload), "utf8");
+  await savePayload(jobId, { kind: "zip", archivePath });
 }
 
 export async function saveGitHubArtifact(
   jobId: string,
   params: { repoFullName: string; branch?: string; accessToken: string }
 ): Promise<void> {
-  await ensureArtifactDir();
-
   const encrypted = encryptText(params.accessToken);
-  const payload: GitHubArtifactPayload = {
+  await savePayload(jobId, {
     kind: "github",
     repoFullName: params.repoFullName,
     branch: params.branch,
     encryptedAccessToken: encrypted.ciphertext,
     iv: encrypted.iv,
     authTag: encrypted.authTag,
-  };
+  });
+}
 
-  await fs.writeFile(getMetadataPath(jobId), JSON.stringify(payload), "utf8");
+async function loadPayload(jobId: string): Promise<ScanArtifactPayload | null> {
+  validateJobId(jobId);
+  if (isDbEnabled() && supabaseAdmin) {
+    const { data, error } = await supabaseAdmin
+      .from("scan_artifacts")
+      .select("payload")
+      .eq("job_id", jobId)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data.payload as ScanArtifactPayload;
+  }
+  const raw = await fs.readFile(getMetadataPath(jobId), "utf8");
+  return JSON.parse(raw) as ScanArtifactPayload;
 }
 
 export async function loadArtifact(jobId: string): Promise<
@@ -142,10 +177,14 @@ export async function loadArtifact(jobId: string): Promise<
   | null
 > {
   try {
-    const raw = await fs.readFile(getMetadataPath(jobId), "utf8");
-    const payload = JSON.parse(raw) as ScanArtifactPayload;
+    const payload = await loadPayload(jobId);
+    if (!payload) return null;
 
     if (payload.kind === "zip") {
+      if (payload.archiveBase64) {
+        return { kind: "zip", archiveBuffer: Buffer.from(payload.archiveBase64, "base64") };
+      }
+      if (!payload.archivePath) return null;
       const archiveBuffer = await fs.readFile(payload.archivePath);
       return {
         kind: "zip",
@@ -169,12 +208,18 @@ export async function loadArtifact(jobId: string): Promise<
 }
 
 export async function deleteArtifact(jobId: string): Promise<void> {
+  validateJobId(jobId);
+  if (isDbEnabled() && supabaseAdmin) {
+    await supabaseAdmin.from("scan_artifacts").delete().eq("job_id", jobId);
+    return;
+  }
+
   const metadataPath = getMetadataPath(jobId);
   try {
     const raw = await fs.readFile(metadataPath, "utf8");
     const payload = JSON.parse(raw) as ScanArtifactPayload;
 
-    if (payload.kind === "zip") {
+    if (payload.kind === "zip" && payload.archivePath) {
       await fs.rm(payload.archivePath, { force: true });
     }
   } catch {
