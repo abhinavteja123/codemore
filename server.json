@@ -1,7 +1,7 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.abhinavteja123/codemore",
-  "description": "The static analyzer your AI agent reads — scans vibe-coded apps for production-blocking bugs and returns fix-ready, machine-readable reports over MCP.",
+  "description": "The static analyzer your AI agent reads — fix-ready, machine-readable scan reports over MCP.",
   "repository": {
     "url": "https://github.com/abhinavteja123/codemore",
     "source": "github"
