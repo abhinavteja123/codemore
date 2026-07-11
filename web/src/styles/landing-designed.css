@@ -7,15 +7,10 @@ html {
      on fast scrolls. Lenis owns ALL scroll smoothing. */
   scroll-behavior: auto;
 }
-/* Below-fold static sections skip render work entirely until scrolled near.
-   Scroll-bound sections (.portal-scene, .scene2, .threats) are excluded —
-   they measure their own rects every frame. */
-.manifesto,
-.atlas,
-.footer {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 900px;
-}
+/* NOTE: content-visibility:auto was tried on the below-fold sections and
+   reverted — re-rendering them mid-upward-scroll caused visible jank that
+   outweighed the render savings. The canvases inside them already pause
+   themselves offscreen. */
 /* Heavy scroll-pinned sections own their paint + layout — sibling sections
    re-laying out (eg footer brand letters mounting) can't dirty the portal. */
 .portal-scene,
@@ -226,8 +221,11 @@ body {
   opacity: 0;
 }
 .nav.is-scrolled {
-  background: rgba(4, 4, 10, 0.75);
-  backdrop-filter: blur(16px);
+  /* solid, not backdrop-filter: backdrop blur forces a read-back of the live
+     WebGL behind the nav every frame — on weaker GPUs the compositor drops
+     the nav's tiles mid-scroll (the "nav vanishes" bug) and paints banding
+     artifacts over the portal. Same reason the other blurs below are solid. */
+  background: rgba(4, 4, 10, 0.92);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   padding: 16px 24px;
   border-radius: 999px;
@@ -544,6 +542,9 @@ body {
 .scene2 {
   position: relative;
   height: 350vh; /* Scrollable track for slide transition */
+  /* opaque: without a background, layers beneath bleed through as bands
+     during the hero → scene2 handoff on fast scrolls */
+  background: #04040a;
 }
 .scene2__sticky {
   position: sticky;
@@ -1411,8 +1412,7 @@ body {
   transform: translateX(-50%);
   width: min(440px, 92vw);
   z-index: 250;
-  background: rgba(8, 10, 22, 0.96);
-  backdrop-filter: blur(20px);
+  background: rgba(8, 10, 22, 0.97);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 18px;
   box-shadow:
@@ -1686,10 +1686,9 @@ body {
 .threats__detail {
   padding: 24px 28px;
   border-radius: 14px;
-  background: rgba(6, 9, 26, 0.65);
+  background: rgba(6, 9, 26, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.05);
   min-height: 240px;
-  backdrop-filter: blur(8px);
 }
 .threats__detail-eyebrow {
   font-family: var(--font-mono);

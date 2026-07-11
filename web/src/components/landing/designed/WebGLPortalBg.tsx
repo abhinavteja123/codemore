@@ -264,17 +264,17 @@ export default function WebGLPortalBg() {
         animationFrameId = null;
       }
     };
-    const io = new IntersectionObserver(
-      ([entry]) => (entry.isIntersecting ? startLoop() : stopLoop()),
-      { threshold: 0, rootMargin: "100px" }
-    );
-    // Reduced motion: single static frame, never observe/loop.
-    if (!reducedMotion) io.observe(canvas);
+    // NO IntersectionObserver here, deliberately: page.tsx hides the portal
+    // (visibility:hidden) synchronously with scroll once the dive veil covers
+    // it — that already drops the expensive 25×-scaled layer. An IO pause on
+    // top is async: on fast scroll-up the canvas turns visible showing a
+    // stale zoomed frame until the observer restarts the loop → the exact
+    // "flicker returning to the hero" bug. The always-on loop draws one cheap
+    // quad; hidden frames aren't composited.
     startLoop();
 
     return () => {
       stopLoop();
-      io.disconnect();
       ro.disconnect();
       window.removeEventListener("mousemove", handleMouseMove);
       gl.deleteBuffer(buffer);

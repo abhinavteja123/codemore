@@ -167,14 +167,14 @@ export default function Landing() {
     let rafId: number | null = null;
 
     const apply = (p: number) => {
-      const zoom      = 1 + Math.pow(p, 2.4) * 24;       // 1 → 25× — disc swells into a dive
+      const zoom      = 1 + Math.pow(p, 2.4) * 7;        // 1 → 8× — swells past the viewport edge; 25× was a GPU tile bomb every dive
       const coreB     = 1 + p * 1.6;                     // core brightens as we dive
       const ringO     = 1 - smooth(0.72, 0.96, p);       // ring fades just before the dive ends
       const copyO     = 1 - smooth(0.18, 0.52, p);
       const copyShift = p * -160;
       const copyScale = 1 + p * 0.12;
       const hintO     = 1 - smooth(0.02, 0.12, p);
-      const veilO     = smooth(0.8, 0.99, p);            // crossfade into scene2 palette at dive end
+      const veilO     = smooth(0.8, 0.97, p);            // fully opaque before the portal hides at 0.985
 
       portalRef.current!.style.setProperty("--pz",     zoom.toFixed(3));
       portalRef.current!.style.setProperty("--core-b", coreB.toFixed(3));
@@ -187,7 +187,7 @@ export default function Landing() {
       // composited layer. A will-change canvas scaled 25× that stays alive
       // for the whole page is what starves the GPU and makes the compositor
       // drop tiles (blank nav, texture garbage) on fast scrolls.
-      portalRef.current!.style.visibility = p >= 0.995 ? "hidden" : "visible";
+      portalRef.current!.style.visibility = p >= 0.985 ? "hidden" : "visible";
     };
 
     // No JS easing here: Lenis already smooths wheel scrolling, so the raw
