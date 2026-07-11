@@ -269,6 +269,22 @@ Known environment quirks (don't re-diagnose): Node 24 + Windows libuv teardown a
 
 ---
 
+## 0.10 Update — 2026-07-11 (0.2.7 live everywhere, docs sync, 0.2.8 prepped)
+
+Verified live by probing, not assumed: **npm `codemore@0.2.7`** (457 downloads first week), **VS Code Marketplace 0.2.7** (publisher CodeMore — domain still unverified), **codemore.tech + /docs both 200**, CI green, `NPM_TOKEN` secret set. MCP registry: not listed yet. GitHub: 1 star, 0 releases.
+
+Shipped this session (commits `8110243` → `bfd4cdf` → `4d9bb6d`):
+
+- **Docs sync to reality**: 47 rule docs wrongly said `lifecycle: experimental` (catalog is 58 beta + 1 experimental) — all fixed; 24 table-format rule docs got `**Pack:**` lines; docs/README/site synced to 59 rules / 6 packs / 0.2.7 / `codemore fix` / `--format sarif` / `codemore mcp` / scoring caps.
+- **Two production site bugs fixed**: `/docs/limitations` + `/docs/security-gate` 404'd (missing from `docs.ts` STATIC_PAGES); rules index grouped 24 rules under pack "-" with no chips (parser now falls back to the table metadata format). Web build verified: 6 packs, all chips render.
+- **release.yml fixed twice**: tag-verify step crashed on quote escaping (`node -e` with `\"` inside single quotes — first-ever tag push exposed it, run 29149009339); npm publish step now skips when the version is already on the registry, so tag pushes are idempotent.
+- **MCP registry prep**: `server.json` manifest + `mcpName` in package.json + `smithery.yaml`. The registry validates ownership by reading `mcpName` from the *npm-published* package.json — 0.2.7 predates the field, so **0.2.8 is bumped, committed and tagged locally** (`4d9bb6d`, tag `v0.2.8`); its publish makes registry submission possible.
+- **Untracked from the public repo** (kept local, gitignored): `OPUS_CODEMORE_PROMPT.md`, `CODEBASE_DEEP_DIVE.md`, `index.html`, `metadata.json`, `vite.config.ts` (dead AI Studio scaffolding — nothing referenced them).
+
+**User-only steps remaining, in order**: (1) `git push codemore main` then force-push tags `v0.2.7` `v0.2.8` `v1` — v0.2.8's run publishes npm 0.2.8 + first GitHub Releases; (2) Supabase migration 006 in SQL editor + Vercel env vars from `.env.vercel-production` (real Gemini key; delete file after) + redeploy + hosted-scan e2e test; (3) `mcp-publisher login github && mcp-publisher publish` (Windows binary from modelcontextprotocol/registry releases); (4) Marketplace: upload 0.2.8 VSIX + verify codemore.tech domain; (5) smithery.ai add-server. Manual eyeballs (menu Ctrl-C, hero scroll) confirmed done by the user 2026-07-11. A4 multi-IDE matrix deliberately deferred.
+
+---
+
 ## 1. Why this exists — the actual problem
 
 AI coding agents (Cursor, Claude Code, Copilot, Codex) ship code fast and ship *bugs* fast. The data driving this project:
