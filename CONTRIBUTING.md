@@ -51,6 +51,8 @@ npm run test:unit
 - **`npm run scan:samples` produces no NEW BLOCKERs on the four Vercel / Auth.js reference apps.** The reference apps are our "false-positive canary" — they're real code that should NOT produce blockers. If your change makes them red, your rule is too aggressive or has a bug.
 - **`npx mocha --require ts-node/register 'test/parity.test.ts'` is green.** The CLI, MCP, and extension paths must all return the same report.
 
+> **Windows dev quirk:** running the repo-local CLI (`node cli.js scan …`) can crash at process exit with `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` *after* the full report has been written, which poisons the exit code — so `validate-rule-pr.js` may report "CLI scan failed" locally even though every scan succeeded. This does **not** affect the published package (`npx codemore`) and does not happen on Linux/macOS or in CI. If you hit it, trust the CI result.
+
 ## Commit + PR conventions
 
 - Conventional Commits. `feat:` / `fix:` / `refactor:` / `test:` / `docs:` / `build:` / `chore:`.
