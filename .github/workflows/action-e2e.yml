@@ -1,0 +1,28 @@
+name: Action e2e
+
+# Dogfoods the published GitHub Action (@v1) against a corpus fixture that is
+# guaranteed to contain a BLOCKER, and asserts the action's outputs work.
+# Manual trigger only — this is a release-verification tool, not a CI gate.
+on:
+  workflow_dispatch:
+
+jobs:
+  action-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run published action against a known-dirty fixture
+        id: cm
+        uses: abhinavteja123/codemore@v1
+        with:
+          path: corpus/rules/core-security-eval/tp
+          fail-on: NONE
+          comment-on-pr: 'false'
+
+      - name: Assert outputs
+        run: |
+          echo "blockers=${{ steps.cm.outputs.blockers }} score=${{ steps.cm.outputs.score }} report=${{ steps.cm.outputs.report-path }}"
+          test "${{ steps.cm.outputs.blockers }}" -ge 1
+          test -f "${{ steps.cm.outputs.report-path }}"
