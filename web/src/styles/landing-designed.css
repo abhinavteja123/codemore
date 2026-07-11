@@ -7,6 +7,15 @@ html {
      on fast scrolls. Lenis owns ALL scroll smoothing. */
   scroll-behavior: auto;
 }
+/* Below-fold static sections skip render work entirely until scrolled near.
+   Scroll-bound sections (.portal-scene, .scene2, .threats) are excluded —
+   they measure their own rects every frame. */
+.manifesto,
+.atlas,
+.footer {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
 /* Heavy scroll-pinned sections own their paint + layout — sibling sections
    re-laying out (eg footer brand letters mounting) can't dirty the portal. */
 .portal-scene,
@@ -2242,6 +2251,25 @@ body {
 }
 .copy-btn:hover { color: var(--gold-soft); border-color: var(--gold); }
 .copy-btn.is-copied { color: var(--gold-soft); }
+
+/* Copy button on markdown-rendered code blocks (lib/markdown.tsx). */
+.md-code-block { position: relative; }
+.md-copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: rgba(8, 10, 22, 0.85);
+  opacity: 0;
+  transition: opacity 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.md-code-block:hover .md-copy-btn,
+.md-copy-btn:focus-visible,
+.md-copy-btn.is-copied { opacity: 1; }
+@media (hover: none) {
+  .md-copy-btn { opacity: 1; }
+}
 .code-block-body {
   padding: 18px 20px;
   font-family: var(--font-mono);

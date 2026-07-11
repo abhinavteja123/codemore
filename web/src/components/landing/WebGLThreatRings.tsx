@@ -121,6 +121,7 @@ export default function WebGLThreatRings({ active }: Props) {
     window.addEventListener("resize", resize);
 
     const start = performance.now();
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let raf = 0;
     const tick = () => {
       const t = (performance.now() - start) / 1000;
@@ -130,12 +131,34 @@ export default function WebGLThreatRings({ active }: Props) {
       gl.uniform2f(uRes, canvas.width, canvas.height);
       gl.uniform1f(uAct, smoothedActive);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      raf = requestAnimationFrame(tick);
+      raf = reducedMotion ? 0 : requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
+
+    const startLoop = () => {
+      if (raf === 0) raf = requestAnimationFrame(tick);
+    };
+    const stopLoop = () => {
+      if (raf !== 0) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+    };
+
+    let io: IntersectionObserver | null = null;
+    if (reducedMotion) {
+      startLoop(); // one static frame — tick tail won't reschedule
+    } else {
+      io = new IntersectionObserver(
+        ([entry]) => (entry.isIntersecting ? startLoop() : stopLoop()),
+        { threshold: 0, rootMargin: "100px" }
+      );
+      io.observe(canvas);
+      startLoop();
+    }
 
     return () => {
-      cancelAnimationFrame(raf);
+      stopLoop();
+      if (io) io.disconnect();
       window.removeEventListener("resize", resize);
     };
   }, []);

@@ -196,6 +196,7 @@ export default function WebGLPortalBg() {
     let animationFrameId: number | null = null;
     let lastTime = 0;
     let accumulatedTime = 0;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const mouse = { x: 0.5, y: 0.5, targetX: 0.5, targetY: 0.5 };
 
     // Resize only when the element actually changes size — reading
@@ -246,7 +247,7 @@ export default function WebGLPortalBg() {
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-      animationFrameId = requestAnimationFrame(render);
+      animationFrameId = reducedMotion ? null : requestAnimationFrame(render);
     };
 
     // Only render while the portal is on screen — frees the GPU for the rest
@@ -264,9 +265,11 @@ export default function WebGLPortalBg() {
       }
     };
     const io = new IntersectionObserver(
-      ([entry]) => (entry.isIntersecting ? startLoop() : stopLoop())
+      ([entry]) => (entry.isIntersecting ? startLoop() : stopLoop()),
+      { threshold: 0, rootMargin: "100px" }
     );
-    io.observe(canvas);
+    // Reduced motion: single static frame, never observe/loop.
+    if (!reducedMotion) io.observe(canvas);
     startLoop();
 
     return () => {

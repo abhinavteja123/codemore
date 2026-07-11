@@ -232,8 +232,9 @@ export default function WebGLHoloScope({ isScanning, issuesCount, hasScanRun }: 
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // Additive blending for gorgeous sci-fi glow overlay
 
-    let animationId: number;
+    let animationId: number | null = null;
     const startTime = performance.now();
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const loop = () => {
       if (!canvas) return;
@@ -297,13 +298,34 @@ export default function WebGLHoloScope({ isScanning, issuesCount, hasScanRun }: 
       // Paint holographic node grid
       gl.drawArrays(gl.POINTS, 0, particleCount);
 
-      animationId = requestAnimationFrame(loop);
+      animationId = reducedMotion ? null : requestAnimationFrame(loop);
     };
 
-    loop();
+    const startLoop = () => {
+      if (animationId === null) animationId = requestAnimationFrame(loop);
+    };
+    const stopLoop = () => {
+      if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+    };
+
+    let io: IntersectionObserver | null = null;
+    if (reducedMotion) {
+      startLoop(); // one static frame — loop tail won't reschedule
+    } else {
+      io = new IntersectionObserver(
+        ([entry]) => (entry.isIntersecting ? startLoop() : stopLoop()),
+        { threshold: 0, rootMargin: "100px" }
+      );
+      io.observe(canvas);
+      startLoop();
+    }
 
     return () => {
-      cancelAnimationFrame(animationId);
+      stopLoop();
+      if (io) io.disconnect();
       window.removeEventListener("resize", resize);
       window.removeEventListener("mousemove", trackMouse);
       gl.deleteBuffer(positionBuffer);

@@ -10,6 +10,13 @@ export default function WebGLASTConnectionMesh() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // Pure background decoration — mobile GPUs choke on extra contexts, skip entirely.
+    if (window.matchMedia("(max-width: 768px)").matches) {
+      setInitFailed(true);
+      return;
+    }
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     const gl =
       canvas.getContext("webgl", { alpha: true, depth: false, antialias: true }) ||
       (canvas.getContext("experimental-webgl", { alpha: true, depth: false, antialias: true }) as WebGLRenderingContext | null);
@@ -177,7 +184,7 @@ export default function WebGLASTConnectionMesh() {
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-    let animationId: number;
+    let animationId: number | null = null;
     const loop = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
@@ -311,13 +318,34 @@ export default function WebGLASTConnectionMesh() {
 
       gl.drawArrays(gl.POINTS, 0, nodes.length);
 
-      animationId = requestAnimationFrame(loop);
+      animationId = reducedMotion ? null : requestAnimationFrame(loop);
     };
 
-    loop();
+    const startLoop = () => {
+      if (animationId === null) animationId = requestAnimationFrame(loop);
+    };
+    const stopLoop = () => {
+      if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+    };
+
+    let io: IntersectionObserver | null = null;
+    if (reducedMotion) {
+      startLoop(); // one static frame — loop tail won't reschedule
+    } else {
+      io = new IntersectionObserver(
+        ([entry]) => (entry.isIntersecting ? startLoop() : stopLoop()),
+        { threshold: 0, rootMargin: "100px" }
+      );
+      io.observe(canvas);
+      startLoop();
+    }
 
     return () => {
-      cancelAnimationFrame(animationId);
+      stopLoop();
+      if (io) io.disconnect();
       window.removeEventListener("resize", resize);
       window.removeEventListener("mousemove", handleMouseMove);
       gl.deleteBuffer(lineBuffer);

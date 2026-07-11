@@ -1,22 +1,12 @@
-import Link from "next/link";
-
 import { listRuleIds, loadRuleDoc } from "@/lib/docs";
 import NextStep from "@/components/docs/NextStep";
+import RulesExplorer, { type RuleSummary } from "@/components/docs/RulesExplorer";
 
 export const metadata = {
   title: "CodeMore — Rules",
   description:
     "Browse every rule in the catalog: 59 native rules across 6 packs, plus 8 opt-in external-tool adapters.",
 };
-
-interface RuleSummary {
-  id: string;
-  title: string;
-  pack: string;
-  severity: string;
-  languages: string;
-  lifecycle: string;
-}
 
 /** Pull the metadata block out of a rule's markdown frontmatter-y header. */
 function summarise(id: string, md: string | null): RuleSummary {
@@ -70,12 +60,6 @@ const PACK_BADGE_COLOR: Record<string, string> = {
 
 export default function RulesIndex() {
   const summaries = listRuleIds().map(id => summarise(id, loadRuleDoc(id)));
-  const byPack = new Map<string, RuleSummary[]>();
-  for (const s of summaries) {
-    if (!byPack.has(s.pack)) byPack.set(s.pack, []);
-    byPack.get(s.pack)!.push(s);
-  }
-  const packs = Array.from(byPack.keys()).sort();
   return (
     <>
       <h1>Rules ({summaries.length})</h1>
@@ -86,91 +70,7 @@ export default function RulesIndex() {
         <code>.codemorerc.json</code>.
       </p>
 
-      {packs.map(pack => (
-        <section key={pack} id={pack.toLowerCase()}>
-          <h2 style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-            <span>{pack}</span>
-            <span
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                letterSpacing: "0.22em",
-                textTransform: "uppercase",
-                color: "var(--gold-soft)",
-                padding: "3px 9px",
-                borderRadius: 6,
-                background: PACK_BADGE_COLOR[pack] ?? "rgba(255, 255, 255, 0.05)",
-                fontWeight: 500,
-              }}
-            >
-              {byPack.get(pack)!.length} rules
-            </span>
-          </h2>
-          {PACK_BLURB[pack] && (
-            <p style={{ marginTop: -4, marginBottom: 18, color: "rgba(245, 242, 235, 0.65)" }}>
-              {PACK_BLURB[pack]}
-            </p>
-          )}
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-              gap: 12,
-              margin: "12px 0 28px",
-            }}
-          >
-            {byPack.get(pack)!.map(s => (
-              <Link
-                key={s.id}
-                href={`/docs/rules/${s.id}`}
-                style={{
-                  display: "block",
-                  padding: "14px 16px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(255, 255, 255, 0.06)",
-                  background: "rgba(8, 10, 22, 0.5)",
-                  textDecoration: "none",
-                  color: "inherit",
-                  transition: "border-color 0.25s ease, transform 0.25s ease",
-                }}
-                className="rule-card"
-              >
-                <div
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11.5,
-                    color: "var(--gold-soft)",
-                    marginBottom: 4,
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {s.id}
-                </div>
-                <div style={{ fontSize: 13.5, marginBottom: 8, color: "var(--fg)", fontWeight: 500 }}>
-                  {s.title}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 10,
-                    letterSpacing: "0.05em",
-                    color: "rgba(245, 242, 235, 0.5)",
-                    textTransform: "uppercase",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  {s.severity !== "-" && <span>{s.severity}</span>}
-                  {s.languages !== "-" && <span>· {s.languages}</span>}
-                  {s.lifecycle !== "-" && <span>· {s.lifecycle}</span>}
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ))}
+      <RulesExplorer summaries={summaries} packBlurb={PACK_BLURB} badgeColor={PACK_BADGE_COLOR} />
 
       <NextStep
         href="/docs/contributing"

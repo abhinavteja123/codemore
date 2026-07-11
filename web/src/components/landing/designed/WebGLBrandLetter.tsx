@@ -10,6 +10,7 @@ interface WebGLBrandLetterProps {
 
 export default function WebGLBrandLetter({ letter, index }: WebGLBrandLetterProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [mobileHidden, setMobileHidden] = useState<boolean>(false);
   const [hovered, setHovered] = useState<boolean>(false);
   const hoverRef = useRef<number>(0); // Smooth lerped hover progress
   const mouseRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
@@ -33,6 +34,13 @@ export default function WebGLBrandLetter({ letter, index }: WebGLBrandLetterProp
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    // Pure footer decoration — mobile GPUs choke on extra contexts, skip entirely.
+    if (window.matchMedia("(max-width: 768px)").matches) {
+      setMobileHidden(true);
+      return;
+    }
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     // Use WebGL context (fallback to experimental)
     const gl =
@@ -240,10 +248,30 @@ export default function WebGLBrandLetter({ letter, index }: WebGLBrandLetterProp
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-      animFrameIdRef.current = requestAnimationFrame(frame);
+      animFrameIdRef.current = reducedMotion ? null : requestAnimationFrame(frame);
     };
 
-    frame();
+    const startLoop = () => {
+      if (animFrameIdRef.current === null) animFrameIdRef.current = requestAnimationFrame(frame);
+    };
+    const stopLoop = () => {
+      if (animFrameIdRef.current !== null) {
+        cancelAnimationFrame(animFrameIdRef.current);
+        animFrameIdRef.current = null;
+      }
+    };
+
+    let io: IntersectionObserver | null = null;
+    if (reducedMotion) {
+      startLoop(); // one static frame — loop tail won't reschedule
+    } else {
+      io = new IntersectionObserver(
+        ([entry]) => (entry.isIntersecting ? startLoop() : stopLoop()),
+        { threshold: 0, rootMargin: "100px" }
+      );
+      io.observe(canvas);
+      startLoop();
+    }
 
     // Handle viewport resize mapping
     const handleResize = () => {
@@ -259,9 +287,8 @@ export default function WebGLBrandLetter({ letter, index }: WebGLBrandLetterProp
     window.addEventListener("resize", handleResize);
 
     return () => {
-      if (animFrameIdRef.current) {
-        cancelAnimationFrame(animFrameIdRef.current);
-      }
+      stopLoop(); // also nulls the ref so the hover-triggered effect re-run can restart
+      if (io) io.disconnect();
       window.removeEventListener("resize", handleResize);
       gl.deleteTexture(texture);
       gl.deleteBuffer(positionBuffer);
@@ -270,6 +297,8 @@ export default function WebGLBrandLetter({ letter, index }: WebGLBrandLetterProp
       gl.deleteShader(fs);
     };
   }, [letter, hovered]);
+
+  if (mobileHidden) return null;
 
   return (
     <div

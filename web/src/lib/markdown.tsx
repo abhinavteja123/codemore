@@ -20,6 +20,8 @@
 import type { ReactNode } from 'react';
 import React from 'react';
 
+import CopyButton from '@/components/docs/CopyButton';
+
 
 function renderInline(text: string): ReactNode {
   const out: ReactNode[] = [];
@@ -134,10 +136,14 @@ export function renderMarkdown(md: string): ReactNode {
         i++;
       }
       i++; // skip closing fence
+      const code = buf.join('\n');
       out.push(
-        <pre key={k()} className="my-4 overflow-x-auto rounded bg-zinc-100 p-4 dark:bg-zinc-900">
-          <code className={`language-${lang} font-mono text-sm`}>{buf.join('\n')}</code>
-        </pre>,
+        <div key={k()} className="md-code-block my-4">
+          <CopyButton code={code} />
+          <pre className="overflow-x-auto rounded bg-zinc-100 p-4 dark:bg-zinc-900">
+            <code className={`language-${lang} font-mono text-sm`}>{code}</code>
+          </pre>
+        </div>,
       );
       continue;
     }

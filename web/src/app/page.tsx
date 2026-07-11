@@ -43,6 +43,9 @@ import PageTransitionIndicator from "@/components/landing/designed/PageTransitio
 import CodeMoreLinterSandbox  from "@/components/landing/designed/CodeMoreLinterSandbox";
 
 import NavInstallDropdown     from "@/components/landing/NavInstallDropdown";
+// Root package.json is the single version source — hand-typed badges drifted
+// (v0.2.3 was still on the hero at v0.2.8).
+import rootPkg                from "../../../package.json";
 import WebGLThreatRings       from "@/components/landing/WebGLThreatRings";
 import SurfaceParityDemo      from "@/components/landing/SurfaceParityDemo";
 import AgenticFixLoopReplay   from "@/components/landing/AgenticFixLoopReplay";
@@ -432,7 +435,7 @@ export default function Landing() {
           <div className="hero-vignette" />
 
           <div ref={heroCopyRef} className="hero-copy">
-            <span className="kicker">v0.2.8 · 59 rules · 8 adapters · MIT</span>
+            <span className="kicker">{`v${rootPkg.version} · 59 rules · 8 adapters · MIT`}</span>
             <h1 className="hero-title">
               The static analyzer<br />
               <span className="glow">your AI agent reads.</span>
@@ -543,7 +546,13 @@ export default function Landing() {
               <b>{String(cardIdx + 1).padStart(2, "0")}</b>
               <span> · {String(CARDS.length).padStart(2, "0")}</span>
             </div>
-            <div className="arc-btns">
+            <div
+              className="arc-btns"
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft")  { e.preventDefault(); goToCard(Math.max(0, cardIdx - 1)); }
+                if (e.key === "ArrowRight") { e.preventDefault(); goToCard(Math.min(CARDS.length - 1, cardIdx + 1)); }
+              }}
+            >
               <button onClick={() => goToCard(Math.max(0, cardIdx - 1))} disabled={cardIdx === 0} aria-label="Previous">
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -625,7 +634,7 @@ export default function Landing() {
           <div className="meta reveal">
             <div className="rule" />
             CODEMORE / MANIFESTO<br />
-            v0.2.8 · 2026-07-11<br />
+            {`v${rootPkg.version}`} · 2026-07-11<br />
             MIT-LICENSED · OPT-IN TELEMETRY
           </div>
 
@@ -773,7 +782,7 @@ export default function Landing() {
 
           <div className="footer__legal">
             <span>© 2026 CodeMore · MIT-licensed</span>
-            <span>v0.2.8 · 59 rules · 8 adapters · ~90% TP</span>
+            <span>{`v${rootPkg.version} · 59 rules · 8 adapters · ~90% TP`}</span>
             <span>opt-in telemetry · runs entirely in your repo</span>
           </div>
         </div>
