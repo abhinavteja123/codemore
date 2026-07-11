@@ -1,0 +1,7 @@
+# Smithery listing config — https://smithery.ai
+# CodeMore MCP server: stdio transport via the published npm package.
+startCommand:
+  type: stdio
+  configSchema: {}
+  commandFunction: |-
+    () => ({ command: "npx", args: ["-y", "codemore", "serve-mcp"] })

@@ -117,3 +117,4 @@ templates/**
 CODE_OF_CONDUCT.md
 package-lock.json
 server.json
+smithery.yaml

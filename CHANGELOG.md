@@ -2,6 +2,20 @@
 
 All notable changes to CodeMore. Semantic Versioning.
 
+## [0.2.8] — 2026-07-11 — docs sync, MCP registry manifest, release-workflow fixes
+
+### Added
+
+- `server.json` + `mcpName` in package.json — MCP registry (registry.modelcontextprotocol.io) manifest; this is the first npm version whose published package.json carries `mcpName`, which the registry requires for ownership validation.
+- `smithery.yaml` — Smithery listing config.
+- Web docs: /docs/limitations and /docs/security-gate pages registered (were 404 in production); rules index now groups all 59 rules under their real packs with severity/lifecycle chips for both doc metadata formats.
+
+### Fixed
+
+- 47 rule docs claimed `lifecycle: experimental` while the catalog is 58 beta + 1 experimental — docs now match rule sources exactly.
+- Docs/README synced to 0.2.7+ reality: 59 rules, 6 packs, `codemore fix` / `codemore mcp` / `--format sarif` documented, scoring severity caps in schema.md, live npm + Marketplace install paths.
+- release.yml: tag-verify step crashed on quote escaping (first-ever tag push exposed it); npm publish step is now idempotent (skips when the version is already on the registry).
+
 ## [0.2.7] — 2026-07-10 — severity-capped scoring, serverless scan fix, new rule + CLI surfaces
 
 (0.2.6 was never published; everything below ships as 0.2.7.)
