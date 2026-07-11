@@ -440,7 +440,7 @@ export default function Landing() {
           <div className="hero-vignette" />
 
           <div ref={heroCopyRef} className="hero-copy">
-            <span className="kicker">v0.2.3 · 58 rules · 8 adapters · MIT</span>
+            <span className="kicker">v0.2.8 · 59 rules · 8 adapters · MIT</span>
             <h1 className="hero-title">
               The static analyzer<br />
               <span className="glow">your AI agent reads.</span>
@@ -484,7 +484,7 @@ export default function Landing() {
 
           <header className="scene2__head">
             <div>
-              <div className="eyebrow">findings feed · 58 rules · scroll to advance</div>
+              <div className="eyebrow">findings feed · 59 rules · scroll to advance</div>
               <h2>Every finding is agent-actionable. Five sample classes from the 2026-07-07 audit.</h2>
             </div>
             <p>
@@ -569,7 +569,7 @@ export default function Landing() {
           <WebGLThreatRings active={threatIdx} />
 
           <header className="threats__head reveal">
-            <div className="eyebrow">threat taxonomy · 58 rules · 7 classes · scroll</div>
+            <div className="eyebrow">threat taxonomy · 59 rules · 7 classes · scroll</div>
             <h2>Every rule maps to a known threat class.</h2>
           </header>
 
@@ -633,7 +633,7 @@ export default function Landing() {
           <div className="meta reveal">
             <div className="rule" />
             CODEMORE / MANIFESTO<br />
-            v0.2.3 · 2026-07-08<br />
+            v0.2.8 · 2026-07-11<br />
             MIT-LICENSED · OPT-IN TELEMETRY
           </div>
 
@@ -781,7 +781,7 @@ export default function Landing() {
 
           <div className="footer__legal">
             <span>© 2026 CodeMore · MIT-licensed</span>
-            <span>v0.2.3 · 58 rules · 8 adapters · ~90% TP</span>
+            <span>v0.2.8 · 59 rules · 8 adapters · ~90% TP</span>
             <span>opt-in telemetry · runs entirely in your repo</span>
           </div>
         </div>

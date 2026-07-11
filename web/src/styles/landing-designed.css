@@ -1,12 +1,11 @@
 
 /* ────────── Smooth-scroll + flicker guards (landing) ────────── */
 html {
-  /* Browser eases location.hash + scrollTo() jumps so the page never teleports
-     past the WebGL listeners in a single frame. Reduced-motion path below. */
-  scroll-behavior: smooth;
-}
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
+  /* MUST stay auto: Lenis animates window scroll every rAF, and CSS
+     scroll-behavior: smooth re-animates each of those writes — the two
+     smoothing systems fight (scrollY oscillates) and the hero/nav flicker
+     on fast scrolls. Lenis owns ALL scroll smoothing. */
+  scroll-behavior: auto;
 }
 /* Heavy scroll-pinned sections own their paint + layout — sibling sections
    re-laying out (eg footer brand letters mounting) can't dirty the portal. */
@@ -56,7 +55,8 @@ html {
 
 /* Base resets & scrollbar */
 html {
-  scroll-behavior: smooth;
+  /* auto, not smooth — see the Lenis note at the top of this file */
+  scroll-behavior: auto;
   background-color: var(--ink);
   color: var(--fg);
   font-family: var(--font-body);
