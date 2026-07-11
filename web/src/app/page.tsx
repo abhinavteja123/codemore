@@ -165,11 +165,17 @@ export default function Landing() {
       return t * t * (3 - 2 * t);
     };
     let rafId: number | null = null;
+    let ringEl: HTMLElement | null = null;
 
     const apply = (p: number) => {
       const zoom      = 1 + Math.pow(p, 2.4) * 7;        // 1 → 8× — swells past the viewport edge; 25× was a GPU tile bomb every dive
       const coreB     = 1 + p * 1.6;                     // core brightens as we dive
-      const ringO     = 1 - smooth(0.72, 0.96, p);       // ring fades just before the dive ends
+      // Ring bows out as soon as the dive starts: it's a blur(12px) +
+      // infinite-spin surface, and re-rasterizing that inside a scaling
+      // parent on scroll reversals is what left stale crescent artifacts.
+      // At rest it's fully back; past p=0.2 it's visibility:hidden so the
+      // compositor frees the blurred surface entirely.
+      const ringO     = 1 - smooth(0.04, 0.18, p);
       const copyO     = 1 - smooth(0.18, 0.52, p);
       const copyShift = p * -160;
       const copyScale = 1 + p * 0.12;
@@ -188,6 +194,8 @@ export default function Landing() {
       // for the whole page is what starves the GPU and makes the compositor
       // drop tiles (blank nav, texture garbage) on fast scrolls.
       portalRef.current!.style.visibility = p >= 0.985 ? "hidden" : "visible";
+      ringEl ??= portalRef.current!.querySelector<HTMLElement>(".portal__ring");
+      if (ringEl) ringEl.style.visibility = p > 0.2 ? "hidden" : "visible";
     };
 
     // No JS easing here: Lenis already smooths wheel scrolling, so the raw
