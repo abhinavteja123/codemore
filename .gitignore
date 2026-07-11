@@ -67,3 +67,6 @@ CODEBASE_DEEP_DIVE.md
 /index.html
 /metadata.json
 /vite.config.ts
+
+# corpus fixtures must always be committed, even secret-shaped filenames (that is the point of the corpus)
+!corpus/**
