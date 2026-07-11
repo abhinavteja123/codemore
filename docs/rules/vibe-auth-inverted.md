@@ -3,7 +3,7 @@
 **Pack:** `vibe-auth`
 **Default severity:** BLOCKER
 **Languages:** TypeScript, JavaScript
-**Lifecycle:** experimental
+**Lifecycle:** beta
 **Confidence:** 0.7
 
 ## What it catches

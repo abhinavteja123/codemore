@@ -8,7 +8,7 @@ import NextStep from "@/components/docs/NextStep";
 export const metadata = {
   title: "CodeMore — Docs",
   description:
-    "CodeMore is the structured-feedback bus between static scanners and coding agents. 58 rules · 8 adapters · CLI · MCP · VS Code · GitHub Action.",
+    "CodeMore is the structured-feedback bus between static scanners and coding agents. 59 rules · 8 adapters · CLI · MCP · VS Code · GitHub Action.",
 };
 
 export default function DocsHome() {
@@ -30,12 +30,12 @@ export default function DocsHome() {
         <Link href="/docs/install">/docs/install</Link>.
       </p>
 
-      <h2 id="what-ships">What ships in v0.2.1</h2>
+      <h2 id="what-ships">What ships in v0.2.7</h2>
       <ul>
         <li>
           <strong>{ruleCount} native rules</strong> across TypeScript, JavaScript,
-          SQL, and Python — grouped into 7 packs (core-security, core-quality,
-          vibe-auth, vibe-frontend, vibe-secrets, vibe-supabase, vibe-llm).
+          SQL, and Python — grouped into 6 packs (core-security, core-quality,
+          vibe-auth, vibe-frontend, vibe-secrets, vibe-supabase).
           Browse them at <Link href="/docs/rules">/docs/rules</Link>.
         </li>
         <li>
@@ -50,9 +50,13 @@ export default function DocsHome() {
         </li>
         <li>
           <strong>Agentic fix loop</strong> — <code>apply_fix</code> +{" "}
-          <code>validate_fix</code> MCP tools. The agent generates a patch, the
-          validator re-runs the rule and the file-scoped tests, the loop
-          retries up to 3 times.
+          <code>validate_fix</code> MCP tools, and <code>codemore fix</code>{" "}
+          from the CLI. The agent generates a patch, the validator re-runs the
+          rule and the file-scoped tests, the loop retries up to 3 times.
+        </li>
+        <li>
+          <strong>SARIF output</strong> — <code>codemore scan . --format sarif</code>{" "}
+          uploads straight to GitHub code scanning.
         </li>
         <li>
           <strong>Byte-identical reports</strong> across CLI, MCP, VS Code, and

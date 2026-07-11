@@ -2,7 +2,9 @@
 
 | Category | Default severity | Lifecycle | Default confidence |
 |---|---|---|---|
-| maintainability | MAJOR (test path: MINOR) | experimental | 0.85 / 0.6 in tests (clamped to 0.6 while experimental) |
+| maintainability | MAJOR (test path: MINOR) | beta | 0.85 / 0.6 in tests |
+
+**Pack:** `core-quality`
 
 ## What it catches
 

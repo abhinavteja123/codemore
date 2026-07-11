@@ -1,0 +1,28 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.json",
+  "name": "io.github.abhinavteja123/codemore",
+  "description": "The static analyzer your AI agent reads — scans vibe-coded apps for production-blocking bugs and returns fix-ready, machine-readable reports over MCP.",
+  "repository": {
+    "url": "https://github.com/abhinavteja123/codemore",
+    "source": "github"
+  },
+  "version": "0.2.7",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "codemore",
+      "version": "0.2.7",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "serve-mcp"
+        }
+      ]
+    }
+  ]
+}

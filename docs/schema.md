@@ -1,6 +1,6 @@
 # CodeMore Report Schema — v1.0.0
 
-**Last Updated:** 2026-07-02
+**Last Updated:** 2026-07-10
 
 The **`codemore-report.json`** contract is the API. Every CodeMore surface
 (CLI, MCP server, VS Code extension, GitHub Action, web scanner) emits
@@ -12,6 +12,8 @@ identical byte-aligned reports. The schema is stable: breaking changes bump
 ```bash
 npx codemore scan . --json > report.json
 ```
+
+Need SARIF instead (GitHub code scanning)? `npx codemore scan . --format sarif --out codemore.sarif`.
 
 Pipe to your agent. Every rule finding includes file location, severity,
 confidence, fix template, and verification criteria — everything an LLM
@@ -25,12 +27,12 @@ needs to close the loop.
 {
   "schemaVersion":     "1.0.0",           // Semver. Major = breaking change.
   "scannedAt":         "2026-06-12T...",  // ISO-8601 timestamp of scan start.
-  "tool":              { "name": "codemore", "version": "0.2.1" },
+  "tool":              { "name": "codemore", "version": "0.2.7" },
   "project":           { "root": ".", "framework": "next.js", "language": "typescript" },
   "summary":           { /* counts + aggregations */ },
   "issues":            [ /* array of findings */ ],
   "agentInstructions": { "preamble": "You are fixing issues found by CodeMore...", … },  // optional
-  "meta":              { "rulesEnabled": 58, "packsLoaded": […], "scanDurationMs": 4321 }  // optional
+  "meta":              { "rulesEnabled": 59, "packsLoaded": […], "scanDurationMs": 4321 }  // optional
 }
 ```
 
@@ -70,7 +72,7 @@ needs to close the loop.
 ```
 
 **Required fields:**
-- `score` — 0–100. Higher is better. Computed from issue counts and severity distribution.
+- `score` — 0–100. Higher is better. Per-file average, then **capped by the worst severity present**: any BLOCKER caps the score at 59 (−3 per additional BLOCKER, floor 25); otherwise any CRITICAL caps it at 79 (−2 each, floor 45). A codebase with a live BLOCKER can never read "healthy". Logic: `shared/scoring.ts`.
 - `issuesTotal` — Total across all severities.
 - `bySeverity` — Counts for each severity: `BLOCKER`, `CRITICAL`, `MAJOR`, `MINOR`, `INFO`.
 - `byCategory` — Per-category counts. Categories: `bug`, `code-smell`, `performance`, `security`, `maintainability`, `accessibility`, `best-practice`.
@@ -268,7 +270,7 @@ Structured hints to guide the LLM through the fix loop:
   "scannedAt": "2026-06-12T14:32:01.234Z",
   "tool": {
     "name": "codemore",
-    "version": "0.2.1"
+    "version": "0.2.7"
   },
   "project": {
     "root": ".",
@@ -357,7 +359,7 @@ Structured hints to guide the LLM through the fix loop:
     "stopOn": "first-validator-failure"
   },
   "meta": {
-    "rulesEnabled": 58,
+    "rulesEnabled": 59,
     "packsLoaded": [
       "core-security",
       "core-quality",
@@ -376,4 +378,4 @@ Structured hints to guide the LLM through the fix loop:
 - [External tool adapters](./external-tools.md) — namespace and severity translation for ruff, biome, etc.
 - [Security gate](./security-gate.md) — layered scanning workflow using the report.
 - [CLI reference](https://codemore.tech/docs/cli) — scan options and output formats.
-- [Rule catalog](./rules) — docs for all 58+ native rules.
+- [Rule catalog](./rules) — docs for all 59 native rules.

@@ -3,7 +3,7 @@
 **Pack:** `vibe-frontend`
 **Default severity:** MAJOR (promote to BLOCKER via `.codemorerc.json` if you want it gating CI)
 **Languages:** TypeScript, JavaScript
-**Lifecycle:** experimental
+**Lifecycle:** beta
 **Confidence:** 0.85
 
 ## What it catches

@@ -3,7 +3,7 @@
 **Pack:** `core-security`
 **Default severity:** BLOCKER
 **Languages:** SQL, TypeScript, JavaScript
-**Lifecycle:** experimental
+**Lifecycle:** beta
 **Confidence:** 0.9
 
 ## What it catches

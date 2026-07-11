@@ -1,6 +1,6 @@
 # CodeMore Roadmap
 
-**Last Updated:** 2026-07-02
+**Last Updated:** 2026-07-10
 
 This roadmap reflects our current directional thinking. Items are subject to change based on community feedback, adoption data, and emerging priorities. Dates are estimates; we ship when ready.
 
@@ -28,21 +28,16 @@ Today, new rules ship experimental and are manually promoted. v0.3 automates thi
 
 This keeps the < 5% false-positive bar without blocking new detectors.
 
-### CLI apply-fix command
+### ~~CLI apply-fix command~~ — shipped in 0.2.7 as `codemore fix`
 
-Today, `apply_fix` (agentic fixer loop: plan → generate → validate → retry) is MCP-only. v0.3 wraps it in the CLI:
-
-```bash
-codemore apply-fix --issue-id 01HZ9KGZQ7HBGF1XYZP2C3K4Q5 --provider openai
-```
-
-Or interactively:
+The agentic fixer loop (plan → generate → validate → retry) is no longer MCP-only:
 
 ```bash
-codemore scan . --json | jq '.issues[0]' | codemore apply-fix --from-stdin
+codemore fix . --rule <id>        # fix findings of one rule (dry-run: .codemore-fix sidecars)
+codemore fix . --all --write      # fix everything, patch in place with .bak backups
 ```
 
-Uses the same `daemon/services/agenticFixer.ts` orchestrator. Enables headless CI workflows where the agent (Claude via Anthropic API, OpenAI, or local) fixes blockers in PR automation.
+Keyed off `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` (force one with `CODEMORE_LLM_PROVIDER`). Uses the same `daemon/services/agenticFixer.ts` orchestrator. Remaining v0.3 work: `--from-stdin` piping and per-instance `--issue-id` targeting.
 
 ### Expanded white-box test coverage
 
@@ -117,7 +112,7 @@ Partner with Sigstore and npm security team.
 
 ### Corpus expansion
 
-**116 fixture pairs today → 300+ by end of 2026.** Every new rule starts with 3+ pairs. External community can contribute fixtures via PRs.
+**118 fixtures (59 TP/FP pairs) today → 300+ by end of 2026.** Every new rule starts with 3+ pairs. External community can contribute fixtures via PRs.
 
 ### Documentation
 

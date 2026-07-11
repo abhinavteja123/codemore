@@ -3,7 +3,7 @@
 **Pack:** `core-quality`
 **Default severity:** MAJOR
 **Languages:** TypeScript, JavaScript
-**Lifecycle:** experimental
+**Lifecycle:** beta
 **Confidence:** 0.9
 **Threshold:** 15 (McCabe)
 

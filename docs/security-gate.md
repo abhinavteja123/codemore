@@ -9,7 +9,7 @@ PR-comment / dashboard tooling.
 
 | Layer | Tool | Catches |
 |---|---|---|
-| **SAST (we own)** | `codemore scan` | All 58 native rules — SQL injection, BOLA, weak crypto, etc. |
+| **SAST (we own)** | `codemore scan` | All 59 native rules — SQL injection, BOLA, weak crypto, hardcoded passwords, etc. |
 | **SAST (we wrap)** | ruff + biome + bandit | Style + correctness + Python security |
 | **Secret scan** | gitleaks | Hardcoded credentials, in working tree + git history |
 | **SCA** | npm-audit + pip-audit | CVEs in declared dependencies |
@@ -19,6 +19,15 @@ The single CodeMore invocation orchestrates SAST + secrets + SCA via
 `--external-tools` and emits one `codemore-report.json`. Checkov runs
 separately (different output shape, different IaC scope) and emits
 `checkov-report.json`. Both reports are uploaded as workflow artifacts.
+
+Prefer findings in GitHub's Security tab? Emit SARIF instead and upload it:
+
+```yaml
+- run: npx codemore@latest scan . --format sarif --out codemore.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: codemore.sarif
+```
 
 ## Quick install
 
@@ -48,7 +57,7 @@ To lower the gate temporarily during adoption, generate a baseline and
 commit it:
 
 ```bash
-npx codemore@latest baseline create > .codemore-baseline.json
+npx codemore@latest baseline create   # writes .codemore-baseline.json
 git add .codemore-baseline.json
 git commit -m "chore: codemore baseline (pre-adoption snapshot)"
 ```

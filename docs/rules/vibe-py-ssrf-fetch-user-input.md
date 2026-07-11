@@ -3,7 +3,7 @@
 **Pack:** `core-security`
 **Default severity:** MAJOR
 **Languages:** Python
-**Lifecycle:** experimental
+**Lifecycle:** beta
 **Confidence:** 0.75
 
 ## What it catches

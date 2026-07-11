@@ -22,7 +22,7 @@ jobs:
       pull-requests: write   # required for the PR comment
     steps:
       - uses: actions/checkout@v4
-      - uses: K0802s/codemore@v1
+      - uses: abhinavteja123/codemore@v1
 ```
 
 That's it. On every PR you'll get a comment like this:
@@ -61,7 +61,7 @@ All inputs are optional.
 ### Tighter gate example
 
 ```yaml
-- uses: K0802s/codemore@v1
+- uses: abhinavteja123/codemore@v1
   with:
     fail-on: CRITICAL          # fail on CRITICAL or higher
     packs: vibe-supabase,vibe-secrets
@@ -71,7 +71,7 @@ All inputs are optional.
 ### Scan a subdirectory
 
 ```yaml
-- uses: K0802s/codemore@v1
+- uses: abhinavteja123/codemore@v1
   with:
     path: apps/web
 ```
@@ -80,7 +80,7 @@ All inputs are optional.
 
 ```yaml
 - id: codemore
-  uses: K0802s/codemore@v1
+  uses: abhinavteja123/codemore@v1
   with:
     fail-on: NONE
 - run: |
@@ -107,13 +107,13 @@ If you set `comment-on-pr: false`, you can drop the `pull-requests: write` scope
 Pin to a major (`@v1`) for security patches without breaking changes:
 
 ```yaml
-- uses: K0802s/codemore@v1
+- uses: abhinavteja123/codemore@v1
 ```
 
 Pin to an exact SHA for full reproducibility:
 
 ```yaml
-- uses: K0802s/codemore@<commit-sha>
+- uses: abhinavteja123/codemore@<commit-sha>
 ```
 
 ## Troubleshooting
@@ -139,7 +139,7 @@ Or disable a rule globally for the project via `.codemorerc.json`:
 }
 ```
 
-If the rule is consistently wrong, please [open an issue](https://github.com/K0802s/codemore/issues) with the failing pattern — the catalog is contributed-to and improvements land fast.
+If the rule is consistently wrong, please [open an issue](https://github.com/abhinavteja123/codemore/issues) with the failing pattern — the catalog is contributed-to and improvements land fast.
 
 ## Adding rules
 

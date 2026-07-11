@@ -60,3 +60,10 @@ report.json
 
 # Local production env hand-off (never commit)
 .env.vercel-production
+
+# internal working notes / AI Studio scaffolding leftovers (kept local, not published)
+OPUS_CODEMORE_PROMPT.md
+CODEBASE_DEEP_DIVE.md
+/index.html
+/metadata.json
+/vite.config.ts

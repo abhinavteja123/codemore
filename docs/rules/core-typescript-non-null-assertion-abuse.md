@@ -2,7 +2,9 @@
 
 | Category | Default severity | Lifecycle | Default confidence |
 |---|---|---|---|
-| bug | MINOR (test path: INFO) | experimental | 0.75 / 0.55 in tests (clamped to 0.6 while experimental) |
+| bug | MINOR (test path: INFO) | beta | 0.75 / 0.55 in tests |
+
+**Pack:** `core-quality`
 
 ## What it catches
 

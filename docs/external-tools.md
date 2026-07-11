@@ -1,13 +1,13 @@
 # External tool adapters
 
-CodeMore's native catalog (48 rules) covers **TypeScript / JavaScript / SQL / Python**. Polyglot repos sometimes need broader coverage. The `--external-tools` flag wraps four industry-standard linters and routes their output through the same `codemore-report.json` schema — so the agent loop (`apply_fix` / `validate_fix` / `suggest_fix`) keeps working uniformly.
+CodeMore's native catalog (59 rules) covers **TypeScript / JavaScript / SQL / Python**. Polyglot repos sometimes need broader coverage. The `--external-tools` flag wraps eight industry-standard tools and routes their output through the same `codemore-report.json` schema — so the agent loop (`apply_fix` / `validate_fix` / `suggest_fix`) keeps working uniformly.
 
 ## Quick start
 
 ```bash
 codemore scan ./my-repo --external-tools ruff
 codemore scan ./my-repo --external-tools ruff,biome
-codemore scan ./my-repo --external-tools all   # ruff + golangci + clippy + biome
+codemore scan ./my-repo --external-tools all   # ruff + golangci + clippy + biome + bandit + gitleaks + npm-audit + pip-audit
 ```
 
 **Off by default.** None of the adapters run unless `--external-tools` is passed.
@@ -16,12 +16,16 @@ codemore scan ./my-repo --external-tools all   # ruff + golangci + clippy + biom
 
 ## Supported tools
 
-| Tool | Languages | Install | Output mode |
+| Tool | Languages / scope | Install | Output mode |
 |---|---|---|---|
 | **ruff** | Python | `pip install ruff` | `ruff check --output-format json` |
 | **golangci-lint** | Go | [installer](https://golangci-lint.run/usage/install/) | `golangci-lint run --out-format json` |
 | **clippy** | Rust | `rustup component add clippy` | `cargo clippy --message-format=json` |
 | **biome** | TypeScript / JavaScript / JSON | `npm i -g @biomejs/biome` | `biome check --reporter=json` |
+| **bandit** | Python security | `pip install bandit` | `bandit -r <root> -f json -q` |
+| **gitleaks** | Secrets (working tree) | [releases](https://github.com/gitleaks/gitleaks) | `gitleaks detect --report-format=json --no-git` |
+| **npm-audit** | npm dependency CVEs | ships with npm (needs `package-lock.json`) | `npm audit --json` |
+| **pip-audit** | Python dependency CVEs | `pip install pip-audit` | `pip-audit --format json` |
 
 ## Rule-id namespace
 
@@ -92,8 +96,12 @@ Sources:
 - `daemon/external/golangci.ts` — Go.
 - `daemon/external/clippy.ts` — Rust.
 - `daemon/external/biome.ts` — TS/JS/JSON.
+- `daemon/external/bandit.ts` — Python security.
+- `daemon/external/gitleaks.ts` — secrets.
+- `daemon/external/npm-audit.ts` / `daemon/external/pip-audit.ts` — dependency CVEs.
+- `daemon/external/parseShape.ts` — shared fail-loud output validation: malformed output or valid-JSON-wrong-shape (tool version drift) produces an error diagnostic, never a silent zero-findings result.
 
-Each adapter is ~150 lines, predominantly the spawn lifecycle. Adding a new adapter for a 5th tool follows the same template.
+Each adapter is ~150 lines, predominantly the spawn lifecycle. Adding a new adapter for a 9th tool follows the same template.
 
 ## Performance
 

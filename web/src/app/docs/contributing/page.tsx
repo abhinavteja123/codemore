@@ -105,7 +105,7 @@ npm run test:unit`}</CodeBlock>
       <NextStep
         href="/docs/rules"
         title="Browse the catalog before contributing"
-        description="58 rules across 7 packs. See the shape, the lifecycle gates, the pack ownership before opening a PR."
+        description="59 rules across 6 packs. See the shape, the lifecycle gates, the pack ownership before opening a PR."
       />
     </>
   );

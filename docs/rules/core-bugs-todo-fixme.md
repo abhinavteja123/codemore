@@ -4,7 +4,9 @@
 
 | Category | Default severity | Lifecycle | Default confidence |
 |---|---|---|---|
-| maintainability | INFO | experimental | 1.0 (clamped to 0.6 while experimental) |
+| maintainability | INFO | beta | 1.0 |
+
+**Pack:** `core-quality`
 
 ## What it catches
 

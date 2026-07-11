@@ -2,7 +2,9 @@
 
 | Category | Default severity | Lifecycle | Default confidence |
 |---|---|---|---|
-| bug | MINOR | experimental | 0.95 (clamped to 0.6 while experimental) |
+| bug | MINOR | beta | 0.95 |
+
+**Pack:** `core-quality`
 
 ## What it catches
 

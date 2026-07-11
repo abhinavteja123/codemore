@@ -2,7 +2,9 @@
 
 | Category | Default severity | Lifecycle | Default confidence |
 |---|---|---|---|
-| security | BLOCKER (literal: MAJOR) | experimental | 0.9 dynamic / 0.75 literal (clamped to 0.6 while experimental) |
+| security | BLOCKER (literal: MAJOR) | beta | 0.9 dynamic / 0.75 literal |
+
+**Pack:** `core-security`
 
 ## What it catches
 

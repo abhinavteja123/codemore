@@ -3,7 +3,7 @@
 **Pack:** `vibe-auth`
 **Default severity:** MAJOR (promote to BLOCKER via `.codemorerc.json` if it should gate CI)
 **Languages:** TypeScript, JavaScript
-**Lifecycle:** experimental
+**Lifecycle:** beta
 **Confidence:** 0.8
 
 ## What it catches

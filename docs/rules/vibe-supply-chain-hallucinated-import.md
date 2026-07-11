@@ -3,7 +3,7 @@
 **Pack:** `core-security`
 **Default severity:** MAJOR (promote to BLOCKER via `.codemorerc.json` once calibrated; tutorial and monorepo-workspace projects both produce noise at BLOCKER until v1.1 unions workspace `package.json` files)
 **Languages:** TypeScript, JavaScript
-**Lifecycle:** experimental
+**Lifecycle:** beta
 **Confidence:** 0.85
 
 ## What it catches

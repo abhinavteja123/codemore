@@ -42,7 +42,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: abhinavteja123/codemore@main
+      - uses: abhinavteja123/codemore@v1
         with:
           fail-on: BLOCKER`;
 
@@ -94,7 +94,13 @@ codemore scan . --telemetry
 
 # layer on external adapters: ruff, biome, golangci-lint, clippy, bandit,
 # gitleaks, npm-audit, pip-audit  (--external-tools all to enable everything)
-codemore scan . --external-tools ruff,biome`}</CodeBlock>
+codemore scan . --external-tools ruff,biome
+
+# SARIF for GitHub code scanning
+codemore scan . --format sarif --out codemore.sarif
+
+# agentic fix loop from the CLI (needs ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY)
+codemore fix . --rule <id> --write`}</CodeBlock>
 
                 <Callout type="note" title="walker behaviour">
                   CodeMore intentionally scans secret-shaped filenames even
@@ -127,6 +133,15 @@ codemore scan . --external-tools ruff,biome`}</CodeBlock>
                   report.
                 </p>
 
+                <h3 id="mcp-auto">One-command install</h3>
+                <CodeBlock lang="shell">{`npx codemore mcp                              # print config + every client's config path
+npx codemore mcp install --client cursor      # merge-safe write (backs up first, --dry-run supported)`}</CodeBlock>
+                <p>
+                  Supported clients: <code>cursor</code>,{" "}
+                  <code>claude-desktop</code>, <code>claude-code</code>,{" "}
+                  <code>codex</code>. Or configure manually:
+                </p>
+
                 <h3 id="mcp-cursor">Cursor</h3>
                 <p>Add to <code>~/.cursor/mcp.json</code>:</p>
                 <CodeBlock lang="json">{CURSOR_MCP}</CodeBlock>
@@ -152,7 +167,7 @@ codemore scan . --external-tools ruff,biome`}</CodeBlock>
 
                 <NextStep
                   href="/docs/rules"
-                  title="Browse the 58-rule catalog"
+                  title="Browse the 59-rule catalog"
                   description="See exactly what each tool will surface — grouped by pack, lifecycle, severity."
                 />
               </>
@@ -177,7 +192,7 @@ codemore scan . --external-tools ruff,biome`}</CodeBlock>
                   <li>Reload when prompted. Analysis runs automatically on save (configurable).</li>
                   <li>Or install the offline VSIX:</li>
                 </ol>
-                <CodeBlock lang="shell">{`code --install-extension codemore-0.2.1.vsix`}</CodeBlock>
+                <CodeBlock lang="shell">{`code --install-extension codemore-<version>.vsix`}</CodeBlock>
 
                 <h3 id="vscode-keyboard">Keyboard shortcuts</h3>
                 <ul>

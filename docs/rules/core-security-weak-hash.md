@@ -5,6 +5,8 @@
 |---|---|---|---|
 | security | MAJOR | beta | 0.85 |
 
+**Pack:** `core-security`
+
 ## What it catches
 
 MD5 and SHA-1 being used for password hashing or auth-secret hashing. Both algorithms are cryptographically broken for any application where collision or pre-image resistance matters. Modern password hashing requires bcrypt / argon2 / scrypt with per-row salt and a configurable work factor.

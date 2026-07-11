@@ -5,6 +5,8 @@
 |---|---|---|---|
 | security | BLOCKER | beta | 0.85 |
 
+**Pack:** `core-security`
+
 ## What it catches
 
 The classical SQL-injection pattern: a query string built by concatenating or interpolating user input directly into a database execution API. Detects patterns like:

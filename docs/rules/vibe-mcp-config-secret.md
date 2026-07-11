@@ -2,7 +2,9 @@
 
 | Category | Default severity | Lifecycle | Default confidence |
 |---|---|---|---|
-| security | BLOCKER | experimental | 0.95 (clamped to 0.6 while experimental) |
+| security | BLOCKER | beta | 0.95 |
+
+**Pack:** `vibe-secrets`
 
 ## What it catches
 

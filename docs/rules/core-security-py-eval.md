@@ -3,7 +3,7 @@
 **Pack:** `core-security`
 **Default severity:** BLOCKER
 **Languages:** Python
-**Lifecycle:** experimental
+**Lifecycle:** beta
 **Confidence:** 0.95
 
 ## What it catches

@@ -5,6 +5,8 @@
 |---|---|---|---|
 | security | CRITICAL | beta | 0.8 |
 
+**Pack:** `core-security`
+
 ## What it catches
 
 A password/credential-named identifier assigned or compared to a string literal — the class bandit calls B105, with no provider prefix to scan for:

@@ -5,6 +5,8 @@
 |---|---|---|---|
 | security | BLOCKER | beta | 0.8 |
 
+**Pack:** `core-security`
+
 ## What it catches
 
 User-supplied filenames concatenated onto a file-system path without an inside-base guard. Maps to CWE-22 (Improper Limitation of a Pathname to a Restricted Directory) and OWASP A03 (Injection).

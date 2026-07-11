@@ -2,7 +2,9 @@
 
 | Category | Default severity | Lifecycle | Default confidence |
 |---|---|---|---|
-| security | BLOCKER | experimental | 0.85 (clamped to 0.6 while experimental) |
+| security | BLOCKER | beta | 0.85 |
+
+**Pack:** `vibe-supabase`
 
 ## What it catches
 

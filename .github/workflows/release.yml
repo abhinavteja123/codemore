@@ -64,10 +64,16 @@ jobs:
           echo "Tarball size: $(du -h "$TGZ" | cut -f1)"
           echo "Tarball files: $(tar -tzf "$TGZ" | wc -l)"
 
-      - name: Publish to npm
+      - name: Publish to npm (skipped if version already on the registry)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance
+        run: |
+          PKG_VERSION="$(node -p 'require("./package.json").version')"
+          if npm view "codemore@$PKG_VERSION" version >/dev/null 2>&1; then
+            echo "codemore@$PKG_VERSION already published — skipping npm publish"
+          else
+            npm publish --access public --provenance
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

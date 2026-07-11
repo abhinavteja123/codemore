@@ -3,7 +3,7 @@
 **Pack:** `vibe-frontend`
 **Default severity:** MAJOR
 **Languages:** TypeScript, JavaScript
-**Lifecycle:** experimental
+**Lifecycle:** beta
 **Confidence:** 0.75
 
 ## What it catches

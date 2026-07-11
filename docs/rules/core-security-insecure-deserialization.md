@@ -5,6 +5,8 @@
 |---|---|---|---|
 | security | BLOCKER | beta | 0.9 |
 
+**Pack:** `core-security`
+
 ## What it catches
 
 Unsafe deserialization of attacker-controlled bytes — the shortest path to remote code execution in Python apps. Detects calls to:

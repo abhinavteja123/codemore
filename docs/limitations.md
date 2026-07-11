@@ -44,7 +44,7 @@ catalog because their TPs are high-value, but agents should weight them lower:
 | `core-quality-unused-export` | ~30 % | TypeScript `import type { X }` consumption isn't tracked; entry-point files (`index.ts`, `route.ts`, `page.tsx`) and dynamic registration patterns leak through | Lower `defaultConfidence: 0.7` so agents sort it below security findings |
 | `vibe-supply-chain-hallucinated-import` | ~25 % | Workspace packages + bundled deps that aren't on npm but ARE real | Read `package.json` `workspaces` field post-launch + add registry network fallback |
 | `vibe-agent-tool-no-confirm` | ~50 % | Agent SDK shapes vary too widely for regex | `defaultConfidence: 0.65` so agents downgrade it |
-| `core-quality-duplicate-string` | ~10 % | Threshold of ≥3 occurrences too aggressive for TypeScript | **Gated behind `--enable-experimental` as of v0.2.1**. Threshold-by-language tuning in v0.3 |
+| `core-quality-duplicate-string` | ~10 % at the old ≥3 threshold | Framework labels, severity strings, file extensions are intended-repeated | **Gated behind `--enable-experimental` as of v0.2.1**. Recalibrated in v0.2.7 (≥5 occurrences of strings ≥8 chars, test files skipped); stays experimental until re-measured |
 
 ## What changed in v0.2.1 (gitignore bypass)
 

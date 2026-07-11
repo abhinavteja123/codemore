@@ -2,7 +2,9 @@
 
 | Category | Default severity | Lifecycle | Default confidence |
 |---|---|---|---|
-| security | BLOCKER (test paths: MAJOR) | experimental | 0.9 (clamped to 0.6 while experimental) |
+| security | BLOCKER (test paths: MAJOR) | beta | 0.9 |
+
+**Pack:** `core-security`
 
 ## What it catches
 

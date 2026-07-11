@@ -3,7 +3,7 @@
 **Pack:** `vibe-supabase`
 **Default severity:** BLOCKER
 **Languages:** TypeScript, JavaScript
-**Lifecycle:** experimental
+**Lifecycle:** beta
 **Confidence:** 0.85
 **Frameworks:** Supabase
 

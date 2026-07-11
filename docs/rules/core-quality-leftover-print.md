@@ -3,7 +3,7 @@
 **Pack:** `core-quality`
 **Default severity:** MINOR
 **Languages:** Python
-**Lifecycle:** experimental
+**Lifecycle:** beta
 **Confidence:** 0.75
 
 ## What it catches

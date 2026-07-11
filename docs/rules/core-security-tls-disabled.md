@@ -5,6 +5,8 @@
 |---|---|---|---|
 | security | MAJOR | beta | 0.95 |
 
+**Pack:** `core-security`
+
 ## What it catches
 
 TLS certificate verification being explicitly disabled. The fix in the moment is always the same: don't disable it. The number of production incidents where someone "temporarily" set `verify=False` or `rejectUnauthorized: false` and forgot to revert is depressingly large.
