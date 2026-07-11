@@ -28,8 +28,8 @@ docs/rules/         # Per-rule docs pages (one .md per rule).
 ## Quick start
 
 ```bash
-# Install (no binary download in dev — set the flag).
-CODEMORE_SKIP_BINARY_DOWNLOAD=1 npm ci
+# Install (postinstall skips binary downloads in dev automatically).
+npm ci
 
 # Type-check everything that ships to npm.
 npx tsc -p tsconfig.publish.json

@@ -70,9 +70,10 @@ That's the wedge. CodeMore is not another SAST dashboard. **It's the report cont
 npx codemore@latest scan .
 ```
 
-Emits [`codemore-report.json`](docs/schema.md): every finding pinned to `file:line:column` with rule citation, fix template, and verification criteria. Pipe it to your agent and watch findings close.
+Prints a summary to the terminal. Add `--json` for the full [report](docs/schema.md) on stdout, or `--out codemore-report.json` to write it to disk: every finding pinned to `file:line:column` with rule citation, fix template, and verification criteria. Pipe it to your agent and watch findings close.
 
 ```bash
+npm install -g codemore                        # once — or prefix each command below with `npx codemore@latest`
 codemore scan . --fail-on BLOCKER              # CI gate: non-zero exit on any BLOCKER
 codemore scan . --external-tools ruff,biome    # opt in to external tools
 codemore scan . --external-tools all           # ruff · golangci-lint · clippy · biome · bandit · gitleaks · npm-audit · pip-audit
@@ -184,7 +185,7 @@ Daemon : issues=224  BLOCKER=5  fingerprint=sha256:7f95f2c62e0d3ecea6f23…
 ```jsonc
 {
   "schemaVersion": "1.0.0",
-  "tool":    { "name": "codemore", "version": "0.2.7" },
+  "tool":    { "name": "codemore", "version": "0.2.8" },
   "project": { "root": ".", "framework": "next.js", "language": "typescript",
                "fingerprint": "sha256:7f95f2c62e0d3ecea6f23…" },
   "summary": {
@@ -352,7 +353,7 @@ codemore/
 ```bash
 git clone https://github.com/abhinavteja123/codemore
 cd codemore
-CODEMORE_SKIP_BINARY_DOWNLOAD=1 npm ci         # skip binary downloads in dev
+npm ci                                         # postinstall skips binary downloads in dev automatically
 
 npx tsc -p tsconfig.publish.json               # type-check the publishable surface
 npm run test:unit                              # unit tests (mocha + ts-node)

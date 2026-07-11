@@ -38,8 +38,8 @@ export default function ContributingPage() {
       </ul>
 
       <h2 id="quickstart">Quick start</h2>
-      <CodeBlock lang="shell">{`# Skip the binary download in dev — set the flag.
-CODEMORE_SKIP_BINARY_DOWNLOAD=1 npm ci
+      <CodeBlock lang="shell">{`# Install (postinstall skips binary downloads in dev automatically).
+npm ci
 
 # Type-check.
 npx tsc -p tsconfig.publish.json
