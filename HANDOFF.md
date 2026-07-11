@@ -212,7 +212,60 @@ Ran the release gates as if shipping for real. Two failed, one long-standing cra
 13. **Consider `.gitattributes`** (`* text=auto eol=lf`) — kills the entire CRLF landmine class that C.2 came from.
 14. **Dashboard Playwright smoke** — upload ZIP → report renders.
 
-PLAN.md remains the live plan of record (Tracks A/B/C unchanged); the list above is the current cross-track execution order.
+PLAN.md remains the live plan of record (Tracks A/B/C unchanged); the list above is the current cross-track execution order. **→ Superseded by §0.9.G below.**
+
+---
+
+## 0.9 Update — 2026-07-09/11 (CI green, prod deploy debugging, scoring fix, 0.2.7)
+
+The deploy-and-harden session: user published npm 0.2.5 + a Marketplace VSIX + Vercel, then everything that was broken in production got found and fixed. Version is now **0.2.7** (0.2.6 was never published anywhere; its whole changelog entry ships as 0.2.7). Read A→G.
+
+### A. CI was red since the feature commits — fixed (`9f516e0`)
+
+Every push since `7bb1d84` failed CI at the Lint step: two eslint **errors** (489 warnings are tolerated, errors aren't) — `no-explicit-any` on `postJson`'s return in `daemon/cli/commands/fix.ts` and `no-var-requires` on the deliberate lazy `require('./commands/fix')` in `daemon/cli/index.ts`. Both got scoped `eslint-disable` directives with reasons. Run 29000015668 confirmed **green** (11m25s). Side quirk: `gh run watch` on a freshly pushed commit can grab the previous run id — re-resolve the id after push.
+
+### B. What's actually live in production (probed 2026-07-09, not assumed)
+
+- **codemore.tech is on Vercel and mostly works**: NextAuth session/CSRF OK (secret set), GitHub OAuth full redirect flow works (real client id, correct callback), Google OAuth works (PKCE), `/dashboard` 200, `/api/analyze` alive with proper validation errors.
+- **Vercel CLI trap**: local `vercel whoami` = `abhinavteja123` but that account has **zero projects** — the deploy lives under a different Vercel login (dashboard uses GitHub sign-in). CLI-driven env management impossible until `npx vercel login` with the right account.
+- **`.env.vercel-production`** (repo root, **gitignored**, delete after upload) holds the full production env, values copied from `web/.env`. Two real finds while building it: `web/.env` had `AI_PROVIDER`/`AI_API_KEY` — **names the app never reads** (it reads `GEMINI_API_KEY` or `CODEMORE_AI_PROVIDER`/`CODEMORE_AI_API_KEY`) — and the key value was literally the stub `your_api_key`. A real Gemini key is still needed for AI fix-suggestions. Supabase project exists (`sibhtpskiotdahqcezsa`, new-format `sb_publishable_`/`sb_secret_` keys).
+
+### C. Hosted scans 500'd — serverless filesystem fix (`1eaa410`)
+
+`ENOENT: mkdir '/var/task/web/.scan-artifacts'` on `/api/scan-jobs/github`. Root cause is architectural, not a path bug: `scanArtifacts.ts` wrote job artifacts (AES-256-GCM-encrypted GitHub token JSON, uploaded zips) to disk, but Vercel's deploy bundle is **read-only** AND the enqueue request and the poll request that processes the job can run on **different lambdas** — disk artifacts can never work there, `/tmp` included. Fix: artifacts now live in a new **`scan_artifacts` Supabase table** (zip stored base64; Vercel's 4.5 MB body limit is the natural size cap); `os.tmpdir()` remains only as the no-DB local-dev fallback. Function signatures unchanged; routes/runner untouched. **Migration `web/supabase/migrations/006_scan_artifacts.sql` MUST be run in the Supabase SQL editor before hosted scans work** — RLS enabled with no policies (service role bypasses).
+
+### D. Incident: user commit `8929e27` "web fixes" silently reverted three fixes
+
+That commit undid the markdown.tsx CRLF fix (docs static build hung again on `/docs/rules/core-quality-duplicate-string` — rediagnosed from scratch before spotting the revert), stripped the demo-BLOCKER suppression directives (release self-scan gate failing again), and deleted `web/.env.example`. All three re-applied in `1eaa410`. **Lesson for both human and agent: `git pull` before editing web/, and diff what a "fixes" commit actually touches.**
+
+### E. Scoring bug — "300 findings but health score 96" (`8863552`)
+
+The per-file average dilutes on large codebases: hundreds of clean files each contribute 100, so live BLOCKERs still read as "excellent". Fixed in `shared/scoring.ts` (the one brain — a subagent verified all four surfaces route through it: CLI `projectScanner.ts:274`, MCP via `scanProject`, extension `contextMap.ts:363`, web `productionAnalyzer.ts:140`): the per-file average stays as the base, but the aggregate is now **capped by worst severity present** — any BLOCKER → ≤59 (−3 each additional, floor 25); else any CRITICAL → ≤79 (−2 each, floor 45); minor/info-only noise still scores high (fair). New `severityCap()` export; `calculateHealthScoreFromTotals` capped identically. The one latent divergent scorer (unused `analyzeProject` in `web/src/lib/analyzer.ts`, own hardcoded weights, INFO=1 vs shared 0.5) rerouted through shared functions. `test/scoring.test.ts` added (5 tests); suite at **177 passing**.
+
+### F. 0.2.7 release prep (`34c3cab`) + VSIX bloat fix (`2dc5246`)
+
+- **`.vscodeignore` had no `*.tgz` rule** — a stray 121 MB `codemore-0.2.2.tgz` in repo root ballooned the VSIX to 118.72 MB. Rule added, stray tgz deleted; VSIX back to **2.84 MB / 26 files**.
+- Version bumped **0.2.7**; CHANGELOG's 0.2.6 entry renamed to 0.2.7 (never published) and completed with the scoring + serverless-artifact fixes.
+- **Artifacts ready to publish**: `codemore-0.2.7.vsix` at repo root (includes scoring fix); `lib/` freshly built; npm tarball verified (304 files, `npm pack --dry-run`).
+- Tags: `v0.2.6` deleted; `v0.2.7` + `v1` local at `34c3cab`. Remote `v1` still points at the old pre-scoring commit (classifier keeps blocking the assistant's force-push).
+- npm token path documented for the user: npmjs.com → Access Tokens → **Granular** token scoped read/write to `codemore` (bypasses the OTP pain from the 0.2.4/0.2.5 saga) → `gh secret set NPM_TOKEN -R abhinavteja123/codemore` → `git push codemore v0.2.7`.
+
+### G. What's left (supersedes §0.8.G)
+
+1. **npm 0.2.7**: granular NPM_TOKEN (steps in F) → `gh secret set NPM_TOKEN` → `git push codemore v0.2.7`. CI publishes with provenance + creates the first GitHub Release. Or manual `npm publish --access public` from user PowerShell. MCP ships inside the package.
+2. **Marketplace**: upload `codemore-0.2.7.vsix` (replaces whatever version is currently listed).
+3. **Web, three user steps**: run migration 006 SQL in Supabase → upload `.env.vercel-production` vars (swap in a real Gemini key, then DELETE the file) → redeploy. Then test the hosted scan end-to-end (sign in → scan a repo → job completes on poll).
+4. **Remote `v1` tag**: `git push codemore v1 --force` (user must run; classifier blocks assistant).
+5. A4 multi-IDE verification matrix (Cursor / Claude Code / Claude Desktop / Codex, screen recordings).
+6. Manual eyeballs still owed: interactive-menu Ctrl-C cancel; hero scroll-dive in a real browser.
+7. MCP registry submissions (server.json + modelcontextprotocol registry + Smithery) — after npm 0.2.7.
+8. Track C flywheel: telemetry on (needs step 3) → 30-day FP data → beta→stable promotions → `auto-demote-rules.yml`.
+9. Python rule parity (~12 py vs ~46 TS rules; 2–3 sessions).
+10. A3 remainder: biome JS config; clippy/gitleaks/golangci recall audit.
+11. Monolith migration to `registryAdapter`, then delete (§0.8.D map still accurate).
+12. A7 StrykerJS mutation testing; `.gitattributes` (`* text=auto eol=lf`) — would kill the CRLF landmine class that bit twice now (C.2 in §0.8 and D above); dashboard Playwright smoke.
+
+Known environment quirks (don't re-diagnose): Node 24 + Windows libuv teardown assert (`src\win\async.c:94`) after complete scan output — pre-existing, stdio-timing dependent, Linux CI unaffected, can flake-fail `validate-rule-pr.js` locally on 2-3 corpus dirs. `cli.js` + `scripts/measure-accuracy.js` resolve stale compiled `lib/` before live source — `npm run build:publish` after rule changes or corpus numbers lie. Git remote is `codemore`, not `origin`.
 
 ---
 
