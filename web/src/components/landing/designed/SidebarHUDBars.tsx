@@ -4,12 +4,18 @@ import React, { useEffect, useState } from "react";
 
 interface SidebarHUDBarsProps {
   sections: { id: string; label: string }[];
+  activeSection?: string;
 }
 
-export default function SidebarHUDBars({ sections }: SidebarHUDBarsProps) {
+export default function SidebarHUDBars({ sections, activeSection: propActiveSection }: SidebarHUDBarsProps) {
   const [activeSection, setActiveSection] = useState<string>("");
 
   useEffect(() => {
+    if (propActiveSection !== undefined) {
+      setActiveSection(propActiveSection);
+      return;
+    }
+
     const observerOptions = {
       root: null,
       rootMargin: "-45% 0px -45% 0px", // High precision matching for the center of screen
@@ -28,16 +34,16 @@ export default function SidebarHUDBars({ sections }: SidebarHUDBarsProps) {
 
     sections.forEach((sec) => {
       const el = document.getElementById(sec.id);
-      if (el) observer.observe(el);
+      if (el) {observer.observe(el);}
     });
 
     return () => {
       sections.forEach((sec) => {
         const el = document.getElementById(sec.id);
-        if (el) observer.unobserve(el);
+        if (el) {observer.unobserve(el);}
       });
     };
-  }, [sections]);
+  }, [sections, propActiveSection]);
 
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);

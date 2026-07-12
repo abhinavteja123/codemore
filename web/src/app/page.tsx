@@ -149,108 +149,6 @@ export default function Landing() {
     };
   }, []);
 
-  // ── Scroll-driven portal animations ──────────────────────────────
-  const passageRef  = useRef<HTMLElement>(null);
-  const portalRef   = useRef<HTMLDivElement>(null);
-  const heroCopyRef = useRef<HTMLDivElement>(null);
-  const heroHintRef = useRef<HTMLDivElement>(null);
-  const diveVeilRef = useRef<HTMLDivElement>(null);
-  const navRef      = useRef<HTMLElement>(null);
-  const scanRef     = useRef<HTMLElement>(null);
-  const threatsRef  = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const smooth = (e0: number, e1: number, v: number) => {
-      const t = Math.min(Math.max((v - e0) / (e1 - e0), 0), 1);
-      return t * t * (3 - 2 * t);
-    };
-    let rafId: number | null = null;
-    let ringEl: HTMLElement | null = null;
-
-    const apply = (p: number) => {
-      const zoom      = 1 + Math.pow(p, 2.4) * 7;        // 1 → 8× — swells past the viewport edge; 25× was a GPU tile bomb every dive
-      const coreB     = 1 + p * 1.6;                     // core brightens as we dive
-      // Ring bows out as soon as the dive starts: it's a blur(12px) +
-      // infinite-spin surface, and re-rasterizing that inside a scaling
-      // parent on scroll reversals is what left stale crescent artifacts.
-      // At rest it's fully back; past p=0.2 it's visibility:hidden so the
-      // compositor frees the blurred surface entirely.
-      const ringO     = 1 - smooth(0.04, 0.18, p);
-      const copyO     = 1 - smooth(0.18, 0.52, p);
-      const copyShift = p * -160;
-      const copyScale = 1 + p * 0.12;
-      const hintO     = 1 - smooth(0.02, 0.12, p);
-      const veilO     = smooth(0.8, 0.97, p);            // fully opaque before the portal hides at 0.985
-
-      portalRef.current!.style.setProperty("--pz",     zoom.toFixed(3));
-      portalRef.current!.style.setProperty("--core-b", coreB.toFixed(3));
-      portalRef.current!.style.setProperty("--ring-o", ringO.toFixed(3));
-      heroCopyRef.current!.style.opacity   = copyO.toFixed(3);
-      heroCopyRef.current!.style.transform = `translateY(${copyShift.toFixed(1)}px) scale(${copyScale.toFixed(3)})`;
-      heroHintRef.current!.style.opacity   = hintO.toFixed(3);
-      if (diveVeilRef.current) diveVeilRef.current.style.opacity = veilO.toFixed(3);
-      // Once the veil is opaque the portal is invisible anyway — drop its
-      // composited layer. A will-change canvas scaled 25× that stays alive
-      // for the whole page is what starves the GPU and makes the compositor
-      // drop tiles (blank nav, texture garbage) on fast scrolls.
-      portalRef.current!.style.visibility = p >= 0.985 ? "hidden" : "visible";
-      ringEl ??= portalRef.current!.querySelector<HTMLElement>(".portal__ring");
-      if (ringEl) ringEl.style.visibility = p > 0.2 ? "hidden" : "visible";
-    };
-
-    // No JS easing here: Lenis already smooths wheel scrolling, so the raw
-    // scroll position IS smooth — a second lerp on top re-introduces exactly
-    // the double-smoothing this page has been bitten by twice. And on instant
-    // jumps (scrollbar drag, Home key) snapping is what we want: easing meant
-    // parading a ~19×-scaled WebGL layer across the viewport for 600ms, which
-    // is what made the compositor drop tiles (vanishing nav/text).
-    const tick = () => {
-      rafId = null;
-      if (navRef.current) {
-        navRef.current.classList.toggle("is-scrolled", window.scrollY > 50);
-      }
-      if (!passageRef.current || !portalRef.current || !heroCopyRef.current || !heroHintRef.current) return;
-      const rect   = passageRef.current.getBoundingClientRect();
-      const len    = Math.max(passageRef.current.offsetHeight - window.innerHeight, 1);
-      apply(Math.min(Math.max(-rect.top / len, 0), 1));
-    };
-    const onScroll = () => {
-      if (rafId === null) {
-        rafId = requestAnimationFrame(tick);
-      }
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
-  }, []);
-
-  // ── Nav hide on scroll-down ──────────────────────────────────────
-  const [isNavHidden, setIsNavHidden] = useState(false);
-  const lastY = useRef(0);
-  useEffect(() => {
-    let raf: number | null = null;
-    const onScroll = () => {
-      if (raf !== null) return;
-      raf = requestAnimationFrame(() => {
-        const y = window.scrollY;
-        const hide = y > 120 && y > lastY.current;
-        // setState only on actual transition — saves dozens of renders on fast
-        // scroll-up bursts which otherwise cascade into WebGL flicker.
-        setIsNavHidden(prev => (prev === hide ? prev : hide));
-        lastY.current = y;
-        raf = null;
-      });
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      if (raf !== null) cancelAnimationFrame(raf);
-    };
-  }, []);
-
   // ── Arc carousel — REAL CodeMore rule findings ──────────────────
   const CARDS: CardItem[] = useMemo(() => [
     {
@@ -305,41 +203,233 @@ export default function Landing() {
     },
   ], []);
 
-  const [cardIdx, setCardIdx] = useState(0);
+  // ── Scroll-driven portal animations ──────────────────────────────
+  const passageRef  = useRef<HTMLElement>(null);
+  const portalRef   = useRef<HTMLDivElement>(null);
+  const heroCopyRef = useRef<HTMLDivElement>(null);
+  const heroHintRef = useRef<HTMLDivElement>(null);
+  const diveVeilRef = useRef<HTMLDivElement>(null);
+  const navRef      = useRef<HTMLElement>(null);
+  const scanRef     = useRef<HTMLDivElement>(null);
+  const threatsRef  = useRef<HTMLElement>(null);
 
-  // ── PHASE 8A — Scroll-bind cardIdx to scene2 track progress ─────
+  const [currentSection, setCurrentSection] = useState<string>("passage");
+  const currentSectionRef = useRef<string>("passage");
+
+  // --- Dynamic Slide state, resizing & scroll pinning ---
+  const [cardIdx, setCardIdx] = useState<number>(0);
+  const [cardOffset, setCardOffset] = useState<number>(0);
+  const [isHovered, setIsHovered] = useState<boolean>(false);
+  const isDragging = useRef<boolean>(false);
+  const startDragX = useRef<number>(0);
+
   useEffect(() => {
-    const el = scanRef.current;
-    if (!el) return;
-    let raf: number | null = null;
+    const smooth = (e0: number, e1: number, v: number) => {
+      const t = Math.min(Math.max((v - e0) / (e1 - e0), 0), 1);
+      return t * t * (3 - 2 * t);
+    };
+    let rafId: number | null = null;
+    let ringEl: HTMLElement | null = null;
+
+    const apply = (p: number) => {
+      // 1. Zoom the WebGL vortex portal (scale 1x to 12x) and smoothly fade the outer conically blurred orbiting ring (p = 0 to 0.45)
+      const pPortal = Math.min(p / 0.48, 1.0);
+      const zoom = 1 + Math.pow(pPortal, 2.4) * 11; // 1 -> 12x zoom
+      const coreB = 1 + pPortal * 1.6;
+      const ringO = 1 - smooth(0.04, 0.18, pPortal);
+      // Hero copy: fade-only via opacity — no JS transform.
+      // Driving translateY/scale via rAF on a will-change layer causes compositor
+      // conflicts on scroll-back-up (white-flash flicker). Opacity-only is
+      // composited cleanly without invalidating the GPU tile cache.
+      const copyO = 1 - smooth(0.15, 0.48, pPortal);
+      const hintO = 1 - smooth(0.02, 0.12, pPortal);
+
+      portalRef.current!.style.setProperty("--pz", zoom.toFixed(3));
+      portalRef.current!.style.setProperty("--core-b", coreB.toFixed(3));
+      portalRef.current!.style.setProperty("--ring-o", ringO.toFixed(3));
+      heroCopyRef.current!.style.opacity = copyO.toFixed(3);
+      heroHintRef.current!.style.opacity = hintO.toFixed(3);
+
+      if (p < 0.45) {
+        portalRef.current!.style.visibility = "visible";
+        portalRef.current!.style.pointerEvents = "auto";
+      } else {
+        portalRef.current!.style.visibility = "hidden";
+        portalRef.current!.style.pointerEvents = "none";
+      }
+
+      ringEl ??= portalRef.current!.querySelector<HTMLElement>(".portal__ring");
+      if (ringEl) ringEl.style.visibility = pPortal > 0.2 ? "hidden" : "visible";
+
+      // 2. Fade in and scale up the Scene 2 layer from the black core void (p = 0.10 to 0.48)
+      if (scanRef.current) {
+        const pScene2 = Math.min(Math.max((p - 0.10) / 0.38, 0), 1);
+        const easeOut = pScene2 * (2 - pScene2); // easeOutQuad
+        const scene2Opacity = easeOut;
+        const scene2Scale = 0.01 + easeOut * 0.99;
+
+        scanRef.current.style.opacity = scene2Opacity.toFixed(3);
+        scanRef.current.style.transform = `scale(${scene2Scale.toFixed(3)})`;
+
+        if (p >= 0.10) {
+          scanRef.current.style.visibility = "visible";
+          scanRef.current.style.pointerEvents = "auto";
+        } else {
+          scanRef.current.style.visibility = "hidden";
+          scanRef.current.style.pointerEvents = "none";
+        }
+      }
+
+      // 3. Carousel slide indexing in Phase 3 (p >= 0.48 to 1.0)
+      if (!isDragging.current) {
+        let targetIdx = 0;
+        let targetOffset = 0;
+        let activeP = 0;
+
+        if (p >= 0.48) {
+          activeP = (p - 0.48) / 0.52;
+          const targetIdxFloat = activeP * (CARDS.length - 1);
+          targetIdx = Math.round(targetIdxFloat);
+          targetOffset = targetIdxFloat - targetIdx;
+        }
+
+        setCardIdx(targetIdx);
+        setCardOffset(targetOffset);
+
+        if (scanRef.current) {
+          scanRef.current.style.setProperty("--scene2-prog", activeP.toFixed(3));
+        }
+      }
+
+      // 4. Synced HUD Active Section
+      let activeSec = currentSectionRef.current;
+      if (p < 1.0) {
+        activeSec = p >= 0.48 ? "scan" : "passage";
+      }
+      if (currentSectionRef.current !== activeSec) {
+        currentSectionRef.current = activeSec;
+        setCurrentSection(activeSec);
+      }
+    };
+
+    const tick = () => {
+      rafId = null;
+      if (navRef.current) {
+        navRef.current.classList.toggle("is-scrolled", window.scrollY > 50);
+      }
+      if (!passageRef.current || !portalRef.current || !heroCopyRef.current || !heroHintRef.current) return;
+      const rect   = passageRef.current.getBoundingClientRect();
+      const len    = Math.max(passageRef.current.offsetHeight - window.innerHeight, 1);
+      apply(Math.min(Math.max(-rect.top / len, 0), 1));
+    };
     const onScroll = () => {
-      if (raf !== null) return;
-      raf = requestAnimationFrame(() => {
-        const rect = el.getBoundingClientRect();
-        const trackLen = Math.max(el.offsetHeight - window.innerHeight, 1);
-        const progress = Math.min(Math.max(-rect.top / trackLen, 0), 1);
-        const continuous = progress * (CARDS.length - 1);
-        const nextIdx = Math.min(CARDS.length - 1, Math.round(continuous));
-        setCardIdx(prev => (prev === nextIdx ? prev : nextIdx));
-        el.style.setProperty("--scene2-prog", continuous.toFixed(3));
-        raf = null;
-      });
+      if (rafId === null) {
+        rafId = requestAnimationFrame(tick);
+      }
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => {
       window.removeEventListener("scroll", onScroll);
-      if (raf !== null) cancelAnimationFrame(raf);
+      if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, [CARDS.length]);
 
-  const goToCard = (newIdx: number) => {
-    const el = scanRef.current;
+  // ── Unlock hero-copy opacity from CSS animation fill-forward ──────────────
+  // `animation-fill-mode: forwards` keeps the hero-reveal keyframe's opacity:1
+  // at a cascade priority ABOVE inline styles (per CSS Animations Level 1 spec).
+  // That means the scroll rAF's `style.opacity` writes are silently no-ops for
+  // as long as the fill is active.
+  //
+  // Fix: listen for animationend, then in the same synchronous microtask:
+  //  1. Set `style.animation = 'none'` — this kills the fill-forward lock.
+  //  2. Set `style.opacity = '1'`    — pins the value so no flash to CSS opacity:0.
+  //
+  // After that the scroll rAF owns opacity with zero interference.
+  useEffect(() => {
+    const el = heroCopyRef.current;
     if (!el) return;
-    const trackLen = Math.max(el.offsetHeight - window.innerHeight, 1);
-    const targetProgress = newIdx / Math.max(CARDS.length - 1, 1);
-    const targetTop = el.offsetTop + targetProgress * trackLen;
-    window.scrollTo({ top: targetTop, behavior: "smooth" });
+    const unlock = (e: AnimationEvent) => {
+      // Guard: only react to the hero-reveal animation, not bubbled child events.
+      if (e.animationName !== "hero-reveal") return;
+      el.style.animation = "none";  // removes fill-forward lock
+      el.style.opacity   = "1";     // hold at 1 until scroll rAF takes over
+    };
+    el.addEventListener("animationend", unlock);
+    return () => el.removeEventListener("animationend", unlock);
+  }, []);
+
+
+  // ── Nav hide on scroll-down ──────────────────────────────────────
+  const [isNavHidden, setIsNavHidden] = useState(false);
+  const lastY = useRef(0);
+  useEffect(() => {
+    let raf: number | null = null;
+    const onScroll = () => {
+      if (raf !== null) return;
+      raf = requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const hide = y > 120 && y > lastY.current;
+        // setState only on actual transition — saves dozens of renders on fast
+        // scroll-up bursts which otherwise cascade into WebGL flicker.
+        setIsNavHidden(prev => (prev === hide ? prev : hide));
+        lastY.current = y;
+        raf = null;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf !== null) cancelAnimationFrame(raf);
+    };
+  }, []);
+
+
+
+  const goToCard = (newIdx: number) => {
+    const targetIdx = Math.min(Math.max(newIdx, 0), CARDS.length - 1);
+    const el = passageRef.current;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      const viewHeight = window.innerHeight;
+      const totalScrollable = el.offsetHeight - viewHeight;
+      if (totalScrollable > 0) {
+        const elementAbsoluteTop = window.scrollY + rect.top;
+        const phase3StartProgress = 0.48;
+        const phase3Range = 0.52;
+        const targetProgress = phase3StartProgress + (targetIdx / (CARDS.length - 1)) * phase3Range;
+        const targetScrollRelativeY = targetProgress * totalScrollable;
+        const targetY = elementAbsoluteTop + targetScrollRelativeY + 2;
+        window.scrollTo({
+          top: targetY,
+          behavior: "smooth"
+        });
+        return;
+      }
+    }
+    setCardIdx(targetIdx);
+    setCardOffset(0);
+    isDragging.current = false;
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    isDragging.current = true;
+    startDragX.current = e.clientX;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging.current) return;
+    const delta = startDragX.current - e.clientX;
+    const offset = delta / cardSpacing;
+    setCardOffset(offset);
+  };
+
+  const handlePointerUp = () => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    const endActive = Math.round(cardIdx + cardOffset);
+    goToCard(endActive);
   };
 
   // ── PHASE 8B2 — Threat taxonomy scroll-bound active idx ─────────
@@ -430,7 +520,7 @@ export default function Landing() {
       </header>
 
       {/* ───── PORTAL HERO ───── */}
-      <section ref={passageRef} id="passage" className="portal-scene" aria-label="The scan portal">
+      <section ref={passageRef} id="passage" className="portal-scene" aria-label="The scan portal" style={{ height: "650vh" }}>
         <div className="portal-sticky">
           <div className="starfield" />
           <div ref={portalRef} className="portal" id="portal" aria-hidden="true">
@@ -460,113 +550,130 @@ export default function Landing() {
             <div className="bar" />
           </div>
 
-          {/* Painted over everything at dive end so the sticky release into
-              scene2 is a seamless crossfade instead of a hard cut. */}
-          <div ref={diveVeilRef} className="dive-veil" aria-hidden />
-        </div>
-      </section>
+          {/* ===== SCENE TWO LAYER (INSIDE VORTEX) ===== */}
+          <div 
+            className="scene2-layer" 
+            id="scan" 
+            ref={scanRef}
+            role="listbox"
+            aria-label="Scan findings"
+            tabIndex={0}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            onPointerLeave={handlePointerUp}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
+            <div 
+              className="scene2__grid" 
+              style={{ transform: `translate3d(${-( (cardIdx + cardOffset) * 45 ).toFixed(1)}px, 0px, 0px)` }}
+              aria-hidden="true"
+            />
+            <div className="scene2__beam" />
+            <span className="hud-bracket hud-bracket-tl" />
+            <span className="hud-bracket hud-bracket-tr" />
+            <span className="hud-bracket hud-bracket-bl" />
+            <span className="hud-bracket hud-bracket-br" />
 
-      {/* ───── SCENE 2 — ARC CAROUSEL (scroll-bound, Phase 8A) ───── */}
-      <section id="scan" ref={scanRef} className="scene2">
-        <div className="scene2__sticky">
-          <div className="scene2__grid" />
-          <div className="scene2__beam" />
-          <span className="hud-bracket hud-bracket-tl" />
-          <span className="hud-bracket hud-bracket-tr" />
-          <span className="hud-bracket hud-bracket-bl" />
-          <span className="hud-bracket hud-bracket-br" />
-
-          <div className="scene2__hud-overlay">
-            <div className="scene2__hud-left">
-              <SidebarHUDBars sections={[...HUD_SECTIONS]} />
+            <div className="scene2__hud-overlay">
+              <div className="scene2__hud-left">
+                <SidebarHUDBars sections={[...HUD_SECTIONS]} activeSection={currentSection} />
+              </div>
+              <div className="scene2__hud-right">
+                <SidebarHUDBars sections={[...HUD_SECTIONS]} activeSection={currentSection} />
+              </div>
             </div>
-            <div className="scene2__hud-right">
-              <SidebarHUDBars sections={[...HUD_SECTIONS]} />
-            </div>
-          </div>
 
-          <header className="scene2__head">
-            <div>
-              <div className="eyebrow">findings feed · 59 rules · scroll to advance</div>
-              <h2>Every finding is agent-actionable. Five sample classes from the 2026-07-07 audit.</h2>
-            </div>
-            <p>
-              Across 7 codebases we caught a real OpenAI key in a production .env, MCP-config
-              secrets, Supabase RLS holes, and real shell + SQL injection — 100% of planted
-              vulnerabilities detected, ~90% TP on BLOCKER findings.
-            </p>
-          </header>
+            <header className="scene2__head">
+              <div>
+                <div className="eyebrow">findings feed · 59 rules · scroll to advance</div>
+                <h2>Every finding is agent-actionable. Five sample classes from the 2026-07-07 audit.</h2>
+              </div>
+              <p>
+                Across 7 codebases we caught a real OpenAI key in a production .env, MCP-config
+                secrets, Supabase RLS holes, and real shell + SQL injection — 100% of planted
+                vulnerabilities detected, ~90% TP on BLOCKER findings.
+              </p>
+            </header>
 
-          <div className="arc">
-            {CARDS.map((c, i) => {
-              const delta = i - cardIdx;
-              const abs = Math.abs(delta);
-              const isCenter = delta === 0;
-              const xOffset = delta * cardSpacing;
-              const yOffset = abs * dropOffset;
-              const rotate = delta * rotationStep;
-              const opacity = abs > 2 ? 0 : 1 - abs * 0.22;
-              return (
-                <div
-                  key={c.id}
-                  className={"card" + (isCenter ? " is-center" : "")}
-                  onClick={() => goToCard(i)}
-                  style={{
-                    transform: `translate(calc(-50% + ${xOffset}px), calc(-50% + ${yOffset}px)) rotate(${rotate}deg)`,
-                    opacity,
-                    zIndex: 100 - abs,
-                    // @ts-expect-error: CSS custom properties
-                    "--h1": c.h1, "--h2": c.h2, "--h3": c.h3,
-                  }}
-                >
-                  <div className="card__inner">
-                    <div className="world" />
-                    <div className="card__scrim" />
-                    <div className="card__body">
-                      <div className="card__idx">{c.idx}</div>
-                      <div className="card__name">{c.name}</div>
-                      <div className="card__desc" style={{ whiteSpace: "pre-line" }}>{c.desc}</div>
-                      <div className="card__go">
-                        {c.icon}<span style={{ marginLeft: 6 }}>{c.tag}</span>
+            <div className="arc">
+              {CARDS.map((c, i) => {
+                const activeFactor = cardIdx + cardOffset;
+                const off = i - activeFactor;
+                const ax = off * cardSpacing;
+                const ay = Math.pow(Math.abs(off), 1.55) * dropOffset;
+                const rot = off * rotationStep;
+                const sc = Math.max(0.6, 1 - Math.abs(off) * 0.14);
+                const op = Math.max(0, 1 - Math.abs(off) * 0.32);
+                const isCenter = Math.round(activeFactor) === i;
+                return (
+                  <div
+                    key={c.id}
+                    className={"card" + (isCenter ? " is-center" : "")}
+                    onClick={() => {
+                      if (!isDragging.current && i !== cardIdx) {
+                        goToCard(i);
+                      }
+                    }}
+                    style={{
+                      transform: `translate(-50%, -50%) translate(${ax.toFixed(1)}px, ${ay.toFixed(1)}px) rotate(${rot.toFixed(2)}deg) scale(${sc.toFixed(3)})`,
+                      opacity: op.toFixed(3),
+                      zIndex: 200 - Math.round(Math.abs(off) * 10),
+                      // @ts-expect-error: CSS custom properties
+                      "--h1": c.h1, "--h2": c.h2, "--h3": c.h3,
+                    }}
+                  >
+                    <div className="card__inner">
+                      <div className="world" />
+                      <div className="card__scrim" />
+                      <div className="card__body">
+                        <div className="card__idx">{c.idx}</div>
+                        <div className="card__name">{c.name}</div>
+                        <div className="card__desc" style={{ whiteSpace: "pre-line" }}>{c.desc}</div>
+                        <div className="card__go">
+                          {c.icon}<span style={{ marginLeft: 6 }}>{c.tag}</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="card__detail">
-                      <div className="card__detail-row">
-                        <span className={c.severity === "BLOCKER" ? "pip-blocker" : "pip-major"}>
-                          {c.severity}
-                        </span>
-                        <span><b>cvss</b> {c.score}</span>
+                      <div className="card__detail">
+                        <div className="card__detail-row">
+                          <span className={c.severity === "BLOCKER" ? "pip-blocker" : "pip-major"}>
+                            {c.severity}
+                          </span>
+                          <span><b>cvss</b> {c.score}</span>
+                        </div>
+                        <div className="card__detail-fix">{c.remediation}</div>
+                        <div className="card__detail-snippet">{c.codeSnippet}</div>
                       </div>
-                      <div className="card__detail-fix">{c.remediation}</div>
-                      <div className="card__detail-snippet">{c.codeSnippet}</div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
 
-          <div className="arc-ui">
-            <div className="arc-prog">
-              <i style={{ transform: `translateX(${cardIdx * 100}%)`, width: `${100 / CARDS.length}%` }} />
-            </div>
-            <div className="arc-count">
-              <b>{String(cardIdx + 1).padStart(2, "0")}</b>
-              <span> · {String(CARDS.length).padStart(2, "0")}</span>
-            </div>
-            <div
-              className="arc-btns"
-              onKeyDown={(e) => {
-                if (e.key === "ArrowLeft")  { e.preventDefault(); goToCard(Math.max(0, cardIdx - 1)); }
-                if (e.key === "ArrowRight") { e.preventDefault(); goToCard(Math.min(CARDS.length - 1, cardIdx + 1)); }
-              }}
-            >
-              <button onClick={() => goToCard(Math.max(0, cardIdx - 1))} disabled={cardIdx === 0} aria-label="Previous">
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button onClick={() => goToCard(Math.min(CARDS.length - 1, cardIdx + 1))} disabled={cardIdx === CARDS.length - 1} aria-label="Next">
-                <ChevronRight className="w-4 h-4" />
-              </button>
+            <div className="arc-ui">
+              <div className="arc-prog">
+                <i style={{ transform: `translateX(${cardIdx * 100}%)`, width: `${100 / CARDS.length}%` }} />
+              </div>
+              <div className="arc-count">
+                <b>{String(cardIdx + 1).padStart(2, "0")}</b>
+                <span> · {String(CARDS.length).padStart(2, "0")}</span>
+              </div>
+              <div
+                className="arc-btns"
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowLeft")  { e.preventDefault(); goToCard(Math.max(0, cardIdx - 1)); }
+                  if (e.key === "ArrowRight") { e.preventDefault(); goToCard(Math.min(CARDS.length - 1, cardIdx + 1)); }
+                }}
+              >
+                <button onClick={() => goToCard(Math.max(0, cardIdx - 1))} disabled={cardIdx === 0} aria-label="Previous">
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button onClick={() => goToCard(Math.min(CARDS.length - 1, cardIdx + 1))} disabled={cardIdx === CARDS.length - 1} aria-label="Next">
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

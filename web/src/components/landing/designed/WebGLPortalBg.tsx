@@ -97,7 +97,7 @@ export default function WebGLPortalBg() {
 
         // Color palette setup: Deep emerald, Electric Cyan, Glowing Lavenders
         vec3 colCore = vec3(0.03, 0.95, 0.79); // Coral/Teal
-        vec3 colAura = vec3(0.51, 0.43, 0.95); // Purple-lavender
+        vec3 colAura = vec3(0.0, 0.0, 0.0); // Purple-lavender (Removed completely)
         vec3 colDark = vec3(0.0, 0.0, 0.0); // Complete Black Portal Void Background
 
         // Compute radial gradient masks & eye of the vortex (sink node)
