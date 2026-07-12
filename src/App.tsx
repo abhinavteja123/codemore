@@ -1,4 +1,3 @@
-/* codemore-ignore-file: core-security-hardcoded-secret-pattern, core-security-hardcoded-password */ // intentional demo-vulnerability strings for the linter sandbox UI
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -33,6 +32,12 @@ import PageTransitionIndicator from "./components/PageTransitionIndicator";
 import WebGLPortalBg from "./components/WebGLPortalBg";
 import WebGLBrandLetter from "./components/WebGLBrandLetter";
 import WebGLASTConnectionMesh from "./components/WebGLASTConnectionMesh";
+
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import Lenis from "lenis";
+
+gsap.registerPlugin(ScrollTrigger);
 
 // Types for Carousel Cards
 interface CardItem {
@@ -167,6 +172,12 @@ async function decrementShares(amount) {
 export default function App() {
   // --- Curtain Loader state ---
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
+  const isLoadedRef = useRef<boolean>(isLoaded);
+  const [isEntranceFinished, setIsEntranceFinished] = useState<boolean>(false);
+
+  useEffect(() => {
+    isLoadedRef.current = isLoaded;
+  }, [isLoaded]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -175,82 +186,83 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // --- Scroll based portal animations ---
+  // Play GSAP Entrance Animation and set isEntranceFinished
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!heroCopyRef.current || !heroHintRef.current || !navRef.current) return;
+
+    // Pre-set initial states for the entrance animation
+    gsap.set(heroCopyRef.current, { opacity: 0, y: 30, scale: 0.98 });
+    gsap.set(heroHintRef.current, { opacity: 0 });
+    gsap.set(navRef.current, { opacity: 0, y: -30, xPercent: -50 });
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(heroCopyRef.current,
+        { opacity: 0, y: 30, scale: 0.98 },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 1.4,
+          ease: "power3.out",
+          delay: 1.2
+        }
+      );
+
+      gsap.fromTo(heroHintRef.current,
+        { opacity: 0 },
+        {
+          opacity: 1,
+          duration: 1.0,
+          ease: "power2.out",
+          delay: 0.8
+        }
+      );
+
+      gsap.fromTo(navRef.current,
+        { opacity: 0, y: -30, xPercent: -50 },
+        {
+          opacity: 1,
+          y: 0,
+          xPercent: -50,
+          duration: 1.2,
+          ease: "power3.out",
+          delay: 0.2
+        }
+      );
+    });
+
+    const timer = setTimeout(() => {
+      setIsEntranceFinished(true);
+    }, 2800); // Ensures entrance finishes and elements are fully settled before ScrollTrigger is initialized
+
+    return () => {
+      ctx.revert();
+      clearTimeout(timer);
+    };
+  }, [isLoaded]);
+
+  // Initialize --scroll-p on mount
+  useEffect(() => {
+    document.documentElement.style.setProperty("--scroll-p", "0");
+  }, []);
+
+  // --- Scroll & Layout Refs ---
   const passageRef = useRef<HTMLElement>(null);
   const portalRef = useRef<HTMLDivElement>(null);
   const heroCopyRef = useRef<HTMLDivElement>(null);
   const heroHintRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+  const scene2Ref = useRef<HTMLDivElement>(null);
+  const starfieldRef = useRef<HTMLDivElement>(null);
+  const vignetteRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const onScroll = () => {
-      // 1. Check nav background styling based on scroll amount
-      if (navRef.current) {
-        if (window.scrollY > 50) {
-          navRef.current.classList.add("is-scrolled");
-        } else {
-          navRef.current.classList.remove("is-scrolled");
-        }
-      }
-
-      // 2. Control Portal Scene scaling (rAF logic inside scroll listener)
-      if (!passageRef.current || !portalRef.current || !heroCopyRef.current || !heroHintRef.current) return;
-
-      const rect = passageRef.current.getBoundingClientRect();
-      const scrollHeight = passageRef.current.offsetHeight - window.innerHeight;
-      const len = Math.max(scrollHeight, 1);
-      
-      // Calculate scroll progress p from 0 to 1
-      const p = Math.min(Math.max(-rect.top / len, 0), 1);
-
-      // Scroll scaling factors
-      const zoom = 1 + Math.pow(p, 2.4) * 24;
-      const coreBrightness = 1 + p * 1.6;
-      
-      // Smooth fade-out functions
-      const smoothLevel = (e0: number, e1: number, val: number) => {
-        const t = Math.min(Math.max((val - e0) / (e1 - e0), 0), 1);
-        return t * t * (3 - 2 * t);
-      };
-
-      const ringOpacity = 1 - smoothLevel(0.72, 0.96, p);
-      const copyOpacity = 1 - smoothLevel(0.18, 0.52, p);
-      const copyTranslateY = p * -160;
-      const copyScale = 1 + p * 0.12;
-      const hintOpacity = 1 - smoothLevel(0.02, 0.12, p);
-
-      // Apply styles smoothly
-      portalRef.current.style.setProperty("--pz", zoom.toFixed(3));
-      portalRef.current.style.setProperty("--core-b", coreBrightness.toFixed(3));
-      portalRef.current.style.setProperty("--ring-o", ringOpacity.toFixed(3));
-
-      heroCopyRef.current.style.opacity = copyOpacity.toFixed(3);
-      heroCopyRef.current.style.transform = `translateY(${copyTranslateY.toFixed(1)}px) scale(${copyScale.toFixed(3)})`;
-      heroHintRef.current.style.opacity = hintOpacity.toFixed(3);
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  // --- Header Navigation hide on scroll-down ---
-  const [isNavHidden, setIsNavHidden] = useState<boolean>(false);
-  const lastScrollY = useRef<number>(0);
-
-  useEffect(() => {
-    const handleScrollNav = () => {
-      const currentScrollY = window.scrollY;
-      if (currentScrollY > 120 && currentScrollY > lastScrollY.current) {
-        setIsNavHidden(true);
-      } else {
-        setIsNavHidden(false);
-      }
-      lastScrollY.current = currentScrollY;
-    };
-
-    window.addEventListener("scroll", handleScrollNav, { passive: true });
-    return () => window.removeEventListener("scroll", handleScrollNav);
-  }, []);
+  // --- Synced scroll state ---
+  const [currentSection, setCurrentSection] = useState<string>("passage");
+  const currentSectionRef = useRef<string>("passage");
+  const activeIdxRef = useRef<number>(0);
+  const dragOffsetRef = useRef<number>(0);
 
   // --- Carousel Data ---
   const CARDS: CardItem[] = useMemo(() => [
@@ -381,9 +393,8 @@ export default function App() {
   
   const isDragging = useRef<boolean>(false);
   const startDragX = useRef<number>(0);
+  const lenisRef = useRef<Lenis | null>(null);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1200);
-  const scene2Ref = useRef<HTMLDivElement>(null);
-
   // Resize boundaries tracking
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -392,57 +403,333 @@ export default function App() {
   }, []);
 
   const cardSpacing = useMemo(() => {
+    if (windowWidth < 480) {
+      return Math.min(windowWidth * 0.42, 180);
+    }
+    if (windowWidth < 760) {
+      return Math.min(windowWidth * 0.35, 200);
+    }
+    if (windowWidth < 1024) {
+      return Math.min(windowWidth * 0.25, 215);
+    }
     return Math.min(windowWidth * 0.17, 215);
   }, [windowWidth]);
 
   const dropOffset = useMemo(() => {
-    return windowWidth < 760 ? 40 : 60;
+    return windowWidth < 760 ? 20 : 60;
   }, [windowWidth]);
 
   const rotationStep = 7;
 
-  // Scroll tracking to translate vertical scroll to horizontal arc slider positions
+  // Scroll and portal animations: unified scroll tracking across the whole portal-scene using GSAP ScrollTrigger and Lenis smooth scroll
   useEffect(() => {
-    const handleScrollScene2 = () => {
-      const el = scene2Ref.current;
-      if (!el || isDragging.current) return;
+    if (!isEntranceFinished) return;
 
-      const rect = el.getBoundingClientRect();
-      const viewHeight = window.innerHeight;
-      const totalScrollable = el.offsetHeight - viewHeight;
-      if (totalScrollable <= 0) return;
+    // 1. Initialize Lenis smooth scroll
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      smoothWheel: true,
+    });
 
-      // Scrolled amount within Section 2 is -rect.top
-      const scrolled = -rect.top;
-      const progress = Math.min(Math.max(scrolled / totalScrollable, 0), 1);
+    lenisRef.current = lenis;
 
-      // Maps 0-1 to 0-(CARDS.length-1)
-      const targetIdxFloat = progress * (CARDS.length - 1);
-      const roundedIdx = Math.round(targetIdxFloat);
-      const offset = targetIdxFloat - roundedIdx;
+    // Connect Lenis to ScrollTrigger updates
+    lenis.on("scroll", ScrollTrigger.update);
 
-      setActiveIdx(roundedIdx);
-      setDragOffset(offset);
+    // Frame ticker for Lenis
+    const raf = (time: number) => {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
     };
+    requestAnimationFrame(raf);
 
-    window.addEventListener("scroll", handleScrollScene2, { passive: true });
-    return () => window.removeEventListener("scroll", handleScrollScene2);
-  }, [CARDS.length]);
+    // 2. Setup GSAP ScrollTrigger for the Portal Scene
+    if (!passageRef.current || !portalRef.current || !heroCopyRef.current || !heroHintRef.current || !scene2Ref.current) {
+      return;
+    }
+
+    // Set initial GSAP states to prevent layout flash or wrong initial positions
+    gsap.set(portalRef.current, {
+      scale: 1,
+      opacity: 1,
+      visibility: "visible",
+      "--ring-o": 1
+    });
+    gsap.set(heroCopyRef.current, {
+      opacity: 1,
+      y: 0,
+      scale: 1
+    });
+    gsap.set(heroHintRef.current, {
+      opacity: 1
+    });
+    gsap.set(scene2Ref.current, {
+      opacity: 0,
+      scale: 0.01,
+      visibility: "hidden",
+      pointerEvents: "none"
+    });
+    if (starfieldRef.current) {
+      gsap.set(starfieldRef.current, { opacity: 0.6, visibility: "visible" });
+    }
+    if (vignetteRef.current) {
+      gsap.set(vignetteRef.current, { opacity: 1, visibility: "visible" });
+    }
+
+    // Create a scrubbed GSAP Timeline driven entirely by the scroll position of the passage container
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: passageRef.current,
+        start: "top top",
+        end: "bottom bottom",
+        scrub: true,
+        onUpdate: (self) => {
+          // Clamp progress strictly to [0.0, 1.0] to prevent negative rubber-band overshooting from causing NaN in Math.pow
+          const p = Math.max(0, Math.min(1, self.progress));
+          const currentScrollY = self.scroll();
+
+          // 1. Update high-performance CSS variable for progress-based CSS calculations
+          document.documentElement.style.setProperty("--scroll-p", p.toFixed(4));
+
+          // 2. Add scrolled class to document element for global stylesheet selector styling
+          if (currentScrollY > 50) {
+            document.documentElement.classList.add("nav-scrolled");
+          } else {
+            document.documentElement.classList.remove("nav-scrolled");
+          }
+
+          // Robust styling updates for navbar (.nav) and progress-bar (.progress-bar)
+          if (navRef.current) {
+            const navP = Math.min(Math.max((p - 0.15) / 0.18, 0), 1);
+            navRef.current.style.opacity = (1 - navP).toFixed(3);
+            navRef.current.style.transform = `translate3d(-50%, ${(-navP * 30).toFixed(1)}px, 0)`;
+            if (navP >= 0.99) {
+              navRef.current.style.visibility = "hidden";
+              navRef.current.style.pointerEvents = "none";
+            } else {
+              navRef.current.style.visibility = "visible";
+              navRef.current.style.pointerEvents = "auto";
+            }
+          }
+
+          if (progressBarRef.current) {
+            progressBarRef.current.style.transform = `scaleX(${p.toFixed(4)})`;
+          }
+
+          // 3. Robust Visibility and Pointer-Events Toggles based on Progress
+          // This avoids GSAP timeline .set() race conditions/skipping on fast scrolls.
+          if (portalRef.current) {
+            if (p < 0.45) {
+              portalRef.current.style.visibility = "visible";
+              portalRef.current.style.pointerEvents = "auto";
+            } else {
+              portalRef.current.style.visibility = "hidden";
+              portalRef.current.style.pointerEvents = "none";
+            }
+          }
+
+          if (heroCopyRef.current) {
+            if (p < 0.35) {
+              heroCopyRef.current.style.visibility = "visible";
+            } else {
+              heroCopyRef.current.style.visibility = "hidden";
+            }
+          }
+
+          if (heroHintRef.current) {
+            if (p < 0.12) {
+              heroHintRef.current.style.visibility = "visible";
+            } else {
+              heroHintRef.current.style.visibility = "hidden";
+            }
+          }
+
+          if (scene2Ref.current) {
+            if (p >= 0.10) {
+              scene2Ref.current.style.visibility = "visible";
+              scene2Ref.current.style.pointerEvents = "auto";
+            } else {
+              scene2Ref.current.style.visibility = "hidden";
+              scene2Ref.current.style.pointerEvents = "none";
+            }
+          }
+
+          if (starfieldRef.current) {
+            if (p < 0.48) {
+              starfieldRef.current.style.visibility = "visible";
+              starfieldRef.current.style.opacity = ((1 - Math.min(Math.max((p - 0.15) / 0.33, 0), 1)) * 0.6).toFixed(3);
+            } else {
+              starfieldRef.current.style.visibility = "hidden";
+            }
+          }
+
+          if (vignetteRef.current) {
+            if (p < 0.48) {
+              vignetteRef.current.style.visibility = "visible";
+              vignetteRef.current.style.opacity = (1 - Math.min(Math.max((p - 0.15) / 0.33, 0), 1)).toFixed(3);
+            } else {
+              vignetteRef.current.style.visibility = "hidden";
+            }
+          }
+
+          // 4. Carousel slide indexing in Phase 3
+          if (!isDragging.current) {
+            let targetIdx = 0;
+            let targetOffset = 0;
+
+            if (p >= 0.48) {
+              const activeP = (p - 0.48) / 0.52;
+              const targetIdxFloat = activeP * (CARDS.length - 1);
+              targetIdx = Math.round(targetIdxFloat);
+              targetOffset = targetIdxFloat - targetIdx;
+            }
+
+            if (activeIdxRef.current !== targetIdx) {
+              activeIdxRef.current = targetIdx;
+              setActiveIdx(targetIdx);
+            }
+            if (Math.abs(dragOffsetRef.current - targetOffset) > 0.002) {
+              dragOffsetRef.current = targetOffset;
+              setDragOffset(targetOffset);
+            }
+          }
+
+          // 5. Synced HUD Active Section
+          let activeSec = currentSectionRef.current;
+          if (p < 1.0) {
+            activeSec = p >= 0.48 ? "scan" : "passage";
+          }
+          
+          if (currentSectionRef.current !== activeSec) {
+            currentSectionRef.current = activeSec;
+            setCurrentSection(activeSec);
+          }
+        }
+      }
+    });
+
+    // --- TIMELINE DEFINITION ---
+    // All values are mapped to a normalized 0 to 1 timeline duration.
+
+    // 1. Fade out the hero hint label extremely early (p = 0 to 0.12)
+    tl.to(heroHintRef.current, {
+      opacity: 0,
+      ease: "power1.out",
+      duration: 0.12
+    }, 0);
+
+    // 2. Fade out and scale/translate up the main hero copywriting content (p = 0 to 0.35)
+    tl.to(heroCopyRef.current, {
+      opacity: 0,
+      y: -160,
+      scale: 1.12,
+      ease: "power1.out",
+      duration: 0.35
+    }, 0);
+
+    // 3. Zoom the WebGL vortex portal (scale 1x to 12x) and smoothly fade the outer conically blurred orbiting ring (p = 0 to 0.45)
+    tl.to(portalRef.current, {
+      scale: 12.0,
+      opacity: 0,
+      "--ring-o": 0.08,
+      ease: "power2.inOut",
+      duration: 0.45
+    }, 0);
+
+    // 4. Fade in and expand the Scene 2 blueprint scanner grid layout from the black core void (p = 0.10 to 0.48)
+    // Ensures early distant visibility during the zoom sequence to create perfect three-dimensional depth.
+    tl.fromTo(scene2Ref.current,
+      { opacity: 0, scale: 0.01 },
+      {
+        opacity: 1,
+        scale: 1.0,
+        ease: "power2.out",
+        duration: 0.38 // (0.48 - 0.10)
+      },
+      0.10
+    );
+
+    return () => {
+      tl.kill();
+      lenis.destroy();
+      lenisRef.current = null;
+    };
+  }, [isEntranceFinished, CARDS.length]);
+
+  const handleNextSection = () => {
+    if (currentSection === "passage") {
+      const el = passageRef.current;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const totalScrollable = el.offsetHeight - window.innerHeight;
+        const elementAbsoluteTop = window.scrollY + rect.top;
+        const targetProgress = 0.48;
+        const targetScrollRelativeY = targetProgress * totalScrollable;
+        const targetY = elementAbsoluteTop + targetScrollRelativeY + 2;
+        if (lenisRef.current) {
+          lenisRef.current.scrollTo(targetY);
+        } else {
+          window.scrollTo({
+            top: targetY,
+            behavior: "smooth"
+          });
+        }
+      }
+    } else if (currentSection === "scan") {
+      const el = document.getElementById("playground");
+      if (el) {
+        if (lenisRef.current) {
+          lenisRef.current.scrollTo(el);
+        } else {
+          el.scrollIntoView({ behavior: "smooth" });
+        }
+      }
+    } else {
+      const idx = SECTION_IDS.indexOf(currentSection);
+      if (idx !== -1 && idx < SECTION_IDS.length - 1) {
+        const nextId = SECTION_IDS[idx + 1];
+        const el = document.getElementById(nextId);
+        if (el) {
+          if (lenisRef.current) {
+            lenisRef.current.scrollTo(el);
+          } else {
+            el.scrollIntoView({ behavior: "smooth" });
+          }
+        }
+      } else {
+        if (lenisRef.current) {
+          lenisRef.current.scrollTo(0);
+        } else {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      }
+    }
+  };
 
   const handleGo = (index: number) => {
     const targetIdx = Math.min(Math.max(index, 0), CARDS.length - 1);
-    const el = scene2Ref.current;
+    const el = passageRef.current;
     if (el) {
       const rect = el.getBoundingClientRect();
       const viewHeight = window.innerHeight;
       const totalScrollable = el.offsetHeight - viewHeight;
       if (totalScrollable > 0) {
         const elementAbsoluteTop = window.scrollY + rect.top;
-        const targetScrollRelativeY = (targetIdx / (CARDS.length - 1)) * totalScrollable;
-        window.scrollTo({
-          top: elementAbsoluteTop + targetScrollRelativeY + 2, // minor padding to lock precisely
-          behavior: "smooth"
-        });
+        // Phase 3 starts at p = 0.48 and goes to 1.0
+        const phase3StartProgress = 0.48;
+        const phase3Range = 0.52;
+        const targetProgress = phase3StartProgress + (targetIdx / (CARDS.length - 1)) * phase3Range;
+        const targetScrollRelativeY = targetProgress * totalScrollable;
+        const targetY = elementAbsoluteTop + targetScrollRelativeY + 2;
+        if (lenisRef.current) {
+          lenisRef.current.scrollTo(targetY);
+        } else {
+          window.scrollTo({
+            top: targetY, // minor padding to lock precisely
+            behavior: "smooth"
+          });
+        }
         return;
       }
     }
@@ -450,6 +737,8 @@ export default function App() {
     // Fallback if not scrolling yet
     setActiveIdx(targetIdx);
     setDragOffset(0);
+    activeIdxRef.current = targetIdx;
+    dragOffsetRef.current = 0;
     isDragging.current = false;
   };
 
@@ -463,7 +752,9 @@ export default function App() {
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging.current) return;
     const delta = startDragX.current - e.clientX;
-    setDragOffset(delta / cardSpacing);
+    const offset = delta / cardSpacing;
+    setDragOffset(offset);
+    dragOffsetRef.current = offset;
   };
 
   const handlePointerUp = () => {
@@ -492,6 +783,48 @@ export default function App() {
 
     return () => {
       revealElements.forEach((el) => observer.unobserve(el));
+    };
+  }, []);
+
+  // --- Scroll observer for lower section active trackers (avoids layout thrashing in ScrollTrigger) ---
+  useEffect(() => {
+    const observerOptions = {
+      root: null,
+      rootMargin: "-45% 0px -45% 0px", // Center viewport trigger line
+      threshold: 0,
+    };
+
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const sectionId = entry.target.id;
+          // Only track sections below the main portal-scene
+          if (sectionId && ["playground", "playground-linter", "docs", "dashboard"].includes(sectionId)) {
+            const passageEl = passageRef.current;
+            if (passageEl) {
+              const passageBottom = passageEl.offsetTop + passageEl.offsetHeight;
+              // Double check we are scrolled past the passage section
+              if (window.scrollY >= passageBottom - 120) {
+                currentSectionRef.current = sectionId;
+                setCurrentSection(sectionId);
+              }
+            }
+          }
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+
+    ["playground", "playground-linter", "docs", "dashboard"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) {
+        observer.observe(el);
+      }
+    });
+
+    return () => {
+      observer.disconnect();
     };
   }, []);
 
@@ -545,9 +878,55 @@ export default function App() {
 
   return (
     <>
-      {/* Dynamic HUD Navigation trackers */}
-      <SidebarHUDBars sections={HUD_SECTIONS} />
-      <PageTransitionIndicator sections={SECTION_IDS} />
+      <PageTransitionIndicator sections={SECTION_IDS} onNextSection={handleNextSection} progressBarRef={progressBarRef} />
+
+      <header ref={navRef} className="nav" aria-label="Global navigation">
+        <a href="#top" aria-label="CodeMore home" className="brand" onClick={(e) => {
+          e.preventDefault();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}>
+          <div className="brand__mark" />
+          <span className="brand__name">CODEMORE</span>
+        </a>
+        <nav className="nav__links">
+          <a href="#passage" onClick={(e) => {
+            e.preventDefault();
+            const el = document.getElementById("passage");
+            if (el) el.scrollIntoView({ behavior: "smooth" });
+          }}>Overview</a>
+          <a href="#scan" onClick={(e) => {
+            e.preventDefault();
+            const el = document.getElementById("scan");
+            if (el) el.scrollIntoView({ behavior: "smooth" });
+          }}>Scan Feed</a>
+          <a href="#playground" onClick={(e) => {
+            e.preventDefault();
+            const el = document.getElementById("playground");
+            if (el) el.scrollIntoView({ behavior: "smooth" });
+          }}>Schema</a>
+          <a href="#playground-linter" onClick={(e) => {
+            e.preventDefault();
+            const el = document.getElementById("playground-linter");
+            if (el) el.scrollIntoView({ behavior: "smooth" });
+          }}>Linter</a>
+          <a href="#docs" onClick={(e) => {
+            e.preventDefault();
+            const el = document.getElementById("docs");
+            if (el) el.scrollIntoView({ behavior: "smooth" });
+          }}>Manifesto</a>
+          <a href="#dashboard" onClick={(e) => {
+            e.preventDefault();
+            const el = document.getElementById("dashboard");
+            if (el) el.scrollIntoView({ behavior: "smooth" });
+          }}>Safety Stats</a>
+        </nav>
+        <a href="#playground-linter" className="nav__cta" onClick={(e) => {
+          e.preventDefault();
+          const el = document.getElementById("playground-linter");
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+        }}>Try Sandbox</a>
+      </header>
+
       <WebGLASTConnectionMesh />
 
       {/* ===================== CURTAIN ENTRANCE ===================== */}
@@ -565,40 +944,14 @@ export default function App() {
       </div>
 
 
-      {/* ===================== NAV ===================== */}
-      <header className={`nav ${isNavHidden ? "is-hidden" : ""}`} id="nav" ref={navRef}>
-        <a 
-          className="brand" 
-          href="#top" 
-          aria-label="CodeMore home"
-          onMouseMove={(e) => handleMagneticMove(e, 0.15)}
-          onMouseLeave={handleMagneticLeave}
-        >
-          <span className="brand__mark" aria-hidden="true" />
-          <span className="brand__name">CODEMORE</span>
-        </a>
-        <nav className="nav__links" aria-label="Primary">
-          <a href="#scan">Scan Feed</a>
-          <a href="#playground">Playground</a>
-          <a href="#playground-linter">Interactive Scanner</a>
-          <a href="#dashboard">Dashboard</a>
-        </nav>
-        <a 
-          className="nav__cta" 
-          href="#scan"
-          onMouseMove={(e) => handleMagneticMove(e, 0.2)}
-          onMouseLeave={handleMagneticLeave}
-        >
-          Continue with GitHub
-        </a>
-      </header>
+
 
       <main id="top">
-        {/* ===== PORTAL HERO ===== */}
-        <section className="portal-scene" id="passage" ref={passageRef} aria-label="The scan portal">
+        {/* ===== COMBINED VORTEX AND SCAN PORTAL ===== */}
+        <section className="portal-scene" id="passage" ref={passageRef} aria-label="The scan portal" style={{ height: "650vh" }}>
           <div className="portal-sticky">
-            <div className="starfield" aria-hidden="true" />
-            <div className="hero-vignette" />
+            <div className="starfield" aria-hidden="true" ref={starfieldRef} />
+            <div className="hero-vignette" ref={vignetteRef} />
 
             <div className="portal" id="portal" ref={portalRef} aria-hidden="true">
               <div className="portal__ring" />
@@ -609,254 +962,258 @@ export default function App() {
             </div>
 
             <div className="hero-copy" id="heroCopy" ref={heroCopyRef}>
-              <span className="kicker reveal">NOT ANOTHER LINTER</span>
-              <h1 className="hero-title reveal">
-                <span className="glow">Your code has<br />secrets to tell.</span>
-              </h1>
-              <p className="hero-sub reveal">
-                CodeMore tears through your codebase in seconds. Security holes, race conditions, forgotten logs, that hardcoded AWS key from 2022 — we find it all and show you exactly where to look.
-              </p>
+              <div>
+                <span className="kicker">NOT ANOTHER LINTER</span>
+                <h1 className="hero-title">
+                  <span className="glow">Your code has<br />secrets to tell.</span>
+                </h1>
+                <p className="hero-sub">
+                  CodeMore tears through your codebase in seconds. Security holes, race conditions, forgotten logs, that hardcoded AWS key from 2022 — we find it all and show you exactly where to look.
+                </p>
+              </div>
             </div>
 
             <div className="hero-hint text-center" id="heroHint" ref={heroHintRef}>
-              <span className="text-gray-400">Scroll to scan</span>
-              <span className="bar" aria-hidden="true" />
+              <div className="hero-hint-inner">
+                <span className="text-gray-400">Scroll to scan</span>
+                <span className="bar" aria-hidden="true" />
+              </div>
             </div>
-          </div>
-        </section>
 
-        {/* ===== SCENE TWO — ARC SLIDER ===== */}
-        <section className="scene2" id="scan" aria-label="CodeMore scan results" ref={scene2Ref}>
-          <div className="scene2__sticky">
-            
-            {/* Parallax technical backdrop grid */}
-            <div 
-              className="scene2__grid animate-pulse-slow" 
-              style={{ transform: `translate3d(${-( (activeIdx + dragOffset) * 45 ).toFixed(1)}px, 0px, 0px)` }}
-              aria-hidden="true"
-            />
-            <div className="scene2__beam" aria-hidden="true" />
-
-            {/* Corner Bracket Accents (HUD design detail) */}
-            <div className="hud-bracket hud-bracket-tl" aria-hidden="true" />
-            <div className="hud-bracket hud-bracket-tr" aria-hidden="true" />
-            <div className="hud-bracket hud-bracket-bl" aria-hidden="true" />
-            <div className="hud-bracket hud-bracket-br" aria-hidden="true" />
-
-            {/* Technical HUD Overlay Sidebars */}
-            <div className="scene2__hud-overlay select-none pointer-events-none" aria-hidden="true">
+            {/* ===== SCENE TWO LAYER (INSIDE VORTEX) ===== */}
+            <div className="scene2-layer" id="scan" ref={scene2Ref}>
               
-              {/* Left Sidebar - Parser and Engine Stats */}
-              <div className="scene2__hud-left">
-                <div className="border border-gray-950 bg-black/50 p-4 rounded-xl backdrop-blur-md flex flex-col gap-3.5 shadow-25xl">
-                  <div className="flex items-center gap-2 border-b border-gray-900/80 pb-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] tracking-widest text-[#4ef2ca] font-mono">SYSTEM INTEGRITY ENGINE</span>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center text-[10px] font-mono text-gray-500">
-                      <span>PARSER STATUS</span>
-                      <span className="text-white font-medium">ACTIVE_SCAN</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] font-mono text-gray-500">
-                      <span>SCAN DEPTH</span>
-                      <span className="text-white font-medium">65,492 AST NODES</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] font-mono text-gray-500">
-                      <span>ACCURACY VERDICT</span>
-                      <span className="text-[#4ef2ca] font-medium font-mono">STABLE (99.8%)</span>
-                    </div>
-                  </div>
+              {/* Parallax technical backdrop grid */}
+              <div 
+                className="scene2__grid animate-pulse-slow" 
+                style={{ transform: `translate3d(${-( (activeIdx + dragOffset) * 45 ).toFixed(1)}px, 0px, 0px)` }}
+                aria-hidden="true"
+              />
+              <div className="scene2__beam" aria-hidden="true" />
 
-                  <div className="border-t border-gray-900/60 pt-3">
-                    <span className="text-[9px] tracking-widest text-gray-500 font-mono block mb-2">GRAPH LOAD RATIO</span>
-                    <div className="flex items-end gap-1.5 h-10 pt-1">
-                      {[0.4, 0.7, 0.5, 0.9, 0.6, 0.8, 0.45, 0.75].map((val, idx) => {
-                        const dynamicVal = Math.min(1, Math.max(0.15, val + (activeIdx % 3) * 0.05 - (idx === activeIdx % 8 ? 0.2 : 0)));
-                        return (
-                          <div 
-                            key={idx} 
-                            className="flex-1 bg-gradient-to-t from-emerald-500/20 to-[#4ef2ca] rounded-sm transition-all duration-300"
-                            style={{ height: `${(dynamicVal * 100).toFixed(0)}%` }}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                  
-                  <div className="text-[9px] text-gray-600 font-mono flex items-center justify-between border-t border-gray-900/60 pt-2 mt-1">
-                    <span>SECTOR_0X{activeIdx.toString(16).toUpperCase()}</span>
-                    <span>TEMP_REF_44.1A</span>
-                  </div>
-                </div>
+              {/* Corner Bracket Accents (HUD design detail) */}
+              <div className="hud-bracket hud-bracket-tl" aria-hidden="true" />
+              <div className="hud-bracket hud-bracket-tr" aria-hidden="true" />
+              <div className="hud-bracket hud-bracket-bl" aria-hidden="true" />
+              <div className="hud-bracket hud-bracket-br" aria-hidden="true" />
+
+              {/* Technical HUD Overlay Sidebars */}
+              <div className="scene2__hud-overlay select-none pointer-events-none" aria-hidden="true">
                 
-                {/* Floating telemetry notes */}
-                <div className="text-[10px] text-gray-600 px-1 font-mono tracking-wide leading-relaxed mt-2">
-                  // Scans for deep structural leaks. Horizontal scroll matches viewport offset.
-                </div>
-              </div>
-
-              {/* Right Sidebar - Threat Telemetry Panel */}
-              <div className="scene2__hud-right">
-                <div className="border border-gray-950 bg-black/50 p-5 rounded-xl backdrop-blur-md flex flex-col gap-4 shadow-25xl">
-                  
-                  {/* Category Pill based on severity */}
-                  <div className="flex justify-between items-center border-b border-gray-900/80 pb-3">
-                    <span className="text-[10px] text-gray-500 font-mono tracking-widest">[ ACTIVE ANALYZER ]</span>
-                    <span className={`text-[9px] px-2 py-0.5 rounded border uppercase font-mono tracking-wider ${
-                      CARDS[activeIdx]?.severity === 'CRITICAL' ? 'text-red-400 border-red-500/20 bg-red-500/5' :
-                      CARDS[activeIdx]?.severity.includes('WARNING') ? 'text-amber-400 border-amber-500/20 bg-amber-500/5' :
-                      'text-emerald-400 border-emerald-500/20 bg-emerald-500/5'
-                    }`}>
-                      {CARDS[activeIdx]?.severity}
-                    </span>
-                  </div>
-
-                  {/* Danger score indicator */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-gray-500 font-mono">DANGER EXPOSURE INDEX</span>
-                    <span className={`text-sm font-bold font-mono tracking-wide ${
-                      CARDS[activeIdx]?.severity === 'CRITICAL' ? 'text-red-400' :
-                      CARDS[activeIdx]?.severity.includes('WARNING') ? 'text-amber-400' :
-                      'text-teal-400'
-                    }`}>
-                      {CARDS[activeIdx]?.score}
-                    </span>
-                  </div>
-
-                  {/* Syntactic Code Inspector */}
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-[9px] text-gray-500 font-mono tracking-wider">SYNTAX AST MATCH:</span>
-                    <div className="relative overflow-hidden rounded-lg border border-gray-900 bg-[#030307] p-3 text-[10px] font-mono leading-normal text-gray-300">
-                      <div className="absolute inset-x-0 top-0 h-0.5 bg-[#4ef2ca]/10 anim-sweep pointer-events-none" />
-                      <pre className="whitespace-pre select-text font-mono text-[9.5px] text-teal-200/90 leading-tight">
-                        {CARDS[activeIdx]?.codeSnippet}
-                      </pre>
+                {/* Left Sidebar - Parser and Engine Stats */}
+                <div className="scene2__hud-left">
+                  <div className="border border-gray-950 bg-black/50 p-4 rounded-xl backdrop-blur-md flex flex-col gap-3.5 shadow-25xl">
+                    <div className="flex items-center gap-2 border-b border-gray-900/80 pb-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[10px] tracking-widest text-[#4ef2ca] font-mono">SYSTEM INTEGRITY ENGINE</span>
                     </div>
-                  </div>
-
-                  {/* Remediation Advice */}
-                  <div className="flex flex-col gap-1.5 bg-white/[0.01] border border-gray-900/40 p-3 rounded-lg">
-                    <span className="text-[9px] text-gray-500 font-mono uppercase tracking-widest">PROPOSED REMEDIATION:</span>
-                    <p className="text-[10.5px] text-gray-400 leading-normal font-sans tracking-wide">
-                      {CARDS[activeIdx]?.remediation}
-                    </p>
-                  </div>
-
-                </div>
-              </div>
-
-            </div>
-
-            <div className="scene2__head">
-              <div>
-                <div className="eyebrow">codemore — scan</div>
-                <h2 className="reveal">
-                  SQL Injection // XSS Vulnerabilities // Memory Leaks // Race Conditions
-                </h2>
-              </div>
-              <p className="reveal">
-                We extract structural code semantics and hand structural definitions to Cursor, Claude Code, or Copilot for secure execution.
-              </p>
-            </div>
-
-            <div 
-              className={`arc ${isDragging.current ? "dragging" : ""}`} 
-              id="arc" 
-              role="listbox" 
-              aria-label="Scan findings" 
-              tabIndex={0}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
-              onPointerLeave={handlePointerUp}
-              onMouseEnter={() => setIsHovered(true)}
-              onMouseLeave={() => setIsHovered(false)}
-            >
-              {CARDS.map((card, i) => {
-                const activeFactor = activeIdx + dragOffset;
-                const off = i - activeFactor;
-                const ax = off * cardSpacing;
-                const ay = Math.pow(Math.abs(off), 1.55) * dropOffset;
-                const rot = off * rotationStep;
-                const sc = Math.max(0.6, 1 - Math.abs(off) * 0.14);
-                const op = Math.max(0, 1 - Math.abs(off) * 0.32);
-                const isCenter = Math.round(activeFactor) === i;
-
-                return (
-                  <article 
-                    key={card.id}
-                    className={`card ${isCenter ? "is-center" : ""}`} 
-                    style={{
-                      transform: `translate(-50%,-50%) translate(${ax.toFixed(1)}px, ${ay.toFixed(1)}px) rotate(${rot.toFixed(2)}deg) scale(${sc.toFixed(3)})`,
-                      opacity: op.toFixed(3),
-                      zIndex: 200 - Math.round(Math.abs(off) * 10),
-                      borderColor: isCenter ? 
-                        (card.severity === 'CRITICAL' ? 'rgba(239, 68, 68, 0.35)' : 
-                         card.severity.includes('WARNING') ? 'rgba(245, 158, 11, 0.35)' : 
-                         'rgba(16, 185, 129, 0.35)') : undefined,
-                      boxShadow: isCenter ? 
-                        (card.severity === 'CRITICAL' ? '0 30px 70px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(239, 68, 68, 0.2), 0 0 45px rgba(239, 68, 68, 0.12)' : 
-                         card.severity.includes('WARNING') ? '0 30px 70px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(245, 158, 11, 0.2), 0 0 45px rgba(245, 158, 11, 0.12)' : 
-                         '0 30px 70px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(16, 185, 129, 0.2), 0 0 45px rgba(16, 185, 129, 0.12)') : undefined
-                    }}
-                    onClick={() => {
-                      if (!isDragging.current && i !== activeIdx) {
-                        handleGo(i);
-                      }
-                    }}
-                  >
-                    <div className="world" style={{ "--h1": card.h1, "--h2": card.h2, "--h3": card.h3 } as React.CSSProperties} />
-                    <div className="card__scrim" />
-                    <div className="card__body">
-                      {/* Active level label on top of card inside body */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-1.5">
-                          {card.icon}
-                          <span className="card__idx text-white/90 font-medium">{card.idx}</span>
-                        </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-[10px] font-mono text-gray-500">
+                        <span>PARSER STATUS</span>
+                        <span className="text-white font-medium">ACTIVE_SCAN</span>
                       </div>
-                      <h3 className="card__name">{card.name}</h3>
-                      <p className="card__desc">{card.desc}</p>
-                      <span className="card__go">{card.tag}</span>
+                      <div className="flex justify-between items-center text-[10px] font-mono text-gray-500">
+                        <span>SCAN DEPTH</span>
+                        <span className="text-white font-medium">65,492 AST NODES</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] font-mono text-gray-500">
+                        <span>ACCURACY VERDICT</span>
+                        <span className="text-[#4ef2ca] font-medium font-mono">STABLE (99.8%)</span>
+                      </div>
                     </div>
-                  </article>
-                );
-              })}
+
+                    <div className="border-t border-gray-900/60 pt-3">
+                      <span className="text-[9px] tracking-widest text-gray-500 font-mono block mb-2">GRAPH LOAD RATIO</span>
+                      <div className="flex items-end gap-1.5 h-10 pt-1">
+                        {[0.4, 0.7, 0.5, 0.9, 0.6, 0.8, 0.45, 0.75].map((val, idx) => {
+                          const dynamicVal = Math.min(1, Math.max(0.15, val + (activeIdx % 3) * 0.05 - (idx === activeIdx % 8 ? 0.2 : 0)));
+                          return (
+                            <div 
+                              key={idx} 
+                              className="flex-1 bg-gradient-to-t from-emerald-500/20 to-[#4ef2ca] rounded-sm transition-all duration-300"
+                              style={{ height: `${(dynamicVal * 100).toFixed(0)}%` }}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    <div className="text-[9px] text-gray-600 font-mono flex items-center justify-between border-t border-gray-900/60 pt-2 mt-1">
+                      <span>SECTOR_0X{activeIdx.toString(16).toUpperCase()}</span>
+                      <span>TEMP_REF_44.1A</span>
+                    </div>
+                  </div>
+                  
+                  {/* Floating telemetry notes */}
+                  <div className="text-[10px] text-gray-600 px-1 font-mono tracking-wide leading-relaxed mt-2">
+                    // Scans for deep structural leaks. Horizontal scroll matches viewport offset.
+                  </div>
+                </div>
+
+                {/* Right Sidebar - Threat Telemetry Panel */}
+                <div className="scene2__hud-right">
+                  <div className="border border-gray-950 bg-black/50 p-5 rounded-xl backdrop-blur-md flex flex-col gap-4 shadow-25xl">
+                    
+                    {/* Category Pill based on severity */}
+                    <div className="flex justify-between items-center border-b border-gray-900/80 pb-3">
+                      <span className="text-[10px] text-gray-500 font-mono tracking-widest">[ ACTIVE ANALYZER ]</span>
+                      <span className={`text-[9px] px-2 py-0.5 rounded border uppercase font-mono tracking-wider ${
+                        CARDS[activeIdx]?.severity === 'CRITICAL' ? 'text-red-400 border-red-500/20 bg-red-500/5' :
+                        CARDS[activeIdx]?.severity.includes('WARNING') ? 'text-amber-400 border-amber-500/20 bg-amber-500/5' :
+                        'text-emerald-400 border-emerald-500/20 bg-emerald-500/5'
+                      }`}>
+                        {CARDS[activeIdx]?.severity}
+                      </span>
+                    </div>
+
+                    {/* Danger score indicator */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-500 font-mono">DANGER EXPOSURE INDEX</span>
+                      <span className={`text-sm font-bold font-mono tracking-wide ${
+                        CARDS[activeIdx]?.severity === 'CRITICAL' ? 'text-red-400' :
+                        CARDS[activeIdx]?.severity.includes('WARNING') ? 'text-amber-400' :
+                        'text-teal-400'
+                      }`}>
+                        {CARDS[activeIdx]?.score}
+                      </span>
+                    </div>
+
+                    {/* Syntactic Code Inspector */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[9px] text-gray-500 font-mono tracking-wider">SYNTAX AST MATCH:</span>
+                      <div className="relative overflow-hidden rounded-lg border border-gray-900 bg-[#030307] p-3 text-[10px] font-mono leading-normal text-gray-300">
+                        <div className="absolute inset-x-0 top-0 h-0.5 bg-[#4ef2ca]/10 anim-sweep pointer-events-none" />
+                        <pre className="whitespace-pre select-text font-mono text-[9.5px] text-teal-200/90 leading-tight">
+                          {CARDS[activeIdx]?.codeSnippet}
+                        </pre>
+                      </div>
+                    </div>
+
+                    {/* Remediation Advice */}
+                    <div className="flex flex-col gap-1.5 bg-white/[0.01] border border-gray-900/40 p-3 rounded-lg">
+                      <span className="text-[9px] text-gray-500 font-mono uppercase tracking-widest">PROPOSED REMEDIATION:</span>
+                      <p className="text-[10.5px] text-gray-400 leading-normal font-sans tracking-wide">
+                        {CARDS[activeIdx]?.remediation}
+                      </p>
+                    </div>
+
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="scene2__head">
+                <div>
+                  <div className="eyebrow">codemore — scan</div>
+                  <h2 className="reveal">
+                    SQL Injection // XSS Vulnerabilities // Memory Leaks // Race Conditions
+                  </h2>
+                </div>
+                <p className="reveal">
+                  We extract structural code semantics and hand structural definitions to Cursor, Claude Code, or Copilot for secure execution.
+                </p>
+              </div>
+
+              <div 
+                className={`arc ${isDragging.current ? "dragging" : ""}`} 
+                id="arc" 
+                role="listbox" 
+                aria-label="Scan findings" 
+                tabIndex={0}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+                onPointerLeave={handlePointerUp}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+              >
+                {CARDS.map((card, i) => {
+                  const activeFactor = activeIdx + dragOffset;
+                  const off = i - activeFactor;
+                  const ax = off * cardSpacing;
+                  const ay = Math.pow(Math.abs(off), 1.55) * dropOffset;
+                  const rot = off * rotationStep;
+                  const sc = Math.max(0.6, 1 - Math.abs(off) * 0.14);
+                  const op = Math.max(0, 1 - Math.abs(off) * 0.32);
+                  const isCenter = Math.round(activeFactor) === i;
+
+                  return (
+                    <article 
+                      key={card.id}
+                      className={`card ${isCenter ? "is-center" : ""}`} 
+                      style={{
+                        transform: `translate(-50%,-50%) translate(${ax.toFixed(1)}px, ${ay.toFixed(1)}px) rotate(${rot.toFixed(2)}deg) scale(${sc.toFixed(3)})`,
+                        opacity: op.toFixed(3),
+                        zIndex: 200 - Math.round(Math.abs(off) * 10),
+                        borderColor: isCenter ? 
+                          (card.severity === 'CRITICAL' ? 'rgba(239, 68, 68, 0.35)' : 
+                           card.severity.includes('WARNING') ? 'rgba(245, 158, 11, 0.35)' : 
+                           'rgba(16, 185, 129, 0.35)') : undefined,
+                        boxShadow: isCenter ? 
+                          (card.severity === 'CRITICAL' ? '0 30px 70px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(239, 68, 68, 0.2), 0 0 45px rgba(239, 68, 68, 0.12)' : 
+                           card.severity.includes('WARNING') ? '0 30px 70px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(245, 158, 11, 0.2), 0 0 45px rgba(245, 158, 11, 0.12)' : 
+                           '0 30px 70px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(16, 185, 129, 0.2), 0 0 45px rgba(16, 185, 129, 0.12)') : undefined
+                      }}
+                      onClick={() => {
+                        if (!isDragging.current && i !== activeIdx) {
+                          handleGo(i);
+                        }
+                      }}
+                    >
+                      <div className="world" style={{ "--h1": card.h1, "--h2": card.h2, "--h3": card.h3 } as React.CSSProperties} />
+                      <div className="card__scrim" />
+                      <div className="card__body">
+                        {/* Active level label on top of card inside body */}
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-1.5">
+                            {card.icon}
+                            <span className="card__idx text-white/90 font-medium">{card.idx}</span>
+                          </div>
+                        </div>
+                        <h3 className="card__name">{card.name}</h3>
+                        <p className="card__desc">{card.desc}</p>
+                        <span className="card__go">{card.tag}</span>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div className="arc-ui">
+                <div className="arc-prog" aria-hidden="true">
+                  <i id="arcProg" style={{ transform: `translateX(${(activeIdx * (100 / CARDS.length)).toFixed(2)}%)`, width: `${(100 / CARDS.length).toFixed(2)}%` }} />
+                </div>
+                <div className="arc-count">
+                  <b id="arcCur">{String(activeIdx + 1).padStart(2, "0")}</b> / {String(CARDS.length).padStart(2, "0")} · <span id="arcName" className="text-gray-300 font-medium">{CARDS[activeIdx]?.name}</span>
+                </div>
+                <div className="arc-btns">
+                  <button 
+                    id="arcPrev" 
+                    aria-label="Previous issue" 
+                    disabled={activeIdx <= 0}
+                    onClick={() => handleGo(activeIdx - 1)}
+                    onMouseMove={(e) => handleMagneticMove(e, 0.2)}
+                    onMouseLeave={handleMagneticLeave}
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button 
+                    id="arcNext" 
+                    aria-label="Next issue" 
+                    disabled={activeIdx >= CARDS.length - 1}
+                    onClick={() => handleGo(activeIdx + 1)}
+                    onMouseMove={(e) => handleMagneticMove(e, 0.2)}
+                    onMouseLeave={handleMagneticLeave}
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
             </div>
 
-            <div className="arc-ui">
-              <div className="arc-prog" aria-hidden="true">
-                <i id="arcProg" style={{ transform: `translateX(${(activeIdx * (100 / CARDS.length)).toFixed(2)}%)`, width: `${(100 / CARDS.length).toFixed(2)}%` }} />
-              </div>
-              <div className="arc-count">
-                <b id="arcCur">{String(activeIdx + 1).padStart(2, "0")}</b> / {String(CARDS.length).padStart(2, "0")} · <span id="arcName" className="text-gray-300 font-medium">{CARDS[activeIdx]?.name}</span>
-              </div>
-              <div className="arc-btns">
-                <button 
-                  id="arcPrev" 
-                  aria-label="Previous issue" 
-                  disabled={activeIdx <= 0}
-                  onClick={() => handleGo(activeIdx - 1)}
-                  onMouseMove={(e) => handleMagneticMove(e, 0.2)}
-                  onMouseLeave={handleMagneticLeave}
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button 
-                  id="arcNext" 
-                  aria-label="Next issue" 
-                  disabled={activeIdx >= CARDS.length - 1}
-                  onClick={() => handleGo(activeIdx + 1)}
-                  onMouseMove={(e) => handleMagneticMove(e, 0.2)}
-                  onMouseLeave={handleMagneticLeave}
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
           </div>
         </section>
 

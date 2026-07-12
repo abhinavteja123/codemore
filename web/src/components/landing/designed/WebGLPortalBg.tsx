@@ -98,36 +98,37 @@ export default function WebGLPortalBg() {
         // Color palette setup: Deep emerald, Electric Cyan, Glowing Lavenders
         vec3 colCore = vec3(0.03, 0.95, 0.79); // Coral/Teal
         vec3 colAura = vec3(0.51, 0.43, 0.95); // Purple-lavender
-        vec3 colDark = vec3(0.02, 0.01, 0.05); // Deep Portal Void Background
+        vec3 colDark = vec3(0.0, 0.0, 0.0); // Complete Black Portal Void Background
 
         // Compute radial gradient masks & eye of the vortex (sink node)
         float portalEdge = smoothstep(0.48, 0.42, r);
-
-        // This generates a ring instead of a filled disk. Peak intensity around 0.3, black/dark at center (< 0.15)
-        float ringGlow = smoothstep(0.12, 0.32, r) * smoothstep(0.48, 0.32, r);
-        float centerVoid = smoothstep(0.08, 0.22, r); // Complete mask out of the center to make text fully readable
+        
+        // Shifting glow start outwards to keep center completely clear of color bleeding
+        float ringGlow = smoothstep(0.27, 0.38, r) * smoothstep(0.48, 0.36, r);
+        float centerVoid = smoothstep(0.24, 0.35, r); // Cleaner, wider transition to absolute black
 
         // Combine procedural texture noise with radial gradients
         vec3 finalCol = colDark;
-
+        
         // Add purple aura backplate
-        finalCol += colAura * (density * 0.4) * smoothstep(0.18, 0.48, r);
-
+        finalCol += colAura * (density * 0.35) * smoothstep(0.25, 0.48, r);
+        
         // Add high contrast teal orbiting energy ring
-        finalCol += colCore * (density * 1.8) * ringGlow;
+        finalCol += colCore * (density * 1.6) * ringGlow;
 
-        // Add a brilliant halo edge transition glow to the boundary of the void
-        finalCol += vec3(0.8, 0.95, 1.0) * smoothstep(0.1, 0.15, r) * (1.0 - smoothstep(0.15, 0.2, r)) * 0.4;
-
-        // Multiply by centerVoid to create the perfect black sink hole / vortex eye
-        finalCol *= centerVoid;
+        // Force pure black in the center void core to ensure no green or purple tint bleeds in
+        if (r < 0.24) {
+          finalCol = vec3(0.0);
+        } else {
+          finalCol *= centerVoid;
+        }
 
         // Soft edge glow to avoid harsh margins
         finalCol *= portalEdge;
 
-        // Subtle vignette at the extreme edges
+        // Subtle vignette at the extreme edges - using aura purple rather than green/teal for solid space integration
         float vignette = smoothstep(0.5, 0.46, r) * 0.25;
-        finalCol += colCore * vignette;
+        finalCol += colAura * (vignette * 0.4);
 
         gl_FragColor = vec4(finalCol, portalEdge * 0.95);
       }
@@ -172,11 +173,11 @@ export default function WebGLPortalBg() {
     // Setup screen quad positions
     const vertices = new Float32Array([
       -1, -1,
-       1, -1,
-      -1,  1,
-      -1,  1,
-       1, -1,
-       1,  1,
+      1, -1,
+      -1, 1,
+      -1, 1,
+      1, -1,
+      1, 1,
     ]);
 
     const buffer = gl.createBuffer();

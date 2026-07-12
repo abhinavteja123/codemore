@@ -96,36 +96,37 @@ export default function WebGLPortalBg() {
         // Color palette setup: Deep emerald, Electric Cyan, Glowing Lavenders
         vec3 colCore = vec3(0.03, 0.95, 0.79); // Coral/Teal
         vec3 colAura = vec3(0.51, 0.43, 0.95); // Purple-lavender
-        vec3 colDark = vec3(0.02, 0.01, 0.05); // Deep Portal Void Background
+        vec3 colDark = vec3(0.0, 0.0, 0.0); // Complete Black Portal Void Background
 
         // Compute radial gradient masks & eye of the vortex (sink node)
         float portalEdge = smoothstep(0.48, 0.42, r);
         
-        // This generates a ring instead of a filled disk. Peak intensity around 0.3, black/dark at center (< 0.15)
-        float ringGlow = smoothstep(0.12, 0.32, r) * smoothstep(0.48, 0.32, r);
-        float centerVoid = smoothstep(0.08, 0.22, r); // Complete mask out of the center to make text fully readable
+        // Shifting glow start outwards to keep center completely clear of color bleeding
+        float ringGlow = smoothstep(0.27, 0.38, r) * smoothstep(0.48, 0.36, r);
+        float centerVoid = smoothstep(0.24, 0.35, r); // Cleaner, wider transition to absolute black
 
         // Combine procedural texture noise with radial gradients
         vec3 finalCol = colDark;
         
         // Add purple aura backplate
-        finalCol += colAura * (density * 0.4) * smoothstep(0.18, 0.48, r);
+        finalCol += colAura * (density * 0.35) * smoothstep(0.25, 0.48, r);
         
         // Add high contrast teal orbiting energy ring
-        finalCol += colCore * (density * 1.8) * ringGlow;
-        
-        // Add a brilliant halo edge transition glow to the boundary of the void
-        finalCol += vec3(0.8, 0.95, 1.0) * smoothstep(0.1, 0.15, r) * (1.0 - smoothstep(0.15, 0.2, r)) * 0.4;
+        finalCol += colCore * (density * 1.6) * ringGlow;
 
-        // Multiply by centerVoid to create the perfect black sink hole / vortex eye
-        finalCol *= centerVoid;
+        // Force pure black in the center void core to ensure no green or purple tint bleeds in
+        if (r < 0.24) {
+          finalCol = vec3(0.0);
+        } else {
+          finalCol *= centerVoid;
+        }
 
         // Soft edge glow to avoid harsh margins
         finalCol *= portalEdge;
 
-        // Subtle vignette at the extreme edges
+        // Subtle vignette at the extreme edges - using aura purple rather than green/teal for solid space integration
         float vignette = smoothstep(0.5, 0.46, r) * 0.25;
-        finalCol += colCore * vignette;
+        finalCol += colAura * (vignette * 0.4);
 
         gl_FragColor = vec4(finalCol, portalEdge * 0.95);
       }
@@ -191,17 +192,18 @@ export default function WebGLPortalBg() {
     const uMouseLoc = gl.getUniformLocation(program, "uMouse");
 
     // Track state parameters
-    let animationFrameId: number;
+    let animationFrameId: number | null = null;
     let lastTime = 0;
     let accumulatedTime = 0;
     const mouse = { x: 0.5, y: 0.5, targetX: 0.5, targetY: 0.5 };
 
-    // Set canvas dimensions with high density ratio
+    // Resize only when the element actually changes size — reading
+    // clientWidth/clientHeight every frame forces a layout pass per rAF and
+    // fights the scroll handlers writing styles (layout thrash → scroll jank).
     const resize = () => {
-      if (!canvas) {return;}
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
-      if (canvas.width !== width || canvas.height !== height) {
+      if (width > 0 && height > 0 && (canvas.width !== width || canvas.height !== height)) {
         canvas.width = width;
         canvas.height = height;
         gl.viewport(0, 0, width, height);
@@ -209,7 +211,8 @@ export default function WebGLPortalBg() {
     };
 
     resize();
-    window.addEventListener("resize", resize, { passive: true });
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
 
     // Handle mouse tracking over hero zone
     const handleMouseMove = (e: MouseEvent) => {
@@ -222,9 +225,9 @@ export default function WebGLPortalBg() {
 
     // Main WebGL drawing tick
     const render = (time: number) => {
-      resize();
-
-      const delta = (time - lastTime) * 0.001;
+      // Clamp delta so a dropped frame (fast scroll, tab switch) can't make
+      // the shader time leap — that leap reads as a visible stutter/jump.
+      const delta = Math.min((time - lastTime) * 0.001, 0.05);
       lastTime = time;
       accumulatedTime += delta;
 
@@ -245,11 +248,30 @@ export default function WebGLPortalBg() {
       animationFrameId = requestAnimationFrame(render);
     };
 
-    animationFrameId = requestAnimationFrame(render);
+    // Only render while the portal is on screen — frees the GPU for the rest
+    // of the page and prevents composite contention during long scrolls.
+    const startLoop = () => {
+      if (animationFrameId === null) {
+        lastTime = performance.now();
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+    const stopLoop = () => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+    };
+    const io = new IntersectionObserver(
+      ([entry]) => (entry.isIntersecting ? startLoop() : stopLoop())
+    );
+    io.observe(canvas);
+    startLoop();
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener("resize", resize);
+      stopLoop();
+      io.disconnect();
+      ro.disconnect();
       window.removeEventListener("mousemove", handleMouseMove);
       gl.deleteBuffer(buffer);
       gl.deleteProgram(program);
