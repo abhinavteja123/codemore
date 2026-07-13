@@ -285,6 +285,28 @@ Shipped this session (commits `8110243` → `bfd4cdf` → `4d9bb6d`):
 
 ---
 
+## 0.11 Update — 2026-07-13 (0.2.8 shipped everywhere, launch-verified, hardened, SEO live)
+
+Everything §0.10 listed as "user-only steps remaining" is DONE, plus a verification + hardening arc. Read this section instead of §0.10's todo list.
+
+**Shipped/live (all verified by probing, not assumed):**
+- **npm `codemore@0.2.8`** published via the release pipeline (first version carrying `mcpName`); **first-ever GitHub Release** (v0.2.8) created by the same tag push.
+- **MCP registry: LISTED** — `io.github.abhinavteja123/codemore` v0.2.8 on registry.modelcontextprotocol.io (`mcp-publisher` needed two server.json fixes: `$schema` must end `server.schema.json`, description ≤100 chars — commit `29b2942`). **Smithery deliberately skipped**: their new publish flow is hosted-HTTP-only; a stdio npm package can't list without hosting an endpoint (post-launch item; `smithery.yaml` kept in repo).
+- **VS Code Marketplace 0.2.8** (user uploaded the VSIX), **Supabase migration 006 + Vercel env** done by user — hosted scans unblocked.
+- **Search Console**: verification file served from `web/public/`, sitemap submitted.
+
+**Launch verification (P0+P1, all green):** fresh-machine `npx codemore@0.2.8` smoke 7/7 (exit-code contract, JSON+SARIF valid); MCP stdio e2e (6 tools, `scan_project` returns severity-capped report); GitHub Action e2e via new manual workflow `.github/workflows/action-e2e.yml` dogfooding published `@v1` (blockers=3, outputs verified); README command audit 22/23 with 4 drifts fixed (`c02fd2d`). Release-pipeline fixes en route: tag-verify quote-escaping crash (`bfd4cdf`), npm-publish idempotency guard, and the root-cause of the first two red release runs — `corpus/rules/vibe-public-env-leak/{tp,fp}/.env.local` had been **gitignored since Jun 7, never committed**; fixed with `!corpus/**` exemption (`6ca57f0`). The tool's own blind-spot bug, in its own repo.
+
+**The Glitch Wars (landing WebGL hardening, five root causes, all fixed + browser-verified):** (1) CSS `scroll-behavior: smooth` fighting Lenis = scrollY oscillation (`f95965a`); (2) portal composited at 25× forever + eased-follower parade = compositor tile drops → nav/text vanishing (`76269eb`: sync visibility-hide + follower removed); (3) `backdrop-filter` on nav/dropdown/threat-card = per-frame readback over WebGL = banding + nav dropout, zoom capped 25×→8× (`144b1ca`); (4) blurred spinning `.portal__ring` inside scaling parent = stale crescent artifact — ring now releases during dive (`03e6ca9`); (5) portal IntersectionObserver pause raced the sync visibility toggle = stale-frame flash (removed, same commit as 2). Lessons in `my-docs/05`.
+
+**UI batch (`c4fbf9e`):** all 5 WebGL components pause offscreen + reduced-motion single-frame; decorative canvases skip mounting ≤768px; carousel arrow keys; `/docs/rules` client-side search (`RulesExplorer`); copy buttons on all docs code blocks; version badges import root package.json (v0.2.3-drift class dead). **SEO (`90d575b`):** robots.ts, sitemap.ts (69 URLs incl. all 59 rule pages), canonical, JSON-LD was already present, hero copy rewritten to the agent-first pitch.
+
+**Local-only assets (gitignored `my-docs/`):** six deep personal docs — 01 story/philosophy, 02 architecture, 03 CLI+MCP, 04 extension+Action, 05 web+ops (incl. the Glitch Wars), 06 paste-ready Opus prompts for the next six phases (telemetry flywheel, Python parity, IDE matrix, monolith migration, StrykerJS, 50-app benchmark — run in that order; №1 starts a 30-day clock).
+
+**Open items:** user's `HeroOverlay.tsx`/`HeroOverlayRoot.tsx` refactor WIP (type-fixed to keep builds green, unwired, uncommitted at the time of writing — verify state before assuming); Marketplace domain verification (TXT record); hosted-scan click-test + real-phone landing pass (user, ~10 min); then the six-phase roadmap above. Known quirk documented in CONTRIBUTING.md: repo-local Windows `node cli.js` runs can die at exit with the libuv `UV_HANDLE_CLOSING` assertion *after* correct output — published package unaffected, trust CI.
+
+---
+
 ## 1. Why this exists — the actual problem
 
 AI coding agents (Cursor, Claude Code, Copilot, Codex) ship code fast and ship *bugs* fast. The data driving this project:
