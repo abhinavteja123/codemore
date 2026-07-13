@@ -5,12 +5,12 @@ import Link from "next/link";
 import NavInstallDropdown from "./NavInstallDropdown";
 
 interface HeroOverlayProps {
-  navRef: React.RefObject<HTMLElement | null>;
-  heroCopyRef: React.RefObject<HTMLDivElement | null>;
-  heroHintRef: React.RefObject<HTMLDivElement | null>;
-  starfieldRef: React.RefObject<HTMLDivElement | null>;
-  vignetteRef: React.RefObject<HTMLDivElement | null>;
-  diveVeilRef: React.RefObject<HTMLDivElement | null>;
+  navRef: React.RefObject<HTMLElement>;
+  heroCopyRef: React.RefObject<HTMLDivElement>;
+  heroHintRef: React.RefObject<HTMLDivElement>;
+  starfieldRef: React.RefObject<HTMLDivElement>;
+  vignetteRef: React.RefObject<HTMLDivElement>;
+  diveVeilRef: React.RefObject<HTMLDivElement>;
   version: string;
   onSignIn: () => void;
 }
