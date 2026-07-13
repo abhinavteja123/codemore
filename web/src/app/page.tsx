@@ -539,9 +539,9 @@ export default function Landing() {
               <span className="glow">your AI agent reads.</span>
             </h1>
             <p className="hero-sub">
-              CodeMore catches the bugs that ship in vibe-coded apps — SQL injection,
-              leaked secrets, broken Supabase RLS, LLM-output-to-eval — and emits a JSON
-              report your coding agent can act on. Same brain across CLI · MCP · VS Code · GitHub Action.
+              Your AI agent writes code fast. CodeMore reads what it wrote —
+              59 security rules, one byte-identical report across CLI · MCP · VS Code ·
+              GitHub Actions. Built for agents to consume, fix, and verify.
             </p>
           </div>
 
