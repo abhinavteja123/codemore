@@ -26,6 +26,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
+import { deriveRuleEvents } from '@/lib/telemetryVerdicts';
 
 export const dynamic = 'force-dynamic';
 
@@ -128,6 +129,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       surface: parsed.data.surface ?? null,
     });
     recorded = !error;
+
+    // Fan out per-rule verdict rows (rule_events, migration 007) for the
+    // beta→stable promotion flywheel. Verdicts only — plain 'fired' pings
+    // carry no tp/fp signal. Best-effort like the ping insert itself; no
+    // fingerprint or content ever reaches this table.
+    const events = deriveRuleEvents(parsed.data.rules, parsed.data.toolVersion);
+    if (events.length > 0) {
+      await supabase.from('rule_events').insert(events);
+    }
   }
 
   return NextResponse.json({ ok: true, recorded });

@@ -1,11 +1,10 @@
 /**
  * Telemetry sender (CLI side).
  *
- * Engaged ONLY when:
- *   - the user passes `--telemetry` to a single `codemore scan` run, OR
- *   - the user has previously written `{ "telemetry": true }` to
- *     `~/.codemore/config.json` and the current run does NOT pass
- *     `--no-telemetry`.
+ * Engaged ONLY when the user passes `--telemetry` to a `codemore scan` run.
+ * (There is no persisted opt-in yet — a `~/.codemore/config.json` flag was
+ * planned but never built; `--no-telemetry` exists to override it if it ever
+ * lands.)
  *
  * Privacy contract (mirrors the endpoint side):
  *   - We send only schemaVersion + toolVersion + fingerprintHash (already
@@ -40,7 +39,9 @@ interface TelemetryPayload {
 
 function buildPayload(report: CodeMoreReport, surface: TelemetryPayload['surface']): TelemetryPayload | null {
   if (!report?.project?.fingerprint) return null;
-  const rules: TelemetryRulePing[] = (report.issues ?? []).map(i => ({
+  // The endpoint's Zod schema caps `rules` at 500 entries and rejects the
+  // whole payload above that — cap here so huge scans still record.
+  const rules: TelemetryRulePing[] = (report.issues ?? []).slice(0, 500).map(i => ({
     id: i.id,
     severity: i.severity,
     confidence: i.confidence,

@@ -48,13 +48,17 @@ export function maxConfidenceFor(lifecycle: Lifecycle): number {
  * - To promote experimental → beta: need >=3 fixture pairs AND
  *   <15% false-positive rate over 7+ days of opt-in telemetry.
  * - To promote beta → stable: need <5% false-positive rate over
- *   30+ days of opt-in telemetry.
- * - Auto-demote stable → experimental when telemetry FP rate
- *   crosses 10% sustained over 14 days. The bot opens a PR; humans
- *   review before the demotion lands.
+ *   30+ days of opt-in telemetry, with at least `minEvents` recorded
+ *   verdicts so the rate is statistically meaningful.
+ * - Auto-demote when telemetry FP rate crosses 10%: the nightly
+ *   workflow (.github/workflows/auto-demote-rules.yml) opens an
+ *   ISSUE tagging the rule for human demotion review — demotion
+ *   itself, like promotion, always lands via a human PR.
+ *
+ * scripts/telemetry-report.js mirrors these numbers — keep in sync.
  */
 export const PROMOTION_THRESHOLDS = {
   experimentalToBeta: { minFixturePairs: 3, maxFpRate: 0.15, minTelemetryDays: 7 },
-  betaToStable:       { minFixturePairs: 3, maxFpRate: 0.05, minTelemetryDays: 30 },
-  autoDemoteFromStable: { fpRateTrigger: 0.10, sustainedDays: 14 },
+  betaToStable:       { minFixturePairs: 3, maxFpRate: 0.05, minTelemetryDays: 30, minEvents: 50 },
+  autoDemoteFromStable: { fpRateTrigger: 0.10, sustainedDays: 14, minEvents: 50 },
 } as const;
