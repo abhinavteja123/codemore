@@ -1,0 +1,81 @@
+# Nightly telemetry flywheel check.
+#
+# Runs scripts/telemetry-report.js against the rule_events_stats_30d view
+# (migration 007) and opens a review ISSUE — never a PR — when any default-on
+# rule's FP rate crosses 10% over >= 50 verdicts in the trailing 30 days.
+# Demotion itself always lands via a human PR (CONTRIBUTING-RULES.md,
+# "Lifecycle states").
+#
+# Required repo secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+
+name: auto-demote-rules
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  flywheel-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Zero npm deps — the script uses only node builtins + global fetch.
+      - name: Run telemetry flywheel report
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/telemetry-report.js --json > flywheel.json
+
+      - name: Open (or extend) demotion-review issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          count=$(node -p "require('./flywheel.json').demotionAlerts.length")
+          echo "Demotion alerts: $count"
+          if [ "$count" -eq 0 ]; then
+            exit 0
+          fi
+
+          node -e '
+            const { demotionAlerts, windowDays } = require("./flywheel.json");
+            const lines = demotionAlerts.map(r =>
+              `- \`${r.ruleId}\` (${r.lifecycle}) — ${(r.fpRate * 100).toFixed(1)}% FP over ${r.verdicts} verdicts`);
+            const body = [
+              `Nightly telemetry report flagged ${demotionAlerts.length} rule(s) with an FP rate above 10% ` +
+              `over the trailing ${windowDays} days (>= 50 verdicts each):`,
+              "",
+              ...lines,
+              "",
+              "Demotion is a human decision. Either defend the rule (add fp/ fixtures covering the " +
+              "false-positive cases and tighten the detector) or open a demotion PR — see " +
+              "CONTRIBUTING-RULES.md, \"Lifecycle states\".",
+            ].join("\n");
+            require("fs").writeFileSync("issue-body.md", body);
+          '
+
+          gh label create rule-demotion-review \
+            --description "Nightly flywheel flagged a rule for human demotion review" \
+            --color D93F0B --force
+
+          # One open review issue at a time — comment on it instead of piling up dailies.
+          existing=$(gh issue list --label rule-demotion-review --state open \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file issue-body.md
+          else
+            gh issue create \
+              --title "Demotion review: rule(s) over the 10% FP threshold" \
+              --label rule-demotion-review \
+              --body-file issue-body.md
+          fi
