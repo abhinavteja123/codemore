@@ -60,7 +60,7 @@ function lineForOffset(content: string, offset: number): number {
 
 export const coreSecuritySqlInjectionConcat: Rule = {
   id: 'core-security-sql-injection-concat',
-  version: '1.1.0',
+  version: '1.1.1',
   pack: 'core-security',
   lifecycle: 'beta',
   languages: ['typescript', 'javascript', 'python'],
