@@ -18,6 +18,7 @@ import { vibeCookieMissingFlags } from './vibe-cookie-missing-flags';
 // Python catalog parity — Flask / Django / FastAPI analogues
 import { vibePyCookieMissingFlags } from './vibe-py-cookie-missing-flags';
 import { vibePyCorsWildcardCredentials } from './vibe-py-cors-wildcard-credentials';
+import { vibePyNoInputValidation } from './vibe-py-no-input-validation';
 
 export const PACK_NAME = 'vibe-frontend' as const;
 
@@ -30,6 +31,7 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   vibeCookieMissingFlags,
   vibePyCookieMissingFlags,
   vibePyCorsWildcardCredentials,
+  vibePyNoInputValidation,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {

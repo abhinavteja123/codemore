@@ -555,3 +555,129 @@ export function findPrintCalls(tree: PythonTree): CallLike[] {
 export function findEvalExecCalls(tree: PythonTree): CallLike[] {
   return findCallsTo(tree.rootNode, new Set(['eval', 'exec']));
 }
+
+/**
+ * A decorated function definition — the shape every Flask / FastAPI /
+ * Django route handler takes. Consumed by the vibe-py route rules
+ * (no-input-validation, auth-missing-check, bola).
+ */
+export interface DecoratedFunctionLike extends FunctionLike {
+  /** Raw text of each decorator, including the leading `@`. */
+  decorators: string[];
+  /** Full text of the decorated_definition (decorators + def + body). */
+  fullText: string;
+  /** 1-indexed last line of the definition. */
+  endLine: number;
+}
+
+/** Iterate every `decorated_definition` wrapping a function_definition. */
+export function* iterDecoratedFunctions(tree: PythonTree): IterableIterator<DecoratedFunctionLike> {
+  for (const n of walk(tree.rootNode)) {
+    if (n.type !== 'decorated_definition') continue;
+    const def = (n as { childForFieldName: (k: string) => PythonNode | null }).childForFieldName('definition');
+    if (!def || def.type !== 'function_definition') continue;
+    const nameNode = (def as { childForFieldName: (k: string) => PythonNode | null }).childForFieldName('name');
+    const bodyNode = (def as { childForFieldName: (k: string) => PythonNode | null }).childForFieldName('body');
+    if (!nameNode || !bodyNode) continue;
+    const decorators: string[] = [];
+    for (let i = 0; i < (n.childCount as number); i++) {
+      const c = n.child(i) as PythonNode | null;
+      if (c && c.type === 'decorator') decorators.push((c as { text: string }).text);
+    }
+    let isAsync = false;
+    for (let i = 0; i < (def.childCount as number); i++) {
+      const c = def.child(i) as PythonNode | null;
+      if (c && c.type === 'async') { isAsync = true; break; }
+    }
+    const pos = posOf(def);
+    yield {
+      node: def,
+      name: (nameNode as { text: string }).text,
+      isAsync,
+      body: bodyNode,
+      line: pos.line,
+      column: pos.column,
+      decorators,
+      fullText: (n as { text: string }).text,
+      endLine: (n as NodePos).endPosition.row + 1,
+    };
+  }
+}
+
+/** What the vibe-py route rules learn from a handler's decorator list. */
+export interface RouteDecoratorInfo {
+  isRoute: boolean;
+  /** Uppercase HTTP methods. `@app.route` with no methods kwarg => ['GET']. */
+  methods: string[];
+  /** Path parameter names: Flask `<int:post_id>` / FastAPI `{post_id}`. */
+  pathParams: string[];
+}
+
+const ROUTE_VERB_RE = /^@[\w.]+\.(get|post|put|patch|delete|head|options)\s*\(\s*(['"])(\/[^'"]*)\2/;
+const ROUTE_ROUTE_RE = /^@[\w.]+\.(?:route|add_url_rule)\s*\(\s*(['"])([^'"]*)\1/;
+const ROUTE_METHODS_KWARG_RE = /methods\s*=\s*[[(]([^\])]*)[\])]/;
+const DRF_API_VIEW_RE = /^@api_view\s*\(\s*[[(]([^\])]*)[\])]/;
+const PATH_PARAM_RE = /<(?:\w+:)?(\w+)>|\{(\w+)(?::[^}]*)?\}/g;
+
+/**
+ * Classify a decorator list as a route handler. Verb-style decorators
+ * (`@app.post(...)`) only count when their first argument is a
+ * `/`-leading path string — this is what separates `@router.post("/x")`
+ * from `@cache.get("key")`.
+ */
+export function parseRouteDecorators(decorators: ReadonlyArray<string>): RouteDecoratorInfo {
+  const info: RouteDecoratorInfo = { isRoute: false, methods: [], pathParams: [] };
+  for (const raw of decorators) {
+    const d = raw.trim();
+    let pathStr: string | null = null;
+
+    const verb = ROUTE_VERB_RE.exec(d);
+    if (verb) {
+      info.isRoute = true;
+      info.methods.push(verb[1].toUpperCase());
+      pathStr = verb[3];
+    }
+
+    const route = ROUTE_ROUTE_RE.exec(d);
+    if (route) {
+      info.isRoute = true;
+      pathStr = route[2];
+      const mk = ROUTE_METHODS_KWARG_RE.exec(d);
+      if (mk) {
+        for (const m of mk[1].split(',')) {
+          const cleaned = m.trim().replace(/['"]/g, '');
+          if (cleaned) info.methods.push(cleaned.toUpperCase());
+        }
+      } else {
+        info.methods.push('GET');
+      }
+    }
+
+    const drf = DRF_API_VIEW_RE.exec(d);
+    if (drf) {
+      info.isRoute = true;
+      for (const m of drf[1].split(',')) {
+        const cleaned = m.trim().replace(/['"]/g, '');
+        if (cleaned) info.methods.push(cleaned.toUpperCase());
+      }
+    }
+
+    if (pathStr) {
+      PATH_PARAM_RE.lastIndex = 0;
+      let pm: RegExpExecArray | null;
+      while ((pm = PATH_PARAM_RE.exec(pathStr)) !== null) {
+        info.pathParams.push(pm[1] ?? pm[2]);
+      }
+    }
+  }
+  return info;
+}
+
+/** Test-file paths the vibe-py route rules skip (fixtures & test suites define throwaway routes). */
+export function isPyTestFilePath(filePath: string): boolean {
+  const norm = filePath.replace(/\\/g, '/');
+  return /(^|\/)tests?\//.test(norm)
+    || /(^|\/)test_[^/]*\.py$/.test(norm)
+    || /_test\.py$/.test(norm)
+    || /(^|\/)conftest\.py$/.test(norm);
+}
