@@ -395,7 +395,7 @@ Found a false positive? [Open a rule-FP report](.github/ISSUE_TEMPLATE) — FP r
 - MCP registry listing (VS Code Marketplace: live)
 - Demo video: open a real vibe-coded app, scan, hand the report to Claude Code, watch every BLOCKER close
 - 50-app benchmark study with published dataset
-- Telemetry-driven rule auto-demotion (nightly workflow)
+- Telemetry-driven rule auto-demotion — live: nightly [`auto-demote-rules.yml`](.github/workflows/auto-demote-rules.yml) opens a review issue when a rule's FP rate crosses 10%
 - JetBrains plugin · cross-language taint tracking (research)
 
 Details: [`docs/roadmap.md`](docs/roadmap.md).

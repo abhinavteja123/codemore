@@ -206,9 +206,17 @@ export const vibeSupabasePack = [
 | `stable` | yes | 1.0 | <5% FP over 30+ days of opt-in telemetry. |
 | `deprecated` | yes (one major) | 0.75 | Emits notice. Removed in next major. |
 
-Promotion PRs are usually opened by the lifecycle bot, not humans. You can request promotion manually if telemetry data backs it.
+### Promoting a rule
 
-Demotion happens automatically: if a stable rule's FP rate crosses 10% sustained over 14 days, the bot opens a PR demoting it. You can defend it by adding fixtures that cover the false-positive cases and tightening the detector.
+Promotion is always a **human PR**, backed by telemetry evidence. `node scripts/telemetry-report.js` prints the current promotion-candidate list (beta rules with <5% FP over ≥50 verdicts in the trailing 30 days). The PR must:
+
+1. Edit the rule module's `lifecycle` field (e.g. `'beta'` → `'stable'`).
+2. Bump `ruleVersion` and add a `CHANGELOG.md` entry.
+3. Pass `node scripts/validate-rule-pr.js`.
+
+### Demotion review
+
+The nightly [`auto-demote-rules.yml`](.github/workflows/auto-demote-rules.yml) workflow opens an **issue** (label `rule-demotion-review`) — not a PR — when a default-on rule's FP rate crosses 10% over ≥50 verdicts in the trailing 30 days. Demotion itself also lands via a human PR: defend the rule by adding `fp/` fixtures covering the false-positive cases and tightening the detector, or open the demotion PR.
 
 See `shared/rules/lifecycle.ts` for the exact thresholds.
 
