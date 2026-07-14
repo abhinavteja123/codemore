@@ -16,12 +16,8 @@ def create_post():
     return jsonify({"id": post.id})
 
 
-@app.route("/posts", methods=["GET"])
-def list_posts():
-    return jsonify([p.to_dict() for p in Post.query.all()])
-
-
-@app.route("/login", methods=["POST"])
-def login():
-    data = request.get_json()
-    return jsonify({"token": issue_token(data["email"], data["password"])})
+@app.route("/posts/<int:post_id>", methods=["DELETE"])
+def delete_post(post_id):
+    Post.query.filter_by(id=post_id).delete()
+    db.session.commit()
+    return "", 204

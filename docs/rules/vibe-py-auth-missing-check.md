@@ -10,7 +10,9 @@
 
 Flask / FastAPI route handlers for state-changing methods (POST / PUT / PATCH / DELETE) that reference no auth mechanism anywhere in the decorated definition, in a file that imports no auth library. Python analogue of [`vibe-auth-missing-session-check`](./vibe-auth-missing-session-check.md).
 
-Auth evidence accepted (any one is enough): `@login_required`, `@jwt_required()`, `@permission_required`, `current_user`, `get_jwt_identity()`, `Depends(...)`, `request.user`, `g.user`, `session["user_id"]` reads, `verify_token` / `authenticate` / `check_permission` calls, or a file-level import of flask_login / flask_jwt_extended / flask_httpauth / fastapi.security / authlib / django.contrib.auth.
+Auth evidence accepted (any one is enough, checked **per handler**): `@login_required`, `@jwt_required()`, `@permission_required`, `current_user`, `get_jwt_identity()`, `Depends(...)`, `request.user`, `g.user`, `session["user_id"]` reads, `verify_token` / `authenticate` / `check_permission` calls.
+
+A bare auth-lib *import* is deliberately **not** evidence — "one gated route plus one forgotten route in the same file" is exactly the bug class this rule exists for. Files with a `@app.before_request` auth hook are skipped entirely, and so are handlers whose name marks them public by design (`login` / `register` / `webhook` / `health` / `oauth` callback / `token` issuance).
 
 ## Why it matters
 
@@ -39,7 +41,7 @@ def create_item(item: Item, user: User = Depends(get_current_user)):
     ...
 ```
 
-Also not flagged: GET-only routes and test files (`tests/`, `test_*.py`, `conftest.py`).
+Also not flagged: GET-only routes, test files (`tests/`, `test_*.py`, `conftest.py`), files with a `@app.before_request` auth hook, and public-by-name handlers (`login`, `register`, `webhook`, `health`, ...).
 
 ## Suggested fix
 
@@ -56,7 +58,7 @@ Webhook receivers verify a signature instead of a session — suppress with a Re
 
 ## Implementation
 
-Tree-sitter-python AST scopes decorated route handlers; a regex over the full decorated definition looks for auth terms; a file-level import scan looks for auth libraries. Auth enforced by middleware or a `before_request` hook in another file is invisible to single-file analysis — suppress with a Reason comment.
+Tree-sitter-python AST scopes decorated route handlers; a regex over the full decorated definition looks for auth terms. Auth enforced by middleware or a `before_request` hook in **another file** is invisible to single-file analysis — suppress with a Reason comment.
 
 Source: [`shared/packs/vibe-auth/vibe-py-auth-missing-check.ts`](../../shared/packs/vibe-auth/vibe-py-auth-missing-check.ts)
 Fixtures: [`corpus/rules/vibe-py-auth-missing-check/`](../../corpus/rules/vibe-py-auth-missing-check/)

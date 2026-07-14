@@ -6,18 +6,22 @@
  * DELETE) that reference no auth mechanism anywhere in the decorated
  * definition, in a file that imports no auth library.
  *
- * Auth evidence accepted (any one is enough):
+ * Auth evidence accepted (any one is enough, checked per handler):
  *   - decorator: @login_required / @jwt_required() / @auth.login_required /
  *     @permission_required(...) / dependencies=[Depends(...)]
  *   - body/signature: current_user, get_jwt_identity(), Depends(...),
  *     request.user, g.user, session["user_id"]-style reads,
  *     verify_token / authenticate / check_permission calls
- *   - file-level import of flask_login, flask_jwt_extended, flask_httpauth,
- *     fastapi.security, authlib, django.contrib.auth
  *
- * Severity: MAJOR (not BLOCKER) — same reasoning as the TS rule: webhook
- * receivers and public form endpoints legitimately ship without a session
- * check; suppress those with a Reason comment.
+ * A bare auth-lib IMPORT is deliberately NOT evidence — "one gated route
+ * plus one forgotten route in the same file" is exactly the bug class.
+ * Files with a @app.before_request auth hook are skipped entirely, and so
+ * are handlers whose NAME marks them public by design (login / register /
+ * webhook / health / oauth callback).
+ *
+ * Severity: MAJOR (not BLOCKER) — same reasoning as the TS rule: public
+ * form endpoints legitimately ship without a session check; suppress
+ * those with a Reason comment.
  *
  * Coverage gap (intentional):
  *   - Auth enforced by middleware / a before_request hook in another file
@@ -58,9 +62,14 @@ const AUTH_TERM_RE = new RegExp(
   ].join('|'),
 );
 
-// File-level auth library imports.
-const AUTH_IMPORT_RE =
-  /(?:^|\n)\s*(?:import|from)\s+(?:flask_login|flask_jwt_extended|flask_httpauth|flask_praetorian|fastapi\.security|authlib|django\.contrib\.auth|rest_framework\.permissions)\b/;
+// File-level auth enforced by a hook that runs before every route —
+// per-route decorators are then legitimately absent.
+const BEFORE_REQUEST_HOOK_RE = /@\w+(?:\.\w+)*\.(?:before_request|before_app_request)\b/;
+
+// Handlers that legitimately run unauthenticated: login/registration
+// flows, token issuance, signature-verified webhooks, health checks.
+const PUBLIC_HANDLER_NAME_RE =
+  /^(?:login|logout|register|signup|signin|sign_in|sign_up|auth|token|refresh|callback|oauth|webhook|health|healthz|ping|status)/i;
 
 export const vibePyAuthMissingCheck: Rule = {
   id: 'vibe-py-auth-missing-check',
@@ -83,7 +92,11 @@ export const vibePyAuthMissingCheck: Rule = {
   detect(ctx: RuleContext): RuleFinding[] {
     if (!ctx.pythonAst) return [];
     if (isPyTestFilePath(ctx.filePath)) return [];
-    if (AUTH_IMPORT_RE.test(ctx.content)) return [];
+    // Auth enforced for every route by a before_request hook — per-route
+    // decorators are then legitimately absent. (A bare auth-lib IMPORT is
+    // deliberately NOT a skip: "one gated route + one forgotten route in
+    // the same file" is exactly the bug class this rule exists for.)
+    if (BEFORE_REQUEST_HOOK_RE.test(ctx.content)) return [];
 
     const tree = ctx.pythonAst as PythonTree;
     const findings: RuleFinding[] = [];
@@ -93,6 +106,7 @@ export const vibePyAuthMissingCheck: Rule = {
       if (!route.isRoute) continue;
       const verbs = route.methods.filter(m => STATE_CHANGING.has(m));
       if (verbs.length === 0) continue;
+      if (PUBLIC_HANDLER_NAME_RE.test(fn.name)) continue;
       if (AUTH_TERM_RE.test(fn.fullText)) continue;
 
       findings.push({
@@ -105,7 +119,7 @@ export const vibePyAuthMissingCheck: Rule = {
         },
         whyItMatters:
           `Route handler \`${fn.name}\` handles ${verbs.join(', ')} but neither its decorators ` +
-          `nor its body reference any auth mechanism, and the file imports no auth library. ` +
+          `nor its body reference any auth mechanism. ` +
           `Anonymous callers can hit this endpoint and mutate data.`,
         suggestedFix: {
           type: 'code-patch',
