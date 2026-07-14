@@ -18,6 +18,8 @@ import type { Rule } from '../../rules/Rule';
 import { vibeAuthMissingSessionCheck } from './vibe-auth-missing-session-check';
 import { vibeAuthBola } from './vibe-auth-bola';
 import { vibeAuthInverted } from './vibe-auth-inverted';
+// Python catalog parity — Flask / FastAPI analogues
+import { vibePyAuthMissingCheck } from './vibe-py-auth-missing-check';
 
 export const PACK_NAME = 'vibe-auth' as const;
 
@@ -25,6 +27,7 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   vibeAuthMissingSessionCheck,
   vibeAuthBola,
   vibeAuthInverted,
+  vibePyAuthMissingCheck,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {
