@@ -32,7 +32,7 @@ needs to close the loop.
   "summary":           { /* counts + aggregations */ },
   "issues":            [ /* array of findings */ ],
   "agentInstructions": { "preamble": "You are fixing issues found by CodeMore...", … },  // optional
-  "meta":              { "rulesEnabled": 59, "packsLoaded": […], "scanDurationMs": 4321 }  // optional
+  "meta":              { "rulesEnabled": 64, "packsLoaded": […], "scanDurationMs": 4321 }  // optional
 }
 ```
 
@@ -359,7 +359,7 @@ Structured hints to guide the LLM through the fix loop:
     "stopOn": "first-validator-failure"
   },
   "meta": {
-    "rulesEnabled": 59,
+    "rulesEnabled": 64,
     "packsLoaded": [
       "core-security",
       "core-quality",
@@ -378,4 +378,4 @@ Structured hints to guide the LLM through the fix loop:
 - [External tool adapters](./external-tools.md) — namespace and severity translation for ruff, biome, etc.
 - [Security gate](./security-gate.md) — layered scanning workflow using the report.
 - [CLI reference](https://codemore.tech/docs/cli) — scan options and output formats.
-- [Rule catalog](./rules) — docs for all 59 native rules.
+- [Rule catalog](./rules) — docs for all 64 native rules.

@@ -1,6 +1,6 @@
 # External tool adapters
 
-CodeMore's native catalog (59 rules) covers **TypeScript / JavaScript / SQL / Python**. Polyglot repos sometimes need broader coverage. The `--external-tools` flag wraps eight industry-standard tools and routes their output through the same `codemore-report.json` schema — so the agent loop (`apply_fix` / `validate_fix` / `suggest_fix`) keeps working uniformly.
+CodeMore's native catalog (64 rules) covers **TypeScript / JavaScript / SQL / Python**. Polyglot repos sometimes need broader coverage. The `--external-tools` flag wraps eight industry-standard tools and routes their output through the same `codemore-report.json` schema — so the agent loop (`apply_fix` / `validate_fix` / `suggest_fix`) keeps working uniformly.
 
 ## Quick start
 

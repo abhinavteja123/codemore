@@ -22,7 +22,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.6,
   }));
 
-  // 59 rule pages — the long-tail surface ("codemore sql injection rule" etc.)
+  // 64 rule pages — the long-tail surface ("codemore sql injection rule" etc.)
   const rulePages: MetadataRoute.Sitemap = listRuleIds().map(id => ({
     url: `${SITE}/docs/rules/${id}`,
     lastModified: now,

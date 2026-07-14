@@ -67,7 +67,7 @@ export default async function OpengraphImage() {
           maxWidth: 920,
           lineHeight: 1.45,
         }}>
-          58 rules + 8 external adapters. Catches the bugs that ship in vibe-coded apps. Reports them
+          64 rules + 8 external adapters. Catches the bugs that ship in vibe-coded apps. Reports them
           in a schema your coding agent can act on.
         </div>
 

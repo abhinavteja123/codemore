@@ -32,13 +32,13 @@ const SCRIPT: Line[] = [
   { text: "$ npx codemore@latest scan .",                          kind: "cmd",   pace: 22 },
   { text: "Indexing 247 files…",                                   kind: "info",  pace: 8 },
   { text: "✓ Parsed TypeScript + Python AST",                      kind: "ok",    pace: 8 },
-  { text: "✓ Loaded 6 packs · 58 rules · 8 external adapters",     kind: "ok",    pace: 8 },
+  { text: "✓ Loaded 6 packs · 64 rules · 8 external adapters",     kind: "ok",    pace: 8 },
   { text: "✗ src/db/users.ts:42   core-security-sql-injection-concat", kind: "err",  pace: 6 },
   { text: "✗ .env.local:2          vibe-public-env-leak",          kind: "err",   pace: 6 },
   { text: "✗ .github/workflows/deploy.yml:13   vibe-cicd-secret-in-yaml", kind: "err", pace: 6 },
   { text: "⚠ src/lib/agent.ts:21   vibe-llm-output-to-sink",       kind: "warn",  pace: 6 },
   { text: "",                                                      kind: "info",  pace: 1 },
-  { text: "150 issues · 51 BLOCKERs · 58/58 rules · score 54/100", kind: "info",  pace: 6 },
+  { text: "150 issues · 51 BLOCKERs · 64/64 rules · score 54/100", kind: "info",  pace: 6 },
   { text: "→ codemore-report.json ready for your agent.",          kind: "agent", pace: 7 },
 ];
 

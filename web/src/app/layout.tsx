@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     template: "%s · CodeMore",
   },
   description:
-    "59 rules + 8 external adapters. Catches the bugs that ship in vibe-coded apps. Reports them in a schema your coding agent can act on. CLI, MCP server, VS Code, GitHub Action.",
+    "64 rules + 8 external adapters. Catches the bugs that ship in vibe-coded apps. Reports them in a schema your coding agent can act on. CLI, MCP server, VS Code, GitHub Action.",
   alternates: {
     canonical: "/",
   },
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "CodeMore — the static analyzer your AI agent reads",
     description:
-      "59 rules + 8 external adapters. CLI / MCP / VS Code / GitHub Action.",
+      "64 rules + 8 external adapters. CLI / MCP / VS Code / GitHub Action.",
     url: "/",
     siteName: "CodeMore",
     locale: "en_US",
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "CodeMore — the static analyzer your AI agent reads",
     description:
-      "59 rules + 8 external adapters. CLI / MCP / VS Code / GitHub Action.",
+      "64 rules + 8 external adapters. CLI / MCP / VS Code / GitHub Action.",
   },
   robots: {
     index: true,

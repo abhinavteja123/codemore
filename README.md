@@ -13,7 +13,7 @@ AI agents ship code fast — and ship bugs fast. CodeMore scans the code, then h
 
 [![npm](https://img.shields.io/npm/v/codemore?style=flat-square&color=cb3837&logo=npm)](https://www.npmjs.com/package/codemore)
 [![License: MIT](https://img.shields.io/badge/license-MIT-4ef2ca.svg?style=flat-square)](LICENSE)
-[![Rules](https://img.shields.io/badge/native%20rules-59-success.svg?style=flat-square)](docs/rules)
+[![Rules](https://img.shields.io/badge/native%20rules-64-success.svg?style=flat-square)](docs/rules)
 [![Adapters](https://img.shields.io/badge/external%20adapters-8-blueviolet.svg?style=flat-square)](docs/external-tools.md)
 [![Audit](https://img.shields.io/badge/last%20audit-2026--07--07-ff69b4.svg?style=flat-square)](accuracy-report-2026-07-07.md)
 [![BLOCKER TP rate](https://img.shields.io/badge/BLOCKER%20TP%20rate-~90%25-4ef2ca.svg?style=flat-square)](accuracy-report-2026-07-07.md)
@@ -22,7 +22,7 @@ AI agents ship code fast — and ship bugs fast. CodeMore scans the code, then h
 npx codemore@latest scan .
 ```
 
-**59 native rules · 8 external adapters · CLI · MCP server · VS Code extension · GitHub Action — one report, byte-identical on every surface.**
+**64 native rules · 8 external adapters · CLI · MCP server · VS Code extension · GitHub Action — one report, byte-identical on every surface.**
 
 </div>
 
@@ -148,22 +148,22 @@ Sign in at [**codemore.tech**](https://codemore.tech), paste a public GitHub URL
 
 ## What it catches
 
-**59 native rules** across **6 packs**, every rule mapped to a *cited real-world incident class* — not a hypothetical:
+**64 native rules** across **6 packs**, every rule mapped to a *cited real-world incident class* — not a hypothetical:
 
 | Pack | Rules | Highlights |
 |---|---:|---|
 | `core-security` | 22 | SQL injection (concat), path traversal, weak crypto, insecure deserialization, `eval`, shell injection, TLS-off, hardcoded secret patterns, hardcoded passwords (B105-class), SSRF, secret-in-log, LLM-output → eval/exec/SQL sinks, prompt-injection sinks, DB write-without-WHERE, hallucinated imports |
 | `core-quality` | 21 | Unused vars/imports/exports, cyclomatic complexity, dead conditionals, leftover console/prints, async-without-await, unreachable code, loose equality, `as any`, non-null-assertion abuse |
-| `vibe-frontend` | 6 | XSS (`dangerouslySetInnerHTML`), CORS-with-credentials, missing rate limit, missing cookie flags, file-upload validation, missing input validation |
+| `vibe-frontend` | 9 | XSS (`dangerouslySetInnerHTML`), CORS-with-credentials, missing rate limit, missing cookie flags, file-upload validation, missing input validation — CORS, cookie flags and input validation each in TS + Python (Flask/FastAPI) form |
 | `vibe-secrets` | 4 | Public env leaks (`NEXT_PUBLIC_*` / `VITE_*` / `REACT_APP_*`), hardcoded JWTs, MCP config secrets, CI/CD YAML secrets |
-| `vibe-auth` | 3 | BOLA, missing session checks, inverted auth |
+| `vibe-auth` | 5 | BOLA (TS + Python), missing session/auth checks (TS + Python), inverted auth |
 | `vibe-supabase` | 3 | RLS-off, RLS-permissive (`USING (true)`), anon-key bundled to client |
 
 **8 external adapters** (off by default, opt in via `--external-tools`): `ruff` · `golangci-lint` · `clippy` · `biome` · `bandit` · `gitleaks` · `npm-audit` · `pip-audit`. Findings are namespaced `ext:<tool>:<rule-id>` — no collision with native rules; a missing binary skips silently instead of crashing.
 
 **The walker catches what `.gitignore` hides.** When a developer "hides" a leaked secret file by gitignoring it, most scanners stop seeing it — but it's still on disk, in tarballs, in Docker images. CodeMore always scans secret-shaped filenames (`.env*`, `*.pem`, `*.key`, `firebase-adminsdk*.json`, `credentials.json`, `.npmrc`, `.pypirc`, …) even when gitignored. This is exactly how the audits found real production OpenAI keys, Google API keys, and Firebase admin SDK creds that other tools silently missed. Opt out with `--respect-gitignore-fully`.
 
-Per-rule documentation: [`docs/rules`](docs/rules) — 59 pages, one per rule.
+Per-rule documentation: [`docs/rules`](docs/rules) — 64 pages, one per rule.
 
 ---
 
@@ -185,7 +185,7 @@ Daemon : issues=224  BLOCKER=5  fingerprint=sha256:7f95f2c62e0d3ecea6f23…
 ```jsonc
 {
   "schemaVersion": "1.0.0",
-  "tool":    { "name": "codemore", "version": "0.2.8" },
+  "tool":    { "name": "codemore", "version": "0.3.0" },
   "project": { "root": ".", "framework": "next.js", "language": "typescript",
                "fingerprint": "sha256:7f95f2c62e0d3ecea6f23…" },
   "summary": {
@@ -237,7 +237,7 @@ Daemon : issues=224  BLOCKER=5  fingerprint=sha256:7f95f2c62e0d3ecea6f23…
     "stopOn":       "first-validator-failure"
   },
   "meta": {
-    "rulesEnabled": 59,
+    "rulesEnabled": 64,
     "packsLoaded":  ["core-security", "core-quality", "vibe-supabase", "…"],
     "scanDurationMs": 4321
   }
@@ -295,7 +295,7 @@ Synthetic benchmarks lie; real codebases don't. Every release is audited against
 
 ### Quality gates, enforced in CI
 
-- **100% TP / 100% FP** on the 118-fixture corpus regression suite — every rule ships with at least one true-positive and one false-positive fixture under `corpus/rules/<rule-id>/{tp,fp}/`
+- **100% TP / 100% FP** on the 128-fixture corpus regression suite — every rule ships with at least one true-positive and one false-positive fixture under `corpus/rules/<rule-id>/{tp,fp}/`
 - Lifecycle gating: rules are `experimental` → `beta` → `stable`, promotion requires fixture pairs plus real-world FP-rate evidence via opt-in telemetry; rules below the precision bar are gated behind `--enable-experimental` or ship with reduced confidence so agents weight them lower
 
 | Lifecycle | Default | Promotion bar |
@@ -328,7 +328,7 @@ Off by default. Enable per-scan with `--telemetry`. Collected: tool version, has
 ```
 codemore/
 ├── shared/                       ← one brain, shared across all surfaces
-│   ├── packs/                    ← 59 rule modules across 6 packs
+│   ├── packs/                    ← 64 rule modules across 6 packs
 │   ├── rules/                    ← registry, lifecycle gating, suppression, AST helpers (TS + Python)
 │   └── report/                   ← codemore-report.json v1.0.0 schema + types + writer
 ├── daemon/
@@ -339,8 +339,8 @@ codemore/
 │   └── llm/                      ← OpenAI · Anthropic · Gemini · local provider plug-ins
 ├── src/                          ← VS Code extension (forks daemon, renders diagnostics)
 ├── web/                          ← Next.js: landing · dashboard · docs · /api/telemetry
-├── corpus/rules/<id>/{tp,fp}/    ← 59 TP/FP fixture pairs, 1:1 with the rule catalog
-├── docs/                         ← schema · limitations · security-gate · 59 per-rule pages
+├── corpus/rules/<id>/{tp,fp}/    ← 64 TP/FP fixture pairs, 1:1 with the rule catalog
+├── docs/                         ← schema · limitations · security-gate · 64 per-rule pages
 └── templates/                    ← copy-paste GitHub Action workflows
 ```
 

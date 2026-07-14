@@ -54,7 +54,7 @@ export default function HeroOverlay({
 
       {/* ───── HERO TEXT COPY ───── */}
       <div ref={heroCopyRef} className="hero-copy">
-        <span className="kicker">{`v${version} · 59 rules · 8 adapters · MIT`}</span>
+        <span className="kicker">{`v${version} · 64 rules · 8 adapters · MIT`}</span>
         <h1 className="hero-title">
           The static analyzer<br />
           <span className="glow">your AI agent reads.</span>

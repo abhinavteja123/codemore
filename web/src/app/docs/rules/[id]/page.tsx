@@ -36,7 +36,7 @@ export default async function RulePage({ params }: PageProps) {
       <NextStep
         href="/docs/rules"
         title="Back to the catalog"
-        description="See the other 57 rules — grouped by pack, with lifecycle gates."
+        description="See the other 63 rules — grouped by pack, with lifecycle gates."
       />
     </>
   );

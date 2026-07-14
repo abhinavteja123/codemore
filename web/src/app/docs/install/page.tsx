@@ -167,7 +167,7 @@ npx codemore mcp install --client cursor      # merge-safe write (backs up first
 
                 <NextStep
                   href="/docs/rules"
-                  title="Browse the 59-rule catalog"
+                  title="Browse the 64-rule catalog"
                   description="See exactly what each tool will surface — grouped by pack, lifecycle, severity."
                 />
               </>

@@ -5,7 +5,7 @@ import RulesExplorer, { type RuleSummary } from "@/components/docs/RulesExplorer
 export const metadata = {
   title: "CodeMore — Rules",
   description:
-    "Browse every rule in the catalog: 59 native rules across 6 packs, plus 8 opt-in external-tool adapters.",
+    "Browse every rule in the catalog: 64 native rules across 6 packs, plus 8 opt-in external-tool adapters.",
 };
 
 /** Pull the metadata block out of a rule's markdown frontmatter-y header. */

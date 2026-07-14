@@ -533,14 +533,14 @@ export default function Landing() {
           <div className="hero-vignette" />
 
           <div ref={heroCopyRef} className="hero-copy">
-            <span className="kicker">{`v${rootPkg.version} · 59 rules · 8 adapters · MIT`}</span>
+            <span className="kicker">{`v${rootPkg.version} · 64 rules · 8 adapters · MIT`}</span>
             <h1 className="hero-title">
               The static analyzer<br />
               <span className="glow">your AI agent reads.</span>
             </h1>
             <p className="hero-sub">
               Your AI agent writes code fast. CodeMore reads what it wrote —
-              59 security rules, one byte-identical report across CLI · MCP · VS Code ·
+              64 security rules, one byte-identical report across CLI · MCP · VS Code ·
               GitHub Actions. Built for agents to consume, fix, and verify.
             </p>
           </div>
@@ -588,7 +588,7 @@ export default function Landing() {
 
             <header className="scene2__head">
               <div>
-                <div className="eyebrow">findings feed · 59 rules · scroll to advance</div>
+                <div className="eyebrow">findings feed · 64 rules · scroll to advance</div>
                 <h2>Every finding is agent-actionable. Five sample classes from the 2026-07-07 audit.</h2>
               </div>
               <p>
@@ -685,7 +685,7 @@ export default function Landing() {
           <WebGLThreatRings active={threatIdx} />
 
           <header className="threats__head reveal">
-            <div className="eyebrow">threat taxonomy · 59 rules · 7 classes · scroll</div>
+            <div className="eyebrow">threat taxonomy · 64 rules · 7 classes · scroll</div>
             <h2>Every rule maps to a known threat class.</h2>
           </header>
 
@@ -815,8 +815,8 @@ export default function Landing() {
           <div className="atlas-grid">
             <div className="atlas-cell reveal reveal-delay-1">
               <div className="k">Catalog</div>
-              <div className="n">58</div>
-              <div className="l">native rules across 6 packs, 100% recall / 100% precision on the 116-fixture corpus.</div>
+              <div className="n">64</div>
+              <div className="l">native rules across 6 packs, 100% recall / 100% precision on the 128-fixture corpus.</div>
             </div>
             <div className="atlas-cell reveal reveal-delay-2">
               <div className="k">Adapters</div>
@@ -897,7 +897,7 @@ export default function Landing() {
 
           <div className="footer__legal">
             <span>© 2026 CodeMore · MIT-licensed</span>
-            <span>{`v${rootPkg.version} · 59 rules · 8 adapters · ~90% TP`}</span>
+            <span>{`v${rootPkg.version} · 64 rules · 8 adapters · ~90% TP`}</span>
             <span>opt-in telemetry · runs entirely in your repo</span>
           </div>
         </div>

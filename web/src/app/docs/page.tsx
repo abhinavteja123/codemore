@@ -8,7 +8,7 @@ import NextStep from "@/components/docs/NextStep";
 export const metadata = {
   title: "CodeMore — Docs",
   description:
-    "CodeMore is the structured-feedback bus between static scanners and coding agents. 59 rules · 8 adapters · CLI · MCP · VS Code · GitHub Action.",
+    "CodeMore is the structured-feedback bus between static scanners and coding agents. 64 rules · 8 adapters · CLI · MCP · VS Code · GitHub Action.",
 };
 
 export default function DocsHome() {

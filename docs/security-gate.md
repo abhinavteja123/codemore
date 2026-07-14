@@ -9,7 +9,7 @@ PR-comment / dashboard tooling.
 
 | Layer | Tool | Catches |
 |---|---|---|
-| **SAST (we own)** | `codemore scan` | All 59 native rules — SQL injection, BOLA, weak crypto, hardcoded passwords, etc. |
+| **SAST (we own)** | `codemore scan` | All 64 native rules — SQL injection, BOLA, weak crypto, hardcoded passwords, etc. |
 | **SAST (we wrap)** | ruff + biome + bandit | Style + correctness + Python security |
 | **Secret scan** | gitleaks | Hardcoded credentials, in working tree + git history |
 | **SCA** | npm-audit + pip-audit | CVEs in declared dependencies |

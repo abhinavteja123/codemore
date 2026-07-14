@@ -2,6 +2,20 @@
 
 All notable changes to CodeMore. Semantic Versioning.
 
+## [0.3.0] — 2026-07-14 — Python catalog parity: 5 new Flask/FastAPI/Django security rules
+
+### Added
+
+- **`vibe-py-cookie-missing-flags`** (MAJOR, beta) — Flask/Django `set_cookie(...)` missing `secure` / `httponly` / `samesite` (or setting them falsy). Tree-sitter AST; `**kwargs` spreads are skipped. Python analogue of `vibe-cookie-missing-flags`.
+- **`vibe-py-cors-wildcard-credentials`** (BLOCKER, beta) — wildcard CORS origin + credentials across FastAPI/Starlette (`allow_origins=["*"]` + `allow_credentials=True`), Flask-CORS (`origins="*"` + `supports_credentials=True`), django-cors-headers settings, and raw header assignments. In Python this pair is actively dangerous (origin echo), not browser-rejected. Analogue of `vibe-cors-wildcard-credentials`.
+- **`vibe-py-no-input-validation`** (MAJOR, beta) — state-changing Flask/FastAPI route reads raw request input (`request.get_json()` / `request.form` / `await request.json()`) in a file importing no schema validator (pydantic / marshmallow / cerberus / wtforms / voluptuous / …). Analogue of `vibe-no-input-validation`.
+- **`vibe-py-auth-missing-check`** (MAJOR, beta) — POST/PUT/PATCH/DELETE Flask/FastAPI route with no auth reference (`@login_required` / `@jwt_required` / `current_user` / `Depends` / `request.user` / auth-lib import). Analogue of `vibe-auth-missing-session-check`.
+- **`vibe-py-auth-bola`** (MAJOR, beta) — authenticated route queries the DB by a path param (`<int:post_id>` / `{item_id}`) without any ownership term in the handler. Analogue of `vibe-auth-bola`.
+- New shared Python AST helpers (`shared/rules/pythonHelpers.ts`): `iterDecoratedFunctions`, `parseRouteDecorators` (Flask `route`/verb decorators, FastAPI, DRF `api_view`, path-param extraction), `isPyTestFilePath`. All three vibe-py route rules skip test files by design.
+- Python TP/FP fixtures for `core-security-sql-injection-concat` (v1.1.1) — the concat / f-string / %-format `cursor.execute` shapes were detected but never fixture-covered.
+
+Catalog: **59 → 64 rules** (vibe-frontend 6 → 9, vibe-auth 3 → 5). Corpus: 64 TP/FP pairs. Rule-count references synced across README, docs/, and the website.
+
 ## [0.2.8] — 2026-07-11 — docs sync, MCP registry manifest, release-workflow fixes
 
 ### Added

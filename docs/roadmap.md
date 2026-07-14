@@ -112,7 +112,7 @@ Partner with Sigstore and npm security team.
 
 ### Corpus expansion
 
-**118 fixtures (59 TP/FP pairs) today → 300+ by end of 2026.** Every new rule starts with 3+ pairs. External community can contribute fixtures via PRs.
+**128 fixtures (64 TP/FP pairs) today → 300+ by end of 2026.** Every new rule starts with 3+ pairs. External community can contribute fixtures via PRs.
 
 ### Documentation
 
