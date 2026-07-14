@@ -15,6 +15,9 @@ import { vibeNoInputValidation } from './vibe-no-input-validation';
 import { vibeFileUploadNoValidation } from './vibe-file-upload-no-validation';
 // Phase 8C Tier 2 — cookie flags
 import { vibeCookieMissingFlags } from './vibe-cookie-missing-flags';
+// Python catalog parity — Flask / Django / FastAPI analogues
+import { vibePyCookieMissingFlags } from './vibe-py-cookie-missing-flags';
+import { vibePyCorsWildcardCredentials } from './vibe-py-cors-wildcard-credentials';
 
 export const PACK_NAME = 'vibe-frontend' as const;
 
@@ -25,6 +28,8 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   vibeNoInputValidation,
   vibeFileUploadNoValidation,
   vibeCookieMissingFlags,
+  vibePyCookieMissingFlags,
+  vibePyCorsWildcardCredentials,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {
