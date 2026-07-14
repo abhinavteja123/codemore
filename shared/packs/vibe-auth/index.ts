@@ -20,6 +20,7 @@ import { vibeAuthBola } from './vibe-auth-bola';
 import { vibeAuthInverted } from './vibe-auth-inverted';
 // Python catalog parity — Flask / FastAPI analogues
 import { vibePyAuthMissingCheck } from './vibe-py-auth-missing-check';
+import { vibePyAuthBola } from './vibe-py-auth-bola';
 
 export const PACK_NAME = 'vibe-auth' as const;
 
@@ -28,6 +29,7 @@ export const PACK_RULES: ReadonlyArray<Rule> = [
   vibeAuthBola,
   vibeAuthInverted,
   vibePyAuthMissingCheck,
+  vibePyAuthBola,
 ];
 
 export function registerInto(register: (packName: string, rules: ReadonlyArray<Rule>) => void): void {
