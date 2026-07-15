@@ -107,6 +107,8 @@ npx codemore mcp install --client cursor      # merge into existing config (back
 
 Six tools exposed: `scan_project` · `scan_file` · `explain_issue` · `suggest_fix` · `apply_fix` · `validate_fix`.
 
+Per-client setup, exact config paths, and verified handshake evidence (Claude Code, Cursor, Claude Desktop, Codex CLI): [docs/ide-matrix.md](docs/ide-matrix.md).
+
 ### VS Code extension
 
 Install **CodeMore** from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=codemore.codemore) (Extensions → search "CodeMore" → Install), or build the VSIX yourself:
