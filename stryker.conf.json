@@ -1,0 +1,42 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "mocha",
+  "mutate": [
+    "shared/**/*.ts",
+    "!shared/**/*.d.ts"
+  ],
+  "mochaOptions": {
+    "spec": ["test/*.test.ts"],
+    "ignore": [
+      "test/parity.test.ts",
+      "test/surface-smoke.test.ts"
+    ],
+    "require": ["ts-node/register/transpile-only"]
+  },
+  "incremental": true,
+  "concurrency": 20,
+  "timeoutMS": 30000,
+  "coverageAnalysis": "perTest",
+  "reporters": ["html", "clear-text", "progress"],
+  "htmlReporter": { "fileName": "reports/mutation/mutation.html" },
+  "ignorePatterns": [
+    "/dist",
+    "/out",
+    "/lib",
+    "/coverage",
+    "web/.next",
+    "web/node_modules",
+    "web/public",
+    "my-docs",
+    "graphify-out",
+    "assets",
+    "bin",
+    "resources",
+    "node_modules",
+    "daemon/dist",
+    "*.vsix",
+    "mcp-publisher.exe",
+    "codemore-issues-*.json"
+  ],
+  "tempDirName": ".stryker-tmp"
+}

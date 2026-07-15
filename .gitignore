@@ -70,3 +70,11 @@ CODEBASE_DEEP_DIVE.md
 
 # corpus fixtures must always be committed, even secret-shaped filenames (that is the point of the corpus)
 !corpus/**
+
+# personal project documentation (local only)
+/my-docs/
+
+# stryker mutation-testing artifacts
+.stryker-tmp/
+reports/mutation/
+reports/stryker-incremental.json
