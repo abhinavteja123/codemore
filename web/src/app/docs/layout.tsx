@@ -48,6 +48,7 @@ const SECTIONS: Array<{ heading: string; items: Array<{ href: string; label: str
     heading: "Operations",
     items: [
       { href: "/docs/security-gate",  label: "CI security gate" },
+      { href: "/docs/benchmark",      label: "50-app benchmark" },
       { href: "/docs/limitations",    label: "Limitations" },
       { href: "/docs/contributing",   label: "Contributing" },
     ],

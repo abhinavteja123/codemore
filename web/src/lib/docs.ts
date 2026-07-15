@@ -45,6 +45,7 @@ export function loadRuleDoc(id: string): string | null {
 }
 
 const STATIC_PAGES: ReadonlyArray<{ slug: string; file: string; title: string }> = [
+  { slug: 'benchmark',      file: 'benchmark.md',      title: '50-app benchmark' },
   { slug: 'external-tools', file: 'external-tools.md', title: 'External tool adapters' },
   { slug: 'github-action',  file: 'github-action.md',  title: 'GitHub Action' },
   { slug: 'limitations',    file: 'limitations.md',    title: 'Limitations' },
