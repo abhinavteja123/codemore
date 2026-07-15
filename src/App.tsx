@@ -1,3 +1,4 @@
+/* codemore-ignore-file: core-security-hardcoded-secret-pattern, core-security-hardcoded-password */ // intentional demo-vulnerability strings for the linter sandbox UI
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
