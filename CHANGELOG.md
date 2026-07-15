@@ -2,6 +2,14 @@
 
 All notable changes to CodeMore. Semantic Versioning.
 
+## [0.3.1] — 2026-07-15 — VSIX packaging fix (secret leak)
+
+### Fixed
+
+- **VS Code extension package no longer bundles environment files or scan reports.** `.vscodeignore` now denies `.env` / `.env.*` at every depth, the `.stryker-tmp/` mutation sandbox, `report.json` (scan reports embed secret-shaped snippets), `benchmark/`, `reports/`, `my-docs/`, and stray binaries. The 0.3.0 VSIX inadvertently packaged `.env.vercel-production` and a Stryker sandbox (852 files); the fixed package is 24 files / 2.78 MB with no secrets. npm tarball was never affected (it uses a `files` allowlist). Marketplace SecretScan now passes.
+
+> Security note: secrets present in the pre-0.3.1 VSIX should be rotated at their source.
+
 ## [0.3.0] — 2026-07-14 — Python catalog parity: 5 new Flask/FastAPI/Django security rules
 
 ### Added
