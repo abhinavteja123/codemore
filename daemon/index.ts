@@ -215,15 +215,11 @@ const handlers: Record<string, RequestHandler> = {
                 [...new Set([...state.config.excludePatterns, ...state.projectConfig.ignore])],
                 state.config.maxFileSizeKB
             );
-            // Create AiService with project config applied to StaticAnalyzer
-            aiService = new AiService(state.config, {
-                maxCyclomaticComplexity: state.projectConfig.maxComplexity,
-                maxFunctionLength: state.projectConfig.maxFunctionLength,
-                maxParameterCount: state.projectConfig.maxParameters,
-                maxLineLength: state.projectConfig.maxLineLength,
-            });
-            // Apply project config for rule overrides
-            aiService.setProjectConfig(state.projectConfig);
+            // AiService now only powers AI-fix generation + external tool
+            // status; scanning goes through the registry (see analyzeFile /
+            // analyzeWorkspace). Project config thresholds/rules are applied
+            // by the registry pipeline via .codemorerc.json.
+            aiService = new AiService(state.config);
             suggestionEngine = new SuggestionEngine(aiService, contextMap);
 
             // Recheck external tool availability (binaries should be pre-packaged)
