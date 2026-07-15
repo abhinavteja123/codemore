@@ -16,6 +16,16 @@ All notable changes to CodeMore. Semantic Versioning.
 
 Catalog: **59 → 64 rules** (vibe-frontend 6 → 9, vibe-auth 3 → 5). Corpus: 64 TP/FP pairs. Rule-count references synced across README, docs/, and the website.
 
+### Changed
+
+- **Web scans now run the shared registry pipeline** ("one brain" completed). `web/src/lib/productionAnalyzer.ts` materializes uploaded files into a temp directory and calls the same `scanProject()` the CLI/MCP/extension use — full rule packs, `.codemorerc.json`, `.gitignore`-aware walking, framework detection, and project-level cross-file rules (previously unavailable on the web). Languages the registry doesn't route (html/css/go/java/…) keep the lightweight web regex fallback; external tool binaries still don't run serverless. Registry issues are no longer passed through `SeverityRemapper`, so web severities now match CLI/extension output exactly.
+- `registryAdapter.reportIssueToCodeIssue` — scan root is now optional; when omitted, issue paths stay relative (web must not leak server temp paths).
+
+### Removed
+
+- **`daemon/services/staticAnalyzer.ts` (2,683 LOC) deleted** — the pre-registry monolith analyzer. Its last two consumers (extension daemon per-file/workspace scans; web `productionAnalyzer`) are registry-routed. `aiService.ts` slimmed from 1,827 to ~950 LOC: the dead `analyzeCode` scan pipeline (StaticAnalyzer integration, per-file external-tool scan, severity remap, analysis-side LLM callers, response cache) is gone; what remains is AI-fix generation and external-tool status/config — the two capabilities the registry has no equivalent for. Orphaned `configLoader` helpers (`shouldIgnoreFile`, `getFileAnalyzerOverride`, `getRuleSeverity`) deleted with the pipeline; the registry applies ignore/overrides itself via `codemorercLoader` + `ignoreResolver`.
+- StaticAnalyzer + configLoader-override regression tests deleted with the monolith (unit suite 183 → 167; the web-fallback regression is kept); registry regressions remain covered by corpus fixtures + `test/parity.test.ts` (byte-identical CLI ↔ MCP ↔ extension reports verified before and after).
+
 ## [0.2.8] — 2026-07-11 — docs sync, MCP registry manifest, release-workflow fixes
 
 ### Added

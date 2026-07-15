@@ -179,6 +179,8 @@ Ran the release gates as if shipping for real. Two failed, one long-standing cra
 
 "One brain" is true only for CLI / MCP / Action — the extension and the web app still run the legacy analyzer internally. Deletion requires migrating both consumers to `registryAdapter` first; that's a separate future project, not a cleanup task.
 
+> **SUPERSEDED (0.3.0, 2026-07-15):** that migration happened. `staticAnalyzer.ts` is deleted; the extension daemon and the web (`productionAnalyzer.ts` → `scanProject()` via temp-dir materialization) now scan through the registry. `aiService.ts` survives slimmed (~950 LOC) because the registry has no equivalent for its two remaining jobs: AI-fix generation (`generateAiFixForIssue`, used by extension SuggestionEngine + web fixSuggestions.ts) and external-tool status/config for the extension diagnostics panel. See CHANGELOG 0.3.0.
+
 ### E. Deployment state (user-side actions, live-probed this session)
 
 - **npm registry = 0.2.5.** 0.2.6 is bumped in-repo but NOT published (see G.1 for the unblock).
@@ -490,7 +492,7 @@ codemore/
 │   ├── cli/                     — CLI entry (scan/baseline/serve-mcp only — no apply-fix)
 │   ├── mcp/                     — server.ts, 6 public tools + 1 env-gated
 │   ├── external/                — 8 adapters + dispatcher (ruff/golangci/clippy/biome/bandit/gitleaks/npm-audit/pip-audit)
-│   ├── services/                — agenticFixer.ts, validatorHarness.ts, staticAnalyzer.ts (legacy), aiService.ts (legacy)
+│   ├── services/                — agenticFixer.ts, validatorHarness.ts, registryAdapter.ts, aiService.ts (AI-fix + external-tool status only; staticAnalyzer.ts deleted in 0.3.0 registry migration)
 │   └── llm/                     — provider plug-ins referenced in docs; verify presence before relying on this path
 ├── src/                         — VS Code extension (extension.ts entry, webview React app incl. its OWN copy of the WebGL components)
 ├── web/                         — Next.js 14 app: dashboard + docs site + /api/telemetry + landing page
