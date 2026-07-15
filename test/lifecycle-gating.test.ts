@@ -22,6 +22,7 @@
 import { strict as assert } from 'assert';
 import { RuleRegistry } from '../shared/rules/registry';
 import { globalRegistry } from '../shared/rules/registry';
+import { maxConfidenceFor } from '../shared/rules/lifecycle';
 import { registerAllPacks } from '../daemon/cli/registerPacks';
 import type { Rule, RuleContext, RuleFinding } from '../shared/rules/Rule';
 import type { Lifecycle } from '../shared/report/types';
@@ -100,6 +101,57 @@ describe('lifecycle gating (Part-4 "zero findings by default" regression)', () =
     it('experimental rule stays off when enableExperimental is explicitly false', () => {
       const selected = registry.selectRules(ctx, { enableExperimental: false });
       assert.equal(selected.some(r => r.id === 'test-experimental-rule'), false);
+    });
+  });
+
+  // Added from the 2026-07-15 mutation baseline (test/MUTATION-BASELINE.md).
+  describe('confidence ceiling per lifecycle state', () => {
+    it('maxConfidenceFor returns the exact ceiling for every state', () => {
+      // A missing switch case returns undefined → Math.min(x, undefined) = NaN
+      // confidence on every finding of that state. The 'beta' case was an
+      // uncovered survivor in the mutation run.
+      assert.equal(maxConfidenceFor('experimental'), 0.6);
+      assert.equal(maxConfidenceFor('beta'), 0.85);
+      assert.equal(maxConfidenceFor('stable'), 1.0);
+      assert.equal(maxConfidenceFor('deprecated'), 0.75);
+    });
+
+    it('scanFile CLAMPS an experimental finding down to the 0.6 ceiling', () => {
+      // Kills Math.min(raw, ceiling) → Math.max: the anti-noise clamp would
+      // silently become a confidence BOOST for unproven detectors.
+      const registry = new RuleRegistry();
+      registry.registerPack('test-pack', [
+        makeRule('test-clamp-experimental', 'experimental'), // defaultConfidence 0.9
+        makeRule('test-clamp-stable', 'stable'),
+      ]);
+      const result = registry.scanFile(makeCtx(), { enableExperimental: true });
+      const byId = new Map(result.issues.map(i => [i.id, i]));
+      assert.equal(byId.get('test-clamp-experimental')?.confidence, 0.6,
+        'experimental findings must be clamped to 0.6 no matter what the detector claims');
+      assert.equal(byId.get('test-clamp-stable')?.confidence, 0.9,
+        'stable findings keep their declared confidence (ceiling 1.0)');
+    });
+  });
+
+  describe('targetFrameworks gating', () => {
+    const registry = new RuleRegistry();
+    registry.registerPack('test-pack', [
+      { ...makeRule('test-fw-multi', 'stable'), targetFrameworks: ['react', 'vue'] },
+      { ...makeRule('test-fw-empty', 'stable'), targetFrameworks: [] },
+    ]);
+
+    it('a rule targeting several frameworks runs when ANY one is present', () => {
+      // Kills .some → .every: react-only projects would silently lose every
+      // rule that also targets a second framework.
+      const selected = registry.selectRules(makeCtx({ frameworks: ['react'] }), {});
+      assert.equal(selected.some(r => r.id === 'test-fw-multi'), true);
+    });
+
+    it('an EMPTY targetFrameworks array means "not framework-scoped" — rule always runs', () => {
+      // Kills length > 0 → length >= 0 (empty array would gate the rule off
+      // forever, since [].some() is always false).
+      const selected = registry.selectRules(makeCtx({ frameworks: [] }), {});
+      assert.equal(selected.some(r => r.id === 'test-fw-empty'), true);
     });
   });
 

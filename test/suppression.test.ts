@@ -103,6 +103,21 @@ describe('suppression parser (shared/rules/suppression.ts)', () => {
       const suppressed = extractSuppressComments(content);
       assert.equal(isLocationSuppressed('vibe-no-rate-limit', 2, suppressed), false);
     });
+
+    it('tight form with NO whitespace still works: /*codemore-ignore-file:rule*/', () => {
+      // Mutation baseline: every `\s*` in FILE_LEVEL_BLOCK_RE degraded to `\s`
+      // survived — a directive written without spaces would silently stop
+      // suppressing. Lock the zero-whitespace form and the exact rule id.
+      const suppressed = extractSuppressComments('/*codemore-ignore-file:no-eval*/\neval(a);');
+      assert.deepEqual(suppressed, [{ ruleId: 'no-eval', line: -1 }]);
+      assert.equal(isLocationSuppressed('no-eval', 2, suppressed), true);
+    });
+
+    it('tight HTML form with NO whitespace still works: <!--codemore-ignore-file:rule-->', () => {
+      const suppressed = extractSuppressComments('<!--codemore-ignore-file:no-eval-->\n<script>eval(a)</script>');
+      assert.deepEqual(suppressed, [{ ruleId: 'no-eval', line: -1 }]);
+      assert.equal(isLocationSuppressed('no-eval', 2, suppressed), true);
+    });
   });
 
   describe('unknown rule id in a directive does not suppress others', () => {

@@ -101,6 +101,12 @@ describe('SARIF output', () => {
     assert.equal(first.locations[0].physicalLocation.artifactLocation.uri, 'src/app.ts');
     assert.equal(third.locations[0].physicalLocation.region.startColumn, 1); // was 0
     assert.equal(second.locations[0].physicalLocation.region.endLine, 9);
+    // endColumn must be CARRIED when present and OMITTED when absent
+    // (mutation baseline: `!== undefined` → `=== undefined` survived —
+    // it emits endColumn exactly when the issue has none).
+    assert.equal(second.locations[0].physicalLocation.region.endColumn, 12);
+    assert.equal('endLine' in first.locations[0].physicalLocation.region, false);
+    assert.equal('endColumn' in first.locations[0].physicalLocation.region, false);
     assert.equal(first.partialFingerprints.codemoreInstanceId, '01A');
   });
 
