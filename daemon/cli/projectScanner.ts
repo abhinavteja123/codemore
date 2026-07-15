@@ -71,7 +71,7 @@ const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
  * Multiple file shapes can produce one language label (e.g. .env / .env.local
  * / .env.production all -> 'env'). This decouples rules from extension trivia.
  */
-function detectLanguage(filename: string, extension: string): string | null {
+export function detectLanguage(filename: string, extension: string): string | null {
   // Env files are detected by basename prefix; they have no normal extension.
   if (filename === '.env' || filename.startsWith('.env.')) return 'env';
   // Suffix form too (docker-compose env_file convention: secrets.env,

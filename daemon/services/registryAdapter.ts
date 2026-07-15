@@ -56,14 +56,20 @@ function ensureRegistry(): void {
  * Map a single ReportIssue → CodeIssue. The CodeIssue.location uses
  * absolute paths (the extension's diagnostic collection works that way),
  * so we resolve evidence.file against the scan root.
+ *
+ * When `rootAbs` is omitted, evidence.file is kept as-is (relative) —
+ * the web surface scans a throwaway temp dir and must not leak server
+ * filesystem paths into issue locations.
  */
 export function reportIssueToCodeIssue(
   iss: ReportIssue,
-  rootAbs: string,
+  rootAbs?: string,
 ): CodeIssue {
-  const fileAbs = path.isAbsolute(iss.evidence.file)
+  const fileAbs = rootAbs === undefined
     ? iss.evidence.file
-    : path.resolve(rootAbs, iss.evidence.file);
+    : path.isAbsolute(iss.evidence.file)
+      ? iss.evidence.file
+      : path.resolve(rootAbs, iss.evidence.file);
 
   const startLine = iss.evidence.line;
   const startColumn = iss.evidence.column;

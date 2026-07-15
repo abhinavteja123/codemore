@@ -1,7 +1,10 @@
-import { AstParser } from "../../../daemon/services/astParser";
-import { StaticAnalyzer } from "../../../daemon/services/staticAnalyzer";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+import { scanProject, detectLanguage } from "../../../daemon/cli/projectScanner";
+import { registerAllPacks } from "../../../daemon/cli/registerPacks";
+import { reportIssueToCodeIssue } from "../../../daemon/services/registryAdapter";
 import { SeverityRemapper } from "../../../daemon/services/severityRemapper";
-import type { FileContext as SharedFileContext } from "../../../shared/protocol";
 import { calculateHealthScore, calculateTechnicalDebt, type IssueSeverityCounts } from "../../../shared/scoring";
 import { identifyHotSpots, HotSpot } from "../../../shared/hotspotDetector";
 import {
@@ -14,57 +17,66 @@ import {
 import { analyzeFile as analyzeFallbackFile } from "./analyzer";
 import { logger, sanitizeError } from './logger';
 
-// Singleton remapper for consistency with daemon
-const severityRemapper = new SeverityRemapper();
-
 /**
- * ARCHITECTURE NOTE: Web vs Extension Scanning Differences
- * 
- * Extension (daemon):
- *   1. ExternalToolRunner (Biome, Ruff, Semgrep, TFLint, Checkov) - runs binaries
- *   2. StaticAnalyzer (TypeScript AST-based)
- *   3. SeverityRemapper (reduces false positives)
- * 
- * Web (serverless):
- *   1. StaticAnalyzer (same as daemon - imported directly)
- *   2. SeverityRemapper (same as daemon - NOW ADDED)
- *   3. NO external tools (cannot execute binaries on Vercel/serverless)
- * 
- * This means web analysis covers ~60% of what the extension provides.
- * For full analysis, users should use the VS Code extension.
+ * ARCHITECTURE NOTE: Web scanning ("one brain, many skins")
+ *
+ * The web now runs the SAME registry pipeline as the CLI / MCP / VS Code
+ * extension: uploaded files are materialized into a scan-local temp
+ * directory (serverless-safe: os.tmpdir()) and passed to scanProject() —
+ * the exact core call the CLI makes. That gives the web the full brain:
+ * rule packs, .codemorerc.json, .gitignore-aware walking, framework
+ * detection, and project-level (cross-file) rules.
+ *
+ * Two deliberate differences from the CLI remain:
+ *   1. NO external tool binaries (Biome, Ruff, …) — serverless can't run them.
+ *   2. Languages the registry doesn't route (html/css/go/java/…) keep the
+ *      lightweight regex fallback in analyzer.ts so existing web coverage
+ *      for those doesn't silently drop.
  */
 
-const STATIC_PRIMARY_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-  ".sql",
-  ".json",
-  ".jsonc",
-  ".yaml",
-  ".yml",
-  ".md",
-  ".markdown",
-  ".sh",
-  ".bash",
-  ".zsh",
-]);
+// Singleton remapper — applied ONLY to fallback-analyzer issues. Registry
+// issues are deliberately NOT remapped so web results stay identical to
+// the CLI / extension for the same input.
+const severityRemapper = new SeverityRemapper();
 
-function getExtension(filePath: string): string {
-  const lowerPath = filePath.toLowerCase();
-  if (lowerPath.endsWith("dockerfile")) {
-    return "dockerfile";
-  }
-
-  const dotIndex = lowerPath.lastIndexOf(".");
-  return dotIndex >= 0 ? lowerPath.slice(dotIndex) : "";
+let packsRegistered = false;
+function ensurePacks(): void {
+  if (packsRegistered) return;
+  registerAllPacks();
+  packsRegistered = true;
 }
 
-function usesStaticAnalyzerAsPrimary(filePath: string): boolean {
-  return STATIC_PRIMARY_EXTENSIONS.has(getExtension(filePath));
+/** True when the registry routes this file to a language pack. */
+function registryCoversFile(filePath: string): boolean {
+  const base = path.basename(filePath.replace(/\\/g, "/"));
+  return detectLanguage(base, path.extname(base).toLowerCase()) !== null;
+}
+
+/**
+ * Write the in-memory ProjectFile[] into a fresh temp directory so the
+ * fs-based scanProject() walker can run against it. Returns the root.
+ *
+ * Trust boundary: paths come from user uploads (zip entries, GitHub tree
+ * paths) — anything absolute or escaping the scan root is skipped.
+ */
+function materializeToTempDir(files: ProjectFile[]): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codemore-web-scan-"));
+  const rootResolved = path.resolve(root);
+  for (const file of files) {
+    const rel = file.path.replace(/\\/g, "/").replace(/^\/+/, "");
+    const abs = path.resolve(rootResolved, rel);
+    if (!abs.startsWith(rootResolved + path.sep)) {
+      logger.warn({ file: file.path }, "[productionAnalyzer] Skipping path escaping scan root");
+      continue;
+    }
+    try {
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, file.content, "utf8");
+    } catch (error) {
+      logger.warn({ err: sanitizeError(error), file: rel }, "[productionAnalyzer] Failed to materialize file");
+    }
+  }
+  return rootResolved;
 }
 
 function dedupeIssues(issues: CodeIssue[]): CodeIssue[] {
@@ -100,8 +112,7 @@ function countMeaningfulLines(content: string): number {
 
 function buildMetrics(
   files: ProjectFile[],
-  issues: CodeIssue[],
-  contexts: SharedFileContext[]
+  issues: CodeIssue[]
 ): CodeHealthMetrics {
   const issuesByCategory: Record<IssueCategory, number> = {
     bug: 0,
@@ -124,7 +135,11 @@ function buildMetrics(
   const issuesByFile = new Map<string, IssueSeverityCounts>();
 
   for (const issue of issues) {
-    issuesByCategory[issue.category] += 1;
+    // Registry categories outside the legacy keyspace land in 'code-smell'
+    // so the dashboard charts never see an undefined bucket (same coercion
+    // the extension daemon applies in deriveMetricsFromSummary).
+    const category = issue.category in issuesByCategory ? issue.category : "code-smell";
+    issuesByCategory[category] += 1;
     issuesBySeverity[issue.severity] += 1;
 
     const filePath = issue.location.filePath;
@@ -135,8 +150,7 @@ function buildMetrics(
     issuesByFile.set(filePath, fileCounts);
   }
 
-  // Per-file scoring — matches the daemon path in contextMap.ts; replaces the
-  // legacy aggregate path that drifted from the daemon's score for the same input.
+  // Per-file scoring — same shared formula the CLI's report summary uses.
   const overallScore = calculateHealthScore(issuesByFile, files.length);
 
   // Calculate technical debt using shared formula
@@ -147,12 +161,6 @@ function buildMetrics(
     0
   );
 
-  const totalComplexity = contexts.reduce(
-    (total, context) =>
-      total + context.symbols.filter((symbol) => symbol.kind === "function").length,
-    0
-  );
-
   return {
     overallScore,
     issuesByCategory,
@@ -160,49 +168,11 @@ function buildMetrics(
     filesAnalyzed: files.length,
     totalFiles: files.length,
     linesOfCode,
-    averageComplexity: files.length > 0 ? totalComplexity / files.length : 0,
+    // Registry doesn't track averageComplexity; 0 reads as "n/a" in the UI
+    // (matches the extension dashboard after its registry migration).
+    averageComplexity: 0,
     technicalDebtMinutes,
   };
-}
-
-const CONFIG_FILENAMES = new Set(['.codemorerc.json', '.codemorerc', 'codemorerc.json']);
-
-const DEFAULT_IGNORE_PATTERNS = ['node_modules', 'dist', 'build', '.next', 'coverage', '.git'];
-
-function extractProjectConfig(files: ProjectFile[]): {
-  analyzerConfig: { maxFunctionLength?: number; maxCyclomaticComplexity?: number; maxNestingDepth?: number };
-  ignorePatterns: string[];
-} {
-  const configFile = files.find(f => CONFIG_FILENAMES.has(f.path.split('/').pop() ?? ''));
-  if (!configFile) return { analyzerConfig: {}, ignorePatterns: DEFAULT_IGNORE_PATTERNS };
-  try {
-    const parsed = JSON.parse(configFile.content) as Record<string, unknown>;
-    const analyzerConfig: { maxFunctionLength?: number; maxCyclomaticComplexity?: number; maxNestingDepth?: number } = {};
-    if (typeof parsed.maxFunctionLength === 'number') analyzerConfig.maxFunctionLength = parsed.maxFunctionLength;
-    if (typeof parsed.maxComplexity === 'number') analyzerConfig.maxCyclomaticComplexity = parsed.maxComplexity;
-    if (typeof parsed.maxNestingDepth === 'number') analyzerConfig.maxNestingDepth = parsed.maxNestingDepth;
-    const ignorePatterns = [
-      ...DEFAULT_IGNORE_PATTERNS,
-      ...(Array.isArray(parsed.ignore) ? (parsed.ignore as string[]) : []),
-    ];
-    return { analyzerConfig, ignorePatterns };
-  } catch {
-    return { analyzerConfig: {}, ignorePatterns: DEFAULT_IGNORE_PATTERNS };
-  }
-}
-
-function matchesIgnorePattern(filePath: string, pattern: string): boolean {
-  const normalized = filePath.replace(/\\/g, '/');
-  const name = normalized.split('/').pop() ?? '';
-  if (pattern.includes('*')) {
-    const re = new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '.*') + '$');
-    return re.test(name) || re.test(normalized);
-  }
-  return normalized.includes('/' + pattern) || normalized.includes(pattern + '/') || name === pattern;
-}
-
-function shouldSkipFile(filePath: string, ignorePatterns: string[]): boolean {
-  return ignorePatterns.some(p => matchesIgnorePattern(filePath, p));
 }
 
 export async function analyzeProjectWithProductionCore(files: ProjectFile[]): Promise<{
@@ -210,53 +180,53 @@ export async function analyzeProjectWithProductionCore(files: ProjectFile[]): Pr
   metrics: CodeHealthMetrics;
   hotspots: HotSpot[];
 }> {
-  const parser = new AstParser();
-  const { analyzerConfig, ignorePatterns } = extractProjectConfig(files);
-  const staticAnalyzer = new StaticAnalyzer(analyzerConfig);
-  const contexts: SharedFileContext[] = [];
-  const allIssues: CodeIssue[] = [];
+  ensurePacks();
 
-  const filesToAnalyze = files.filter(f => !shouldSkipFile(f.path, ignorePatterns));
-
-  for (const file of filesToAnalyze) {
-    let staticIssues: CodeIssue[] = [];
-    let context: SharedFileContext | null = null;
-
+  // 1. Registry scan — the shared brain.
+  let registryIssues: CodeIssue[] = [];
+  const scanRoot = materializeToTempDir(files);
+  try {
+    const report = await scanProject({
+      root: scanRoot,
+      // Match the extension daemon's analyzeWorkspace setting.
+      enableExperimental: true,
+    });
+    // No root passed to the mapper: evidence paths stay relative and line
+    // up with ProjectFile.path, and server temp paths never leak to the UI.
+    registryIssues = report.issues.map(
+      (iss) => reportIssueToCodeIssue(iss) as unknown as CodeIssue
+    );
+  } catch (error) {
+    logger.error({ err: sanitizeError(error) }, '[productionAnalyzer] Registry scan failed');
+  } finally {
     try {
-      const ast = await parser.parse(file.path, file.content);
-      context = parser.extractContext(file.path, ast, file.content);
-      contexts.push(context);
-
-      staticIssues = staticAnalyzer.analyze(
-        file.path,
-        file.content,
-        context,
-        ast.sourceFile ?? undefined
-      ) as unknown as CodeIssue[];
-    } catch (error) {
-      logger.error({ err: sanitizeError(error) }, '[productionAnalyzer] Static analysis failed');
+      fs.rmSync(scanRoot, { recursive: true, force: true });
+    } catch {
+      // Best-effort temp cleanup; serverless containers discard /tmp anyway.
     }
-
-    if (usesStaticAnalyzerAsPrimary(file.path)) {
-      allIssues.push(...dedupeIssues(staticIssues));
-      continue;
-    }
-
-    const fallbackIssues = analyzeFallbackFile(file);
-    allIssues.push(...dedupeIssues([...staticIssues, ...fallbackIssues]));
   }
 
-  // Apply severity remapping for consistency with extension daemon
-  // This reduces false positives and applies context-aware severity adjustments
-  const remappedIssues = severityRemapper.remapIssues(dedupeIssues(allIssues));
-  
+  // 2. Regex fallback for languages the registry doesn't route.
+  const fallbackIssues: CodeIssue[] = [];
+  for (const file of files) {
+    if (registryCoversFile(file.path)) {
+      continue;
+    }
+    fallbackIssues.push(...analyzeFallbackFile(file));
+  }
+  const remappedFallback = severityRemapper.remapIssues(
+    dedupeIssues(fallbackIssues)
+  ) as unknown as CodeIssue[];
+
+  const issues = [...registryIssues, ...remappedFallback];
+
   // Detect hotspots from all issues
-  const hotspots = identifyHotSpots(remappedIssues);
-  logger.info(`Identified ${hotspots.length} hotspots from ${remappedIssues.length} issues`);
+  const hotspots = identifyHotSpots(issues);
+  logger.info(`Identified ${hotspots.length} hotspots from ${issues.length} issues`);
 
   return {
-    issues: remappedIssues,
-    metrics: buildMetrics(files, remappedIssues, contexts),
+    issues,
+    metrics: buildMetrics(files, issues),
     hotspots,
   };
 }
