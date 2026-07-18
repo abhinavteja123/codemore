@@ -2,6 +2,13 @@
 
 All notable changes to CodeMore. Semantic Versioning.
 
+## [0.3.2] — 2026-07-15 — extension/CLI finding-count parity + interactive save-report
+
+### Fixed
+
+- **VS Code extension no longer over-reports vs the CLI on the same project.** The extension's workspace scan hardcoded `enableExperimental: true` while the CLI and MCP server default experimental (lifecycle-unproven) rules off — users saw more findings in the editor than `codemore scan` printed. Experimental rules are now off by default on every surface, including the extension's per-file save path (`scanFileWithRegistry` default flipped `true` → `false`). New setting **`codemore.enableExperimental`** (default `false`) opts the extension in, applied live via the existing config-change flow — equivalent to `codemore scan --enable-experimental`.
+- **Interactive CLI menu can now save the report.** `codemore` → "Scan a project" gains three prompts: an output-file path ("blank = don't save" → `--out`), a json/sarif format select (asked only when saving → `--format sarif`), and an "Include experimental rules?" toggle (→ `--enable-experimental`). Same single `runScan(parseScanArgs(...))` implementation as the flag CLI; the answers→argv mapping is unit-tested.
+
 ## [0.3.1] — 2026-07-15 — VSIX packaging fix (secret leak)
 
 ### Fixed
