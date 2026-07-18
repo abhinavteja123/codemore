@@ -2,12 +2,18 @@
 
 All notable changes to CodeMore. Semantic Versioning.
 
-## [0.3.2] — 2026-07-15 — extension/CLI finding-count parity + interactive save-report
+## [0.3.2] — 2026-07-18 — experimental-rule parity on every surface + interactive save-report
 
 ### Fixed
 
 - **VS Code extension no longer over-reports vs the CLI on the same project.** The extension's workspace scan hardcoded `enableExperimental: true` while the CLI and MCP server default experimental (lifecycle-unproven) rules off — users saw more findings in the editor than `codemore scan` printed. Experimental rules are now off by default on every surface, including the extension's per-file save path (`scanFileWithRegistry` default flipped `true` → `false`). New setting **`codemore.enableExperimental`** (default `false`) opts the extension in, applied live via the existing config-change flow — equivalent to `codemore scan --enable-experimental`.
+- **Web scans run with experimental rules off by default too**, matching `codemore scan .` — the web surface previously over-reported the same way (`web/src/lib/productionAnalyzer.ts`).
+- **MCP `validate_fix` / the agentic fixer no longer evaluate experimental rules the scan tools don't report.** `validatorHarness` defaulted experimental on; now off for scan-surface parity, auto-enabled during validation only when the targeted finding is itself experimental (otherwise its fix could never re-fire the rule and would false-PASS).
 - **Interactive CLI menu can now save the report.** `codemore` → "Scan a project" gains three prompts: an output-file path ("blank = don't save" → `--out`), a json/sarif format select (asked only when saving → `--format sarif`), and an "Include experimental rules?" toggle (→ `--enable-experimental`). Same single `runScan(parseScanArgs(...))` implementation as the flag CLI; the answers→argv mapping is unit-tested.
+
+### Docs
+
+- MCP schemas: `scan_file.enableExperimental` and `validate_fix.includeOtherRules` now document the experimental-off default.
 
 ## [0.3.1] — 2026-07-15 — VSIX packaging fix (secret leak)
 
