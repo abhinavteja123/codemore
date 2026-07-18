@@ -213,7 +213,10 @@ export function scanFileWithRegistry(
   };
   const result = globalRegistry.scanFile(ctx, {
     enabledPacks: opts.enabledPacks,
-    enableExperimental: opts.enableExperimental ?? true,
+    // Default false: every scan surface (CLI, MCP, workspace scan) gates
+    // experimental rules behind an explicit opt-in; the per-file path must
+    // not be the lone over-reporter.
+    enableExperimental: opts.enableExperimental ?? false,
   });
   return result.issues.map(i => reportIssueToCodeIssue(i, rootAbs));
 }

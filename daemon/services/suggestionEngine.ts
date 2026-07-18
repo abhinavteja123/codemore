@@ -30,7 +30,9 @@ export class SuggestionEngine {
 
     constructor(
         private readonly aiService: AiService,
-        private readonly contextMap: ContextMap
+        private readonly contextMap: ContextMap,
+        // Getter (not a snapshot) so setConfig updates apply without rebuild.
+        private readonly enableExperimental: () => boolean = () => false
     ) {
         // Initialize LRU caches with size limits to prevent unbounded memory growth
         this.issueCache = new LRUCache<string, CodeIssue>({
@@ -66,7 +68,9 @@ export class SuggestionEngine {
         // contextMap holds the project root; we get there via the path of
         // any tracked file. Cheap to compute, no I/O.
         const workspacePath = this.contextMap.getWorkspacePath();
-        const issues = scanFileWithRegistry(workspacePath, filePath, content);
+        const issues = scanFileWithRegistry(workspacePath, filePath, content, {
+            enableExperimental: this.enableExperimental(),
+        });
 
         // Cache by id so getSuggestionsForIssue can look up the issue later
         // — the old contract.

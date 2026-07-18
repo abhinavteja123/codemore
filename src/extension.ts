@@ -629,6 +629,7 @@ function getConfiguration(): DaemonConfig {
         aiProvider: config.get('aiProvider', DEFAULT_CONFIG.aiProvider),
         apiKey: config.get('apiKey', DEFAULT_CONFIG.apiKey),
         autoAnalyze: config.get('autoAnalyze', DEFAULT_CONFIG.autoAnalyze),
+        enableExperimental: config.get('enableExperimental', DEFAULT_CONFIG.enableExperimental),
         analysisDelay: config.get('analysisDelay', DEFAULT_CONFIG.analysisDelay),
         excludePatterns: config.get('excludePatterns', DEFAULT_CONFIG.excludePatterns),
         maxFileSizeKB: config.get('maxFileSizeKB', DEFAULT_CONFIG.maxFileSizeKB),

@@ -56,6 +56,7 @@ function createAiService(aiConfig?: AiConfig): AiService {
   return new AiService({
     ...providerConfig,
     autoAnalyze: false,
+    enableExperimental: false,
     analysisDelay: 0,
     excludePatterns: [],
     maxFileSizeKB: 500,

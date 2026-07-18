@@ -169,6 +169,11 @@
           "default": true,
           "description": "Automatically analyze files on save"
         },
+        "codemore.enableExperimental": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Include **experimental** rules in analysis. Experimental rules are new detections still being proven through the rule lifecycle (`experimental` → `stable`) and may over-report. Off by default so the extension reports exactly what `codemore scan` and the MCP server do; equivalent to `codemore scan --enable-experimental`."
+        },
         "codemore.analysisDelay": {
           "type": "number",
           "default": 2000,

@@ -135,7 +135,9 @@ function logError(message: string, error?: unknown): void {
 // here lets callers omit the workspace path on every call.
 function scanSingleFileWithRegistry(absFilePath: string, content: string): CodeIssue[] {
     const root = state.workspacePath || path.dirname(absFilePath);
-    return scanFileWithRegistry(root, absFilePath, content);
+    return scanFileWithRegistry(root, absFilePath, content, {
+        enableExperimental: state.config.enableExperimental,
+    });
 }
 
 /**
@@ -220,7 +222,7 @@ const handlers: Record<string, RequestHandler> = {
             // analyzeWorkspace). Project config thresholds/rules are applied
             // by the registry pipeline via .codemorerc.json.
             aiService = new AiService(state.config);
-            suggestionEngine = new SuggestionEngine(aiService, contextMap);
+            suggestionEngine = new SuggestionEngine(aiService, contextMap, () => state.config.enableExperimental);
 
             // Recheck external tool availability (binaries should be pre-packaged)
             await aiService.recheckExternalTools();
@@ -353,8 +355,11 @@ const handlers: Record<string, RequestHandler> = {
 
         log('Starting workspace scan (registry)...');
 
+        // Default false — matches the CLI (`codemore scan`) and MCP surfaces,
+        // which both gate experimental (lifecycle-unproven) rules behind an
+        // explicit opt-in. Users flip `codemore.enableExperimental` to opt in.
         const { issues, report } = await runRegistryScan(state.workspacePath, {
-            enableExperimental: true,
+            enableExperimental: state.config.enableExperimental,
         });
 
         // Persist for the webview's pull-style RPCs (getAllIssues / getMetrics).

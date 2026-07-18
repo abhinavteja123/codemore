@@ -340,6 +340,9 @@ export interface DaemonConfig {
     aiProvider: 'openai' | 'anthropic' | 'gemini' | 'local';
     apiKey?: string;
     autoAnalyze: boolean;
+    /** Include experimental (lifecycle-unproven) rules in scans. Default
+     *  false so the extension matches the CLI/MCP surfaces exactly. */
+    enableExperimental: boolean;
     analysisDelay: number;
     excludePatterns: string[];
     maxFileSizeKB: number;
@@ -354,6 +357,7 @@ export interface DaemonConfig {
 export const DEFAULT_CONFIG: DaemonConfig = {
     aiProvider: 'openai',
     autoAnalyze: true,
+    enableExperimental: false,
     analysisDelay: 2000,
     excludePatterns: [
         '**/node_modules/**',
