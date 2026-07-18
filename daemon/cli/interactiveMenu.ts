@@ -32,8 +32,30 @@ async function ask<T extends Record<string, unknown>>(questions: prompts.PromptO
   return cancelled ? CANCELLED : (answers as T);
 }
 
+/** Answers collected by menuScan. `format` is absent when no out file was given (its prompt is skipped). */
+// Type alias (not interface) so it satisfies ask()'s Record<string, unknown> constraint.
+export type ScanMenuAnswers = {
+  path: string;
+  failOn: string;
+  out: string;
+  format?: 'json' | 'sarif';
+  experimental: boolean;
+};
+
+/** Pure answers→argv mapping, exported for unit tests; menuScan feeds the result straight into parseScanArgs. */
+export function buildScanArgv(a: ScanMenuAnswers): string[] {
+  const argv = [a.path];
+  if (a.failOn) argv.push('--fail-on', a.failOn);
+  if (a.out) {
+    argv.push('--out', a.out);
+    if (a.format === 'sarif') argv.push('--format', 'sarif');
+  }
+  if (a.experimental) argv.push('--enable-experimental');
+  return argv;
+}
+
 async function menuScan(): Promise<number> {
-  const answers = await ask<{ path: string; failOn: string }>([
+  const answers = await ask<ScanMenuAnswers>([
     { type: 'text', name: 'path', message: 'Path to scan', initial: '.' },
     {
       type: 'select',
@@ -47,12 +69,23 @@ async function menuScan(): Promise<number> {
       ],
       initial: 0,
     },
+    { type: 'text', name: 'out', message: 'Save full report to file (blank = don\'t save)', initial: '' },
+    {
+      // Only ask for a format when a file is actually being written.
+      type: (prev: string) => (prev ? 'select' : null),
+      name: 'format',
+      message: 'Report format',
+      choices: [
+        { title: 'json', value: 'json' },
+        { title: 'sarif', value: 'sarif' },
+      ],
+      initial: 0,
+    },
+    { type: 'confirm', name: 'experimental', message: 'Include experimental rules?', initial: false },
   ]);
   if (answers === CANCELLED) return 0;
 
-  const argv = [answers.path];
-  if (answers.failOn) argv.push('--fail-on', answers.failOn);
-  return runScan(parseScanArgs(argv));
+  return runScan(parseScanArgs(buildScanArgv(answers)));
 }
 
 async function menuMcp(): Promise<number> {

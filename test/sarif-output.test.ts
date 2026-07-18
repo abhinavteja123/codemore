@@ -13,6 +13,7 @@ import { strict as assert } from 'assert';
 
 import { toSarif } from '../shared/report/sarif';
 import { parseScanArgs } from '../daemon/cli/commands/scan';
+import { buildScanArgv } from '../daemon/cli/interactiveMenu';
 import type { CodeMoreReport } from '../shared/report/types';
 
 function fakeReport(): CodeMoreReport {
@@ -116,5 +117,22 @@ describe('SARIF output', () => {
     assert.equal(a.json, true);
     assert.equal(parseScanArgs(['.']).format, 'json');
     assert.throws(() => parseScanArgs(['.', '--format', 'xml']), /--format expects/);
+  });
+
+  it('interactive menu answers map to scan args (out/format/experimental)', () => {
+    const full = parseScanArgs(buildScanArgv({
+      path: 'src', failOn: 'BLOCKER', out: 'x.json', format: 'sarif', experimental: true,
+    }));
+    assert.equal(full.path, 'src');
+    assert.equal(full.failOn, 'BLOCKER');
+    assert.equal(full.out, 'x.json');
+    assert.equal(full.format, 'sarif');
+    assert.equal(full.enableExperimental, true);
+
+    // Blank out-file (format prompt skipped) → no --out/--format, json default.
+    const bare = parseScanArgs(buildScanArgv({ path: '.', failOn: '', out: '', experimental: false }));
+    assert.equal(bare.out, undefined);
+    assert.equal(bare.format, 'json');
+    assert.equal(bare.enableExperimental, false);
   });
 });
