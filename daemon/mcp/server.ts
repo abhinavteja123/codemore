@@ -176,7 +176,10 @@ export async function runMcpServer(): Promise<void> {
         .optional()
         .describe('Override the inferred language (one of: typescript, javascript, sql, env, json, yaml, markdown, shell, python).'),
       packs: z.array(z.string()).optional(),
-      enableExperimental: z.boolean().optional(),
+      enableExperimental: z
+        .boolean()
+        .optional()
+        .describe('Include rules in lifecycle=experimental. Default false (matches scan_project and the CLI).'),
     },
     async ({ filePath, content, language, packs, enableExperimental }: {
       filePath: string;
@@ -280,7 +283,7 @@ export async function runMcpServer(): Promise<void> {
       includeOtherRules: z
         .boolean()
         .optional()
-        .describe('Also report findings from rules other than the targeted one. Useful for "did my fix introduce a new issue?" checks. Default false.'),
+        .describe('Also report findings from rules other than the targeted one. Useful for "did my fix introduce a new issue?" checks. Default false. Experimental rules are excluded (matching scan_project defaults) unless the targeted issue is itself experimental.'),
     },
     async ({ instanceId, newContent, includeOtherRules }: {
       instanceId: string;
@@ -294,8 +297,11 @@ export async function runMcpServer(): Promise<void> {
           message: 'No issue with this instanceId is cached. Re-run scan_project to populate.',
         });
       }
+      // enableExperimental deliberately unset: the harness defaults to the
+      // scan tools' setting (false) unless the targeted issue is itself
+      // experimental — hardcoding true made validate_fix fail fixes over
+      // findings scan_project never reports.
       const result = validateFix(iss, newContent, {
-        enableExperimental: true,
         includeOtherRules: includeOtherRules ?? false,
       });
       return textResult(result);

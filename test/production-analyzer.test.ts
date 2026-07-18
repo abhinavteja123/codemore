@@ -4,8 +4,12 @@
    MINOR/INFO; this directive removes the noise from CI summaries. */
 
 import { strict as assert } from "assert";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { analyzeProjectWithProductionCore } from "../web/src/lib/productionAnalyzer";
 import { ProjectFile } from "../web/src/lib/types";
+import { scanProject } from "../daemon/cli/projectScanner";
 
 describe("production analyzer", () => {
   it("uses the daemon SQL analyzer for foreign key cascade statements", async () => {
@@ -46,5 +50,44 @@ describe("production analyzer", () => {
     );
 
     assert.equal(sqlIssue, undefined);
+  });
+
+  it("reports the same findings as a CLI-default scanProject for the same files (surface parity)", async () => {
+    // Fires core-quality-unreachable-code (beta, default-on) deterministically.
+    const content = [
+      "export function a(): string {",
+      '  return "a";',
+      "  cleanup();",
+      "}",
+      "",
+      "function cleanup(): void {}",
+      "",
+    ].join("\n");
+    const files: ProjectFile[] = [
+      { path: "src/app.ts", language: "typescript", size: content.length, content },
+    ];
+
+    const web = await analyzeProjectWithProductionCore(files);
+
+    // Same file on disk, scanned exactly the way `codemore scan .` does
+    // (enableExperimental unset → false).
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "codemore-parity-"));
+    try {
+      fs.mkdirSync(path.join(root, "src"), { recursive: true });
+      fs.writeFileSync(path.join(root, "src", "app.ts"), content, "utf8");
+      const report = await scanProject({ root });
+
+      const cliKeys = report.issues
+        .map((i) => `${i.evidence.file}:${i.evidence.line}:${i.severity}:${i.title}`)
+        .sort();
+      const webKeys = web.issues
+        .map((i) => `${i.location.filePath}:${i.location.range.start.line}:${i.severity}:${i.title}`)
+        .sort();
+
+      assert.ok(cliKeys.length > 0, "fixture must produce at least one CLI finding");
+      assert.deepEqual(webKeys, cliKeys, "web scan must match CLI defaults for the same input");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });

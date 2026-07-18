@@ -34,6 +34,14 @@ import type { ReportIssue } from '../../shared/report/types';
 const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 
 export interface ValidationOptions {
+  /**
+   * Run lifecycle=experimental rules during the re-scan. Default: false —
+   * matching the scan surfaces (CLI/MCP/extension all gate experimental
+   * behind explicit opt-in) — EXCEPT when the targeted issue itself came
+   * from an experimental rule, in which case it defaults to true so the
+   * validator can actually re-fire that rule (otherwise every fix for an
+   * experimental finding would false-PASS).
+   */
   enableExperimental?: boolean;
   /** Limit re-scan to specific packs. Default: all registered packs. */
   packs?: ReadonlyArray<string>;
@@ -140,7 +148,7 @@ export function validateFix(
   const ctx = buildContext(issue, newContent);
   const result = globalRegistry.scanFile(ctx, {
     enabledPacks: opts.packs ? Array.from(opts.packs) : undefined,
-    enableExperimental: opts.enableExperimental ?? true,
+    enableExperimental: opts.enableExperimental ?? issue.lifecycle === 'experimental',
   });
 
   const remainingForRule = result.issues.filter(f => f.id === issue.id);

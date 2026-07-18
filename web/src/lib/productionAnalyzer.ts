@@ -188,8 +188,10 @@ export async function analyzeProjectWithProductionCore(files: ProjectFile[]): Pr
   try {
     const report = await scanProject({
       root: scanRoot,
-      // Match the extension daemon's analyzeWorkspace setting.
-      enableExperimental: true,
+      // Match the CLI/MCP default (false): experimental rules are opt-in
+      // on every surface, so a web scan of a repo must report the same
+      // findings `codemore scan .` does.
+      enableExperimental: false,
     });
     // No root passed to the mapper: evidence paths stay relative and line
     // up with ProjectFile.path, and server temp paths never leak to the UI.

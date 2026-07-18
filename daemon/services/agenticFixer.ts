@@ -233,8 +233,11 @@ export async function runAgenticFix(args: {
     }
 
     const proposed = stripCodeFences(proposedRaw);
+    // enableExperimental deliberately unset: validatorHarness defaults it
+    // to false (scan-surface parity) unless the targeted issue is itself
+    // experimental — hardcoding true here rejected fixes for findings the
+    // scan surfaces never report.
     const validation = validateFix(args.issue, proposed, {
-      enableExperimental: true,
       includeOtherRules: rejectOnNewFindings,
     });
 
