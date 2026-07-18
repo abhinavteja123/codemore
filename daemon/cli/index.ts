@@ -15,6 +15,7 @@ import { runScan, parseScanArgs } from './commands/scan';
 import { runServeMcp } from './commands/serve-mcp';
 import { runMcp } from './commands/mcp';
 import { runBaseline } from './commands/baseline';
+import { runUpdate } from './commands/update';
 import { toolVersion } from '../../shared/toolVersion';
 import { color } from './colors';
 import { runInteractiveMenu, isInteractiveTty } from './interactiveMenu';
@@ -40,6 +41,7 @@ function printUsage(): void {
     `  codemore baseline <create|update|drop|show> [path]\n` +
     `  codemore fix [path] [--rule <id>] [--all] [--write] [--max-attempts N]\n` +
     `  codemore mcp [install --client <cursor|claude-desktop|claude-code|codex>]\n` +
+    `  codemore update [--check]\n` +
     `  codemore serve-mcp\n\n` +
     `Flags (fix):\n` +
     `  --rule <id>                  Only fix findings of this rule.\n` +
@@ -63,7 +65,10 @@ function printUsage(): void {
     `                                firebase-adminsdk*.json, …). Default: those files are scanned\n` +
     `                                even when gitignored, since devs often hide leaked secrets there.\n\n` +
     `  --help, -h                   Show this help.\n` +
-    `  --version, -v                Show CLI version.\n`,
+    `  --version, -v                Show CLI version.\n` +
+    `  --update                     Check npm for a newer version and install it (alias: codemore update).\n\n` +
+    `Flags (update):\n` +
+    `  --check                       Only check for a newer version; don't install.\n`,
   );
 }
 
@@ -89,6 +94,9 @@ async function main(argv: string[]): Promise<number> {
     process.stdout.write(VERSION + '\n');
     return 0;
   }
+  if (args[0] === '--update') {
+    return await runUpdate(args.slice(1));
+  }
 
   const cmd = args[0];
   const rest = args.slice(1);
@@ -99,6 +107,8 @@ async function main(argv: string[]): Promise<number> {
         return await runScan(parseScanArgs(rest));
       case 'baseline':
         return await runBaseline(rest);
+      case 'update':
+        return await runUpdate(rest);
       case 'fix': {
         // Lazy require: the fix command pulls in the agentic-fixer chain,
         // which non-fix invocations should not pay for at startup.

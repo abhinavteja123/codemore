@@ -2,6 +2,12 @@
 
 All notable changes to CodeMore. Semantic Versioning.
 
+## [0.3.3] — 2026-07-18 — `codemore update`
+
+### Added
+
+- **`codemore update`** (alias `codemore --update`) — checks npm for a newer release and installs it (`npm install -g codemore@latest`) without the user having to remember the command. `--check` reports whether an update exists without installing. Global installs (`npm install -g codemore`) previously had no built-in way to move off a pinned version; `npx codemore@latest` was already always-latest and is unaffected. Also added as an action in the interactive menu (`codemore` with no args).
+
 ## [0.3.2] — 2026-07-18 — experimental-rule parity on every surface + interactive save-report
 
 ### Fixed

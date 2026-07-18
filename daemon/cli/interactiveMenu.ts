@@ -17,6 +17,7 @@ import prompts from 'prompts';
 import { runScan, parseScanArgs } from './commands/scan';
 import { runMcp } from './commands/mcp';
 import { runBaseline } from './commands/baseline';
+import { runUpdate } from './commands/update';
 import { color } from './colors';
 
 export function isInteractiveTty(): boolean {
@@ -134,6 +135,7 @@ export async function runInteractiveMenu(): Promise<number> {
       { title: 'Scan a project', value: 'scan' },
       { title: 'Set up MCP (Cursor / Claude / Codex)', value: 'mcp' },
       { title: 'Manage a baseline', value: 'baseline' },
+      { title: 'Check for updates', value: 'update' },
       { title: 'Show full --help reference', value: 'help' },
       { title: 'Exit', value: 'exit' },
     ],
@@ -144,6 +146,7 @@ export async function runInteractiveMenu(): Promise<number> {
     case 'scan': return menuScan();
     case 'mcp': return menuMcp();
     case 'baseline': return menuBaseline();
+    case 'update': return runUpdate([]);
     case 'help': return -1; // sentinel: caller prints full usage
     default: return 0;
   }

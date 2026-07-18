@@ -74,6 +74,7 @@ Prints a summary to the terminal. Add `--json` for the full [report](docs/schema
 
 ```bash
 npm install -g codemore                        # once — or prefix each command below with `npx codemore@latest`
+codemore update                                # global install pinned an old version? this pulls latest
 codemore scan . --fail-on BLOCKER              # CI gate: non-zero exit on any BLOCKER
 codemore scan . --external-tools ruff,biome    # opt in to external tools
 codemore scan . --external-tools all           # ruff · golangci-lint · clippy · biome · bandit · gitleaks · npm-audit · pip-audit
