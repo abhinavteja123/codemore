@@ -3,6 +3,7 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { ClientProviders } from "./client-providers";
 import { GrainOverlay } from "@/components/landing/GrainOverlay";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://codemore.tech"),
@@ -97,6 +98,7 @@ export default function RootLayout({
         </a>
         <GrainOverlay />
         <ClientProviders>{children}</ClientProviders>
+        <Analytics />
       </body>
     </html>
   );
